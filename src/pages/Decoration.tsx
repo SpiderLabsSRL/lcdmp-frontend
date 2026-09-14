@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { IDecorationApi, defaultDecorationApi } from '@/api/DecorationApi';
 import { useOrdersSocket } from '@/hooks/useOrdersSocket';
 import type { Order, CustomCake, OrderItem } from '@/types';
+import { hoursUntilPickupDateTime } from '@/utils/DateUtils';
 
 interface DecorationProps {
   decorationApi?: IDecorationApi;
@@ -64,7 +65,7 @@ export default function Decoration({ decorationApi = defaultDecorationApi }: Dec
   };
 
   const getUrgencyBadge = (order: Order) => {
-    const hoursUntil = differenceInHours(new Date(order.pickupDate), new Date());
+    const hoursUntil = hoursUntilPickupDateTime(order);
     if (hoursUntil < 6) return { label: 'Urgente', color: 'bg-red-500' };
     if (hoursUntil < 12) return { label: 'Pronto', color: 'bg-orange-500' };
     return { label: 'Normal', color: 'bg-green-500' };
@@ -194,7 +195,7 @@ export default function Decoration({ decorationApi = defaultDecorationApi }: Dec
                 <div className="space-y-3 sm:space-y-4">
                   {decorationOrders.map(order => {
                     const urgency = getUrgencyBadge(order);
-                    const hoursUntil = differenceInHours(new Date(order.pickupDate), new Date());
+                    const hoursUntil = hoursUntilPickupDateTime(order);
                     
                     return isMobile ? (
                       // Mobile Card Layout

@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { IAssemblyApi, defaultAssemblyApi } from '@/api/AssemblyApi';
 import { useOrdersSocket } from '@/hooks/useOrdersSocket';
 import type { Order, BakedProduct, CustomCake } from '@/types';
+import { hoursUntilPickupDateTime } from '@/utils/DateUtils';
 
 interface AssemblyProps {
   assemblyApi?: IAssemblyApi;
@@ -62,7 +63,7 @@ export default function Assembly({ assemblyApi = defaultAssemblyApi }: AssemblyP
   };
 
   const getUrgencyBadge = (order: Order): { label: string; color: string } => {
-    const hoursUntil = differenceInHours(order.pickupDate, new Date());
+    const hoursUntil = hoursUntilPickupDateTime(order);
     if (hoursUntil < 12) return { label: 'Urgente', color: 'bg-red-500' };
     if (hoursUntil < 24) return { label: 'Pronto', color: 'bg-orange-500' };
     return { label: 'Normal', color: 'bg-green-500' };
@@ -199,7 +200,7 @@ export default function Assembly({ assemblyApi = defaultAssemblyApi }: AssemblyP
                 <div className="space-y-3 sm:space-y-4">
                   {assemblyOrders.map(order => {
                     const urgency = getUrgencyBadge(order);
-                    const hoursUntil = differenceInHours(order.pickupDate, new Date());
+                    const hoursUntil = hoursUntilPickupDateTime(order);
                     const totalPortions = getTotalPortionsForOrder(order);
                     const basesNeeded = getTotalBasesNeeded(order);
                     

@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { IDeliveryApi, defaultDeliveryApi } from '@/api/DeliveryApi';
 import { useOrdersSocket } from '@/hooks/useOrdersSocket';
 import type { Order } from '@/types';
+import { hoursUntilPickupDateTime } from '@/utils/DateUtils';
 
 interface DeliveryProps {
   deliveryApi?: IDeliveryApi;
@@ -60,7 +61,7 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
   };
 
   const getUrgencyBadge = (order: Order) => {
-    const hoursUntil = differenceInHours(order.pickupDate, new Date());
+    const hoursUntil = hoursUntilPickupDateTime(order);
     if (hoursUntil < 2) return { label: 'Urgente', color: 'bg-red-500' };
     if (hoursUntil < 6) return { label: 'Pronto', color: 'bg-orange-500' };
     return { label: 'Normal', color: 'bg-green-500' };
@@ -187,7 +188,7 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
               <div className="space-y-3 sm:space-y-4">
                 {deliveryOrders.map(order => {
                   const urgency = getUrgencyBadge(order);
-                  const hoursUntil = differenceInHours(order.pickupDate, new Date());
+                  const hoursUntil = hoursUntilPickupDateTime(order);
                   
                   return isMobile ? (
                     // Mobile Card Layout for Deliveries
