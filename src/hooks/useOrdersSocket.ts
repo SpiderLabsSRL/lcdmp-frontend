@@ -49,12 +49,21 @@ export const useOrdersSocket = ({
     setOrders(initialOrders);
   }, [initialOrders]);
 
+  const parseLocalDate = (dateString: string): Date => {
+    const [year, month, day] = dateString.split('-').map(Number);
+
+    return new Date(year, month - 1, day);
+  };
+
   const parseOrder = useCallback((raw: any): Order => ({
     ...raw,
-    pickupDate: raw.pickupDate ? new Date(raw.pickupDate) : new Date(),
-    createdAt: raw.createdAt ? new Date(raw.createdAt) : new Date(),
+    pickupDate: raw.pickupDate
+      ? parseLocalDate(raw.pickupDate)
+      : new Date(),
+    createdAt: raw.createdAt
+      ? new Date(raw.createdAt)
+      : new Date(),
   }), []);
-
   const matchesFilter = useCallback((status: string): boolean => {
     if (!statusFilterRef.current || statusFilterRef.current.length === 0) return true;
     return statusFilterRef.current.includes(status);
