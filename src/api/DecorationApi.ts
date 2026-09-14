@@ -64,11 +64,19 @@ export class DecorationApi implements IDecorationApi {
         throw new Error(response.data.message || 'Error al obtener pedidos');
       }
       
-      const orders = response.data.data.map((order: any) => ({
-        ...order,
-        pickupDate: new Date(order.pickupDate),
-        createdAt: new Date(order.createdAt)
-      }));
+      const orders = response.data.data.map((order: any) => {
+        const [year, month, day] = order.pickupDate.split('-');
+
+        return {
+          ...order,
+          pickupDate: new Date(
+            Number(year),
+            Number(month) - 1,
+            Number(day)
+          ),
+          createdAt: new Date(order.createdAt)
+        };
+      });
       
       return orders;
     } catch (error: any) {

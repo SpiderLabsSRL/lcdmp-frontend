@@ -18,11 +18,19 @@ export class DeliveryApi implements IDeliveryApi {
         throw new Error(response.data.message || 'Error al obtener pedidos de entrega');
       }
 
-      return response.data.data.map((order: any) => ({
-        ...order,
-        pickupDate: new Date(order.pickupDate),
-        createdAt: new Date(order.createdAt),
-      }));
+      return response.data.data.map((order: any) => {
+        const [year, month, day] = order.pickupDate.split('-');
+
+        return {
+          ...order,
+          pickupDate: new Date(
+            Number(year),
+            Number(month) - 1,
+            Number(day)
+          ),
+          createdAt: new Date(order.createdAt)
+        };
+      });
     } catch (error: any) {
       console.error('Error en getDeliveryOrders:', error);
       throw new Error(error.response?.data?.message || error.message || 'Error de conexión');
