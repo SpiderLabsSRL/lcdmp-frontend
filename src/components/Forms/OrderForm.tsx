@@ -8,6 +8,7 @@ import { CreateOrderData, CustomCake, Order, UpdateOrderData, OrderItem } from '
 import { toast } from 'sonner';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { getLocalDateString } from '@/utils/DateUtils';
 
 export interface OrderFormProps {
   initialData?: Order;
@@ -228,7 +229,7 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
             type="date" 
             required 
             className="text-sm"
-            min={new Date().toISOString().split('T')[0]}
+            min={getLocalDateString()}
             value={formData.pickupDate instanceof Date ? format(formData.pickupDate, 'yyyy-MM-dd') : formData.pickupDate}
             onChange={(e) => {
               const [year, month, day] = e.target.value.split('-');
