@@ -8,11 +8,12 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { MobileCard, useIsMobile } from '@/components/ui/responsive-table';
-import { Palette, Clock, AlertTriangle, CheckCircle, Image, Eye, ArrowRight, Loader2 } from 'lucide-react';
+import { Palette, Clock, AlertTriangle, CheckCircle, Image, Eye, ArrowRight, Loader2, Wifi, WifiOff } from 'lucide-react';
 import { format, differenceInHours } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { IDecorationApi, defaultDecorationApi } from '@/api/DecorationApi';
+import { useOrdersSocket } from '@/hooks/useOrdersSocket';
 import type { Order, CustomCake, OrderItem } from '@/types';
 
 interface DecorationProps {
@@ -22,12 +23,18 @@ interface DecorationProps {
 export default function Decoration({ decorationApi = defaultDecorationApi }: DecorationProps) {
   const isMobile = useIsMobile();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [decorationOrders, setDecorationOrders] = useState<Order[]>([]);
+  const [initialOrders, setInitialOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [decorationNotes, setDecorationNotes] = useState('');
   const [completedCakes, setCompletedCakes] = useState<Set<string>>(new Set());
+
+  // Socket en tiempo real — filtra solo pedidos con status 'decorating'
+  const { orders: decorationOrders, isConnected } = useOrdersSocket({
+    statusFilter: ['decorating'],
+    initialOrders,
+  });
 
   useEffect(() => {
     loadDecorationOrders();
@@ -37,7 +44,7 @@ export default function Decoration({ decorationApi = defaultDecorationApi }: Dec
     try {
       setIsLoading(true);
       const orders = await decorationApi.getDecorationOrders();
-      setDecorationOrders(orders);
+      setInitialOrders(orders);
     } catch (error) {
       console.error('Error loading decoration orders:', error);
       toast.error('Error al cargar los pedidos de decoración');
@@ -81,14 +88,11 @@ export default function Decoration({ decorationApi = defaultDecorationApi }: Dec
       
       toast.success('Decoración completada, pedido listo para entrega');
       
-      // Resetear estado
+      // Resetear estado — el socket removerá el pedido de la lista automáticamente
       setIsCompleteDialogOpen(false);
       setSelectedOrder(null);
       setDecorationNotes('');
       setCompletedCakes(new Set());
-      
-      // Recargar la lista de pedidos
-      await loadDecorationOrders();
     } catch (error) {
       console.error('Error completing decoration:', error);
       toast.error('Error al completar la decoración');
@@ -117,12 +121,22 @@ export default function Decoration({ decorationApi = defaultDecorationApi }: Dec
       <div className="space-y-4 sm:space-y-6 animate-fade-in">
         {/* Header - Mobile first */}
         <div className="px-4 sm:px-6">
-          <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground">
-            Decoración
-          </h1>
-          <p className="text-sm sm:text-base  mt-1">
-            Diseño y decoración de tortas
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground">
+                Decoración
+              </h1>
+              <p className="text-sm sm:text-base  mt-1">
+                Diseño y decoración de tortas
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs">
+              {isConnected
+                ? <><Wifi className="h-3.5 w-3.5 text-green-500" /><span className="text-green-600 hidden sm:inline">En vivo</span></>
+                : <><WifiOff className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-muted-foreground hidden sm:inline">Desconectado</span></>
+              }
+            </div>
+          </div>
         </div>
 
         {/* Stats - Mobile: 2 columnas, Tablet/Desktop: 3 columnas */}

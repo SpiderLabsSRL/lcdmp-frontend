@@ -7,38 +7,43 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MobileCard, useIsMobile } from '@/components/ui/responsive-table';
-import { ChefHat, Clock, AlertTriangle, CheckCircle, Flame, ArrowRight, Loader2 } from 'lucide-react';
+import { ChefHat, Clock, AlertTriangle, CheckCircle, Flame, ArrowRight, Loader2, Wifi, WifiOff } from 'lucide-react';
 import { format, differenceInHours } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { IBakingApi, defaultBakingApi } from '@/api/BakingApi';
+import { useOrdersSocket } from '@/hooks/useOrdersSocket';
 import type { Order, BakedProduct, CustomCake } from '@/types';
 
 interface BakingProps {
   bakingApi?: IBakingApi;
 }
 
-interface BakingStats {
-  pendingOrders: number;
-  totalPortions: number;
-  urgentOrders: number;
-  completedToday: number;
-}
-
 export default function Baking({ bakingApi = defaultBakingApi }: BakingProps) {
   const isMobile = useIsMobile();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
-  const [bakingOrders, setBakingOrders] = useState<Order[]>([]);
+  const [initialOrders, setInitialOrders] = useState<Order[]>([]);
   const [bakedProducts, setBakedProducts] = useState<BakedProduct[]>([]);
-  const [stats, setStats] = useState<BakingStats>({
-    pendingOrders: 0,
-    totalPortions: 0,
-    urgentOrders: 0,
-    completedToday: 0
-  });
   const [isLoading, setIsLoading] = useState(true);
   const [bakedQuantities, setBakedQuantities] = useState<Map<string, number>>(new Map());
+
+  // Socket en tiempo real — filtra solo pedidos con status 'baking'
+  const { orders: bakingOrders, isConnected } = useOrdersSocket({
+    statusFilter: ['baking'],
+    initialOrders,
+  });
+
+  const getTotalPortions = (customCakes: CustomCake[]): number => {
+    return customCakes.reduce((sum, cake) => sum + (cake.portions * (cake.quantity || 1)), 0);
+  }
+
+  const stats = {
+    pendingOrders: bakingOrders.length,
+    totalPortions: bakingOrders.reduce((sum, order) => sum + getTotalPortions(order.customCakes), 0),
+    urgentOrders: bakingOrders.filter(o => differenceInHours(o.pickupDate, new Date()) < 12).length,
+    completedToday: 0,
+  };
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -48,23 +53,8 @@ export default function Baking({ bakingApi = defaultBakingApi }: BakingProps) {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      /*const [orders, products] = await Promise.all([
-        bakingApi.getBakingOrders(),
-        bakingApi.getBakedProductsStock(),
-      ]);
-      */
-      const orders = await bakingApi.getBakingOrders()
-      setBakingOrders(orders);
-      //setBakedProducts(products);
-      setStats({
-        pendingOrders: orders.length,
-        totalPortions: bakingOrders.reduce(
-                          (sum, order) => sum + getTotalPortions(order.customCakes),
-                          0
-                        ),
-        urgentOrders: 0,
-        completedToday: 0
-      });
+      const orders = await bakingApi.getBakingOrders();
+      setInitialOrders(orders);
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Error al cargar los datos');
@@ -72,10 +62,6 @@ export default function Baking({ bakingApi = defaultBakingApi }: BakingProps) {
       setIsLoading(false);
     }
   };
-
-  const getTotalPortions = (customCakes: CustomCake[]): number => {
-    return customCakes.reduce((sum, cake) => sum + (cake.portions * (cake.quantity || 1)), 0);
-  }
 
   const getUrgencyBadge = (order: Order): { label: string; color: string } => {
     const hoursUntil = differenceInHours(order.pickupDate, new Date());
@@ -87,7 +73,7 @@ export default function Baking({ bakingApi = defaultBakingApi }: BakingProps) {
   const markAsBaking = async (order: Order) => {
     try {
       await bakingApi.updateOrderStatus(order.id, 'baking');
-      await loadData(); // Recargar datos
+      // El socket actualizará la lista automáticamente
       toast.success(`Pedido #${order.id} marcado como horneando`);
     } catch (error) {
       toast.error('Error al marcar el pedido');
@@ -121,7 +107,7 @@ export default function Baking({ bakingApi = defaultBakingApi }: BakingProps) {
 
     try {
       await bakingApi.completeBaking(selectedOrder.id, bakedQuantities);
-      await loadData(); // Recargar datos
+      // El socket actualizará la lista automáticamente via order:status_changed
       toast.success('Horneado completado y registrado en inventario');
       setIsCompleteDialogOpen(false);
       setSelectedOrder(null);
@@ -146,12 +132,22 @@ export default function Baking({ bakingApi = defaultBakingApi }: BakingProps) {
       <div className="space-y-4 sm:space-y-6 animate-fade-in">
         {/* Header */}
         <div className="px-4 sm:px-6">
-          <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground">
-            Hornos
-          </h1>
-          <p className="text-sm sm:text-base  mt-1">
-            Gestión de productos a hornear
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground">
+                Hornos
+              </h1>
+              <p className="text-sm sm:text-base  mt-1">
+                Gestión de productos a hornear
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs">
+              {isConnected
+                ? <><Wifi className="h-3.5 w-3.5 text-green-500" /><span className="text-green-600 hidden sm:inline">En vivo</span></>
+                : <><WifiOff className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-muted-foreground hidden sm:inline">Desconectado</span></>
+              }
+            </div>
+          </div>
         </div>
 
         {/* Stats Cards */}

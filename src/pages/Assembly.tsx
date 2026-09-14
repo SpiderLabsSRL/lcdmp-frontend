@@ -7,20 +7,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { MobileCard, useIsMobile } from '@/components/ui/responsive-table';
-import { Hammer, Clock, AlertTriangle, CheckCircle, Package, ArrowRight, Loader2 } from 'lucide-react';
+import { Hammer, Clock, AlertTriangle, CheckCircle, Package, ArrowRight, Loader2, Wifi, WifiOff } from 'lucide-react';
 import { format, differenceInHours } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { IAssemblyApi, defaultAssemblyApi } from '@/api/AssemblyApi';
+import { useOrdersSocket } from '@/hooks/useOrdersSocket';
 import type { Order, BakedProduct, CustomCake } from '@/types';
 
 interface AssemblyProps {
   assemblyApi?: IAssemblyApi;
-}
-
-interface AssemblyStats {
-  pendingOrders: number;
-  urgentOrders: number;
 }
 
 interface MaterialAvailability {
@@ -31,15 +27,22 @@ export default function Assembly({ assemblyApi = defaultAssemblyApi }: AssemblyP
   const isMobile = useIsMobile();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
-  const [assemblyOrders, setAssemblyOrders] = useState<Order[]>([]);
+  const [initialOrders, setInitialOrders] = useState<Order[]>([]);
   const [availableBases, setAvailableBases] = useState<BakedProduct[]>([]);
   const [materialAvailability, setMaterialAvailability] = useState<MaterialAvailability>({});
-  const [stats, setStats] = useState<AssemblyStats>({
-    pendingOrders: 0,
-    urgentOrders: 0,
-  });
   const [isLoading, setIsLoading] = useState(true);
   const [assembledCakes, setAssembledCakes] = useState<Map<string, boolean>>(new Map());
+
+  // Socket en tiempo real — filtra solo pedidos con status 'assembling'
+  const { orders: assemblyOrders, isConnected } = useOrdersSocket({
+    statusFilter: ['assembling'],
+    initialOrders,
+  });
+
+  const stats = {
+    pendingOrders: assemblyOrders.length,
+    urgentOrders: assemblyOrders.filter(o => differenceInHours(o.pickupDate, new Date()) < 12).length,
+  };
 
   useEffect(() => {
     loadData();
@@ -49,14 +52,7 @@ export default function Assembly({ assemblyApi = defaultAssemblyApi }: AssemblyP
     setIsLoading(true);
     try {
       const orders = await assemblyApi.getAssemblyOrders();
-
-      setAssemblyOrders(orders);
-      
-      setStats({
-        pendingOrders: orders.length,
-        urgentOrders: 0,
-      });
-      
+      setInitialOrders(orders);
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Error al cargar los datos');
@@ -110,7 +106,7 @@ export default function Assembly({ assemblyApi = defaultAssemblyApi }: AssemblyP
 
     try {
       await assemblyApi.completeAssembly(selectedOrder.id, assembledCakes);
-      await loadData(); // Recargar datos
+      // El socket actualizará la lista automáticamente via order:status_changed
       toast.success('Armado completado, pedido enviado a decoración');
       setIsCompleteDialogOpen(false);
       setSelectedOrder(null);
@@ -124,12 +120,22 @@ export default function Assembly({ assemblyApi = defaultAssemblyApi }: AssemblyP
       <div className="space-y-4 sm:space-y-6 animate-fade-in">
         {/* Header */}
         <div className="px-4 sm:px-6">
-          <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground">
-            Armado
-          </h1>
-          <p className="text-sm sm:text-base  mt-1">
-            Ensamblaje de tortas
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground">
+                Armado
+              </h1>
+              <p className="text-sm sm:text-base  mt-1">
+                Ensamblaje de tortas
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs">
+              {isConnected
+                ? <><Wifi className="h-3.5 w-3.5 text-green-500" /><span className="text-green-600 hidden sm:inline">En vivo</span></>
+                : <><WifiOff className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-muted-foreground hidden sm:inline">Desconectado</span></>
+              }
+            </div>
+          </div>
         </div>
 
         {/* Stats Cards */}

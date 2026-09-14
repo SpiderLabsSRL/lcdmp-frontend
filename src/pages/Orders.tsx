@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MobileCard, MobileCardHeader, useIsMobile } from '@/components/ui/responsive-table';
-import { Plus, Search, Eye, RefreshCw, Filter, Trash2, Edit, Loader2 } from 'lucide-react';
+import { Plus, Search, Eye, RefreshCw, Filter, Trash2, Edit, Loader2, Wifi, WifiOff } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { CreateOrderData, Order, OrderStatus, UpdateOrderData,Flavor, Product, OrderFilters } from '@/types';
@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { statusConfig } from '@/types/consts';
 import { IOrdersApi, defaultOrdersApi } from '@/api/OrdersApi';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useOrdersSocket } from '@/hooks/useOrdersSocket';
 import { OrderType, PaymentMethod } from '../types/index';
 import OrderForm from '@/components/Forms/OrderForm';
 import OrderDetail from '@/components/Dialogs/OrderDetail';
@@ -54,7 +55,7 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [showFilters, setShowFilters] = useState(false);
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [initialOrders, setInitialOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [fillings, setFillings] = useState<Flavor[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -68,7 +69,14 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
     return /^\d+$/.test(debouncedSearchTerm);
   }, [debouncedSearchTerm]);
 
+  const statusFilter = useMemo(() => {
+    return selectedStatus !== 'all' ? [selectedStatus] : undefined;
+  }, [selectedStatus]);
 
+  const { orders, setOrders, isConnected } = useOrdersSocket({
+    statusFilter,
+    initialOrders,
+  });
 
   const loadOrders = useCallback(async () => {
     if (abortControllerRef.current) {
@@ -101,16 +109,9 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
       ]);
       
       if (!abortControllerRef.current.signal.aborted) {
-        setOrders(ordersData);
+        setInitialOrders(ordersData);
         setFillings(flavors);
         setProducts(productsResponse);
-        
-        const newStats = Object.entries(statusConfig).map(([status, config]) => ({
-          status,
-          ...config,
-          count: ordersData.filter(o => o.status === status).length
-        }));
-        setStats(newStats);
       }
     } catch (error: any) {
       if (error.name !== 'AbortError') {
@@ -122,7 +123,16 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
         setLoading(false);
       }
     }
-  }, [selectedStatus, debouncedSearchTerm, isPhoneSearch]);
+  }, [selectedStatus, debouncedSearchTerm, isPhoneSearch, ordersApi]);
+
+  useEffect(() => {
+    const newStats = Object.entries(statusConfig).map(([status, config]) => ({
+      status,
+      ...config,
+      count: orders.filter(o => o.status === status).length
+    }));
+    setStats(newStats);
+  }, [orders]);
 
   useEffect(() => {
     loadOrders();
@@ -221,13 +231,21 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
       <div className="space-y-4 sm:space-y-6 animate-fade-in">
         {/* Header */}
         <div className="px-4 sm:px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground">
-              Pedidos
-            </h1>
-            <p className="text-sm sm:text-base ">
-              Gestión de pedidos de tortas y combos
-            </p>
+          <div className="flex items-center justify-between sm:justify-start gap-4">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground">
+                Pedidos
+              </h1>
+              <p className="text-sm sm:text-base ">
+                Gestión de pedidos de tortas y combos
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs">
+              {isConnected
+                ? <><Wifi className="h-3.5 w-3.5 text-green-500" /><span className="text-green-600 hidden sm:inline">En vivo</span></>
+                : <><WifiOff className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-muted-foreground hidden sm:inline">Desconectado</span></>
+              }
+            </div>
           </div>
           
           <Dialog open={isNewOrderOpen} onOpenChange={setIsNewOrderOpen}>
