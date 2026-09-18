@@ -235,6 +235,26 @@ export default function Assembly({ assemblyApi = defaultAssemblyApi }: AssemblyP
                                   </p>
                                 </div>
                               ))}
+                              {(order.sweetTableCombos?.length || 0) > 0 && (
+                                <div className="text-sm bg-muted/50 p-2 rounded">
+                                  <p className="font-medium">
+                                    {order.sweetTableCombos
+                                      .map(
+                                        c => 
+                                          `Mesa dulce ${c.products 
+                                            .map(p => `${p.quantity} ${p.productName}`)
+                                              .join(', ')}${c.details ? ` - ${c.details}` : ''}` )
+                                      .join(', ')}
+                                  </p>
+                                </div>
+                              )}
+                              {(order.sweetTableExtras?.length || 0) > 0 && (
+                                <div className="text-sm bg-muted/50 p-2 rounded">
+                                  <p className="font-medium">
+                                    Mesa dulce: {order.sweetTableExtras.map(e => `${e.quantity} ${e.product?.name || e.productName}`).join(', ')}
+                                  </p>
+                                </div>
+                              )}
                               {order.items.map((item, i) => (
                                 <div key={i} className="text-sm bg-muted/50 p-2 rounded">
                                   <p className="font-medium"><strong>{item.productName} - {item.quantity} Unidades</strong></p>
@@ -300,6 +320,26 @@ export default function Assembly({ assemblyApi = defaultAssemblyApi }: AssemblyP
                                 </span>
                               </p>
                             ))}
+                            {(order.sweetTableCombos?.length || 0) > 0 && (
+                                <div>
+                                  <p className="text-sm">
+                                    {order.sweetTableCombos
+                                      .map(
+                                        c => 
+                                          `Mesa dulce ${c.products 
+                                            .map(p => `${p.quantity} ${p.productName}`)
+                                              .join(', ')}${c.details ? ` - ${c.details}` : ''}` )
+                                      .join(', ')}
+                                  </p>
+                                </div>
+                              )}
+                              {(order.sweetTableExtras?.length || 0) > 0 && (
+                                <div>
+                                  <p className="text-sm">
+                                    Mesa dulce: {order.sweetTableExtras.map(e => `${e.quantity} ${e.product?.name || e.productName}`).join(', ')}
+                                  </p>
+                                </div>
+                              )}
                             {order.items.map((item, i) => (
                               <div key={i}>
                                 <p className="text-sm">

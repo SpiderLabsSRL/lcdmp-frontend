@@ -11,7 +11,7 @@ import { MobileCard, MobileCardHeader, useIsMobile } from '@/components/ui/respo
 import { Plus, Search, Eye, RefreshCw, Filter, Trash2, Edit, Loader2, Wifi, WifiOff } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { CreateOrderData, Order, OrderStatus, UpdateOrderData,Flavor, Product, OrderFilters } from '@/types';
+import { CreateOrderData, Order, OrderStatus, UpdateOrderData,Flavor, Product, OrderFilters, SweetTableCombo } from '@/types';
 import { toast } from 'sonner';
 import { statusConfig } from '@/types/consts';
 import { IOrdersApi, defaultOrdersApi } from '@/api/OrdersApi';
@@ -59,6 +59,7 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
   const [loading, setLoading] = useState(true);
   const [fillings, setFillings] = useState<Flavor[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [sweetTableCombos, setSweetTableCombos] = useState<SweetTableCombo[]>([]);
   const [stats, setStats] = useState<Array<{ status: string; label: string; color: string; icon: any; count: number }>>([]);
 
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -102,16 +103,18 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
         }
       }
       
-      const [ordersData, flavors, productsResponse] = await Promise.all([
+      const [ordersData, flavors, productsResponse, combosResponse] = await Promise.all([
         ordersApi.getOrders(filters, abortControllerRef.current.signal),
         ordersApi.getFlavors(),
-        ordersApi.getProducts()
+        ordersApi.getProducts(),
+        ordersApi.getSweetTableCombos()
       ]);
       
       if (!abortControllerRef.current.signal.aborted) {
         setInitialOrders(ordersData);
         setFillings(flavors);
         setProducts(productsResponse);
+        setSweetTableCombos(combosResponse);
       }
     } catch (error: any) {
       if (error.name !== 'AbortError') {
@@ -264,6 +267,7 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
                 onClose={() => setIsNewOrderOpen(false)}
                 products={products}
                 flavors={fillings}
+                sweetTableCombos={sweetTableCombos}
               />
             </DialogContent>
           </Dialog>
@@ -379,9 +383,10 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
                 const config = statusConfig[order.status];
                 const Icon = config.icon;
                 return (
-                  <MobileCard 
-                    key={order.id} 
-                    className="active:scale-[0.98] transition-transform"
+                  <MobileCard
+                    key={order.id}
+                    className="active:scale-[0.98] transition-transform cursor-pointer"
+                    onClick={() => handleSelectOrder(order)}
                   >
                     <MobileCardHeader className="px-3 py-2">
                       <div className="flex items-center gap-2 min-w-0">
@@ -391,27 +396,36 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
                           {config.label}
                         </Badge>
                       </div>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-8 w-8 shrink-0"
-                        onClick={() => handleSelectOrder(order)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectOrder(order);
+                        }}
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button 
-                        variant="outline" 
-                        size="icon" 
+                      <Button
+                        variant="outline"
+                        size="icon"
                         className="h-8 w-8 shrink-0"
-                        onClick={() => handleEditOrder(order)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditOrder(order);
+                        }}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button 
-                        variant="destructive" 
-                        size="icon" 
+                      <Button
+                        variant="destructive"
+                        size="icon"
                         className="h-8 w-8 shrink-0"
-                        onClick={() => handleDeleteOrder(order.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteOrder(order.id);
+                        }}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -431,19 +445,32 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
                       
                       <div className="text-sm bg-muted/50 p-2 rounded space-y-1">
                         {order.customCakes.length > 0 && (
-                          <p className="truncate">
-                            {order.customCakes.map(c => `${c.portions}p ${c.cakeFlavor}`).join(', ')}
-                          </p>
+                          <div className="text-sm bg-muted/50 p-2 rounded">
+                            <p className="font-medium">
+                              {order.customCakes.map(c => `${c.portions}p ${c.cakeFlavor}`).join(', ')}
+                            </p>
+                          </div>
                         )}
-                        {order.sweetTableCombo && (
-                          <p className=" truncate">
-                            Mesa dulce ({order.sweetTableCombo.totalQuantity} postres)
-                          </p>
+                        {(order.sweetTableCombos?.length || 0) > 0 && (
+                          <div className="text-sm bg-muted/50 p-2 rounded">
+                            <p className="font-medium">
+                              {order.sweetTableCombos.map(c => `Mesa dulce (${c.totalQuantity} postres)`).join(', ')}
+                            </p>
+                          </div>
+                        )}
+                        {(order.sweetTableExtras?.length || 0) > 0 && (
+                          <div className="text-sm bg-muted/50 p-2 rounded">
+                            <p className="font-medium">
+                              Mesa dulce: {order.sweetTableExtras.map(e => `${e.quantity} ${e.product?.name || e.productName}`).join(', ')}
+                            </p>
+                          </div>
                         )}
                         {order.items.length > 0 && (
-                          <p className="truncate">
-                            {order.items.map((item,i) => `${item.quantity} ${item.productName}`).join(', ')}
-                          </p>
+                          <div className="text-sm bg-muted/50 p-2 rounded">
+                            <p className="font-medium">
+                              {order.items.map((item,i) => `${item.quantity} ${item.productName}`).join(', ')}
+                            </p>
+                          </div>
                         )}
                       </div>
                       
@@ -490,7 +517,11 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
                       const config = statusConfig[order.status];
                       const Icon = config.icon;
                       return (
-                        <TableRow key={order.id} className="hover:bg-muted/50">
+                        <TableRow
+                          key={order.id}
+                          className="hover:bg-muted/50 cursor-pointer"
+                          onClick={() => handleSelectOrder(order)}
+                        >
                           <TableCell className="font-medium">#{order.orderNumber}</TableCell>
                           <TableCell>
                             <div>
@@ -511,9 +542,14 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
                                   {order.customCakes.map(c => `${c.portions}p ${c.cakeFlavor}`).join(', ')}
                                 </p>
                               )}
-                              {order.sweetTableCombo && (
+                              {(order.sweetTableCombos?.length || 0) > 0 && (
                                 <p className="text-sm ">
-                                  Mesa dulce ({order.sweetTableCombo.totalQuantity} postres)
+                                  {order.sweetTableCombos.map(c => `Mesa dulce (${c.totalQuantity} postres)`).join(', ')}
+                                </p>
+                              )}
+                              {(order.sweetTableExtras?.length || 0) > 0 && (
+                                <p className="text-sm ">
+                                  Mesa Dulce: {order.sweetTableExtras.map(e => `${e.quantity} ${e.product?.name || e.productName}`).join(', ')}
                                 </p>
                               )}
                               {order.items.length > 0 && (
@@ -529,7 +565,7 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
                               Adelanto: Bs. {order.deposit}
                             </p>
                           </TableCell>
-                          <TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
                             <Select
                               value={order.status}
                               onValueChange={(value) => handleUpdateStatus(order.id, value as OrderStatus)}
@@ -549,25 +585,34 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
-                              <Button 
-                                variant="ghost" 
+                              <Button
+                                variant="ghost"
                                 size="icon"
-                                onClick={() => handleSelectOrder(order)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSelectOrder(order);
+                                }}
                                 className="h-8 w-8"
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={() => handleEditOrder(order)}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditOrder(order);
+                                }}
                               >
                                 <Edit className="h-4 w-4 mr-1" /> Editar
                               </Button>
-                              <Button 
-                                variant="destructive" 
-                                size="sm" 
-                                onClick={() => handleDeleteOrder(order.id)}
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteOrder(order.id);
+                                }}
                               >
                                 <Trash2 className="h-4 w-4 mr-1" /> Eliminar
                               </Button>
@@ -609,6 +654,7 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
                 onClose={() => setEditingOrder(null)}
                 products={products}
                 flavors={fillings}
+                sweetTableCombos={sweetTableCombos}
                 isEditing
               />
             )}

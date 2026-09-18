@@ -59,11 +59,6 @@ export default function Decoration({ decorationApi = defaultDecorationApi }: Dec
     return decorationOrders.filter(o => differenceInHours(new Date(o.pickupDate), new Date()) < 6);
   };
 
-  const getCompletedOrdersCount = () => {
-    // Este dato debería venir del API, por ahora usamos el estado local
-    return decorationOrders.filter(o => o.status === 'ready').length;
-  };
-
   const getUrgencyBadge = (order: Order) => {
     const hoursUntil = hoursUntilPickupDateTime(order);
     if (hoursUntil < 6) return { label: 'Urgente', color: 'bg-red-500' };
@@ -165,18 +160,6 @@ export default function Decoration({ decorationApi = defaultDecorationApi }: Dec
               </div>
             </CardContent>
           </Card>
-          
-          <Card>
-            <CardContent className="p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
-              <div className="p-1.5 sm:p-2 bg-green-100 text-green-800 rounded-lg">
-                <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-lg sm:text-2xl font-bold">{getCompletedOrdersCount()}</p>
-                <p className="text-xs sm:text-sm  truncate">Completados hoy</p>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Orders List */}
@@ -223,11 +206,31 @@ export default function Decoration({ decorationApi = defaultDecorationApi }: Dec
                               {order.customCakes?.map((cake, i) => (
                                 <div key={i} className="text-sm bg-muted/50 p-2 rounded">
                                   <p className="font-medium">{getCakeDescription(cake)}</p>
-                                  {cake.design && 
+                                  {cake.design &&
                                     <p className=" mt-0.5">🎨 {cake.design.substring(0, 50)}</p>
                                   }
                                 </div>
                               ))}
+                              {(order.sweetTableCombos?.length || 0) > 0 && (
+                                <div className="text-sm bg-muted/50 p-2 rounded">
+                                  <p className="font-medium">
+                                    {order.sweetTableCombos
+                                      .map(
+                                        c =>
+                                          `Mesa dulce ${c.products
+                                            .map(p => `${p.quantity} ${p.productName}`)
+                                              .join(', ')}${c.details ? ` - ${c.details}` : ''}`)
+                                      .join(', ')}
+                                  </p>
+                                </div>
+                              )}
+                              {(order.sweetTableExtras?.length || 0) > 0 && (
+                                <div className="text-sm bg-muted/50 p-2 rounded">
+                                  <p className="font-medium">
+                                    Mesa dulce: {order.sweetTableExtras.map(e => `${e.quantity} ${e.product?.name || e.productName}`).join(', ')}
+                                  </p>
+                                </div>
+                              )}
                               {order.items?.map((item, i) => (
                                 <div key={i} className="text-sm bg-muted/50 p-2 rounded">
                                   <p className="font-medium">
@@ -277,9 +280,10 @@ export default function Decoration({ decorationApi = defaultDecorationApi }: Dec
                       </MobileCard>
                     ) : (
                       // Desktop Layout
-                      <div 
-                        key={order.id} 
-                        className="flex items-center gap-4 p-4 rounded-lg transition-colors bg-muted/50 hover:bg-muted"
+                      <div
+                        key={order.id}
+                        className="flex items-center gap-4 p-4 rounded-lg transition-colors bg-muted/50 hover:bg-muted cursor-pointer"
+                        onClick={() => handleViewOrder(order)}
                       >
                         <div className={`w-2 h-full min-h-16 rounded-full ${urgency.color}`} />
                         
@@ -306,6 +310,26 @@ export default function Decoration({ decorationApi = defaultDecorationApi }: Dec
                                 </p>
                               </div>
                             ))}
+                            {(order.sweetTableCombos?.length || 0) > 0 && (
+                              <div>
+                                <p className="text-sm">
+                                  {order.sweetTableCombos
+                                    .map(
+                                      c =>
+                                        `Mesa dulce ${c.products
+                                          .map(p => `${p.quantity} ${p.productName}`)
+                                            .join(', ')}${c.details ? ` - ${c.details}` : ''}`)
+                                    .join(', ')}
+                                </p>
+                              </div>
+                            )}
+                            {(order.sweetTableExtras?.length || 0) > 0 && (
+                              <div>
+                                <p className="text-sm">
+                                  Mesa dulce: {order.sweetTableExtras.map(e => `${e.quantity} ${e.product?.name || e.productName}`).join(', ')}
+                                </p>
+                              </div>
+                            )}
                             {order.items?.map((item, i) => (
                               <div key={i} className="space-y-1">
                                 <p className="text-sm">
@@ -340,9 +364,12 @@ export default function Decoration({ decorationApi = defaultDecorationApi }: Dec
                           </p>
                         </div>
 
-                        <Button 
+                        <Button
                           size="sm"
-                          onClick={() => handleCompleteOrder(order)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCompleteOrder(order);
+                          }}
                           className="whitespace-nowrap"
                         >
                           <CheckCircle className="h-4 w-4 mr-2" />
@@ -369,46 +396,42 @@ export default function Decoration({ decorationApi = defaultDecorationApi }: Dec
             </DialogHeader>
             {selectedOrder && (
               <div className="space-y-4 px-1">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div>
-                    <p className="text-xs sm:text-sm ">Cliente</p>
-                    <p className="font-medium text-sm">{selectedOrder.customerName}</p>
+                    <p className="text-sm text-foreground">Cliente</p>
+                    <p className="font-semibold text-base text-foreground">{selectedOrder.customerName}</p>
                   </div>
                   <div>
-                    <p className="text-xs sm:text-sm ">Teléfono</p>
-                    <p className="font-medium text-sm">{selectedOrder.customerPhone}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs sm:text-sm ">Fecha de entrega</p>
-                    <p className="font-medium text-sm">
+                    <p className="text-sm text-foreground">Fecha de entrega</p>
+                    <p className="font-semibold text-base text-foreground">
                       {format(new Date(selectedOrder.pickupDate), 'dd MMMM yyyy', { locale: es })}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs sm:text-sm ">Hora</p>
-                    <p className="font-medium text-sm">{selectedOrder.pickupTime}</p>
+                    <p className="text-sm text-foreground">Hora</p>
+                    <p className="font-semibold text-base text-foreground">{selectedOrder.pickupTime}</p>
                   </div>
                 </div>
 
                 {selectedOrder.customCakes?.map((cake, i) => (
                   <div key={i} className="p-3 sm:p-4 bg-muted/50 rounded-lg space-y-2">
-                    <h4 className="font-medium text-sm sm:text-base">
+                    <h4 className="font-semibold text-base text-foreground">
                       {cake.cakeFlavor}{cake.secondCakeFlavor ? `/${cake.secondCakeFlavor}` : ""} - {cake.portions} porciones
                     </h4>
-                    {cake.shape && <p className="text-xs sm:text-sm">Forma: {cake.shape}</p>}
-                    <p className="text-xs sm:text-sm">Relleno: {cake.fillingFlavor} {cake.secondFillingFlavor ? `/ ${cake.secondFillingFlavor}` : ''}</p>
+                    {cake.shape && <p className="text-sm text-foreground">Forma: {cake.shape}</p>}
+                    <p className="text-sm text-foreground">Relleno: {cake.fillingFlavor} {cake.secondFillingFlavor ? `/ ${cake.secondFillingFlavor}` : ''}</p>
                     {cake.design && (
                       <div className="p-2 sm:p-3 bg-background rounded border">
-                        <p className="text-xs sm:text-sm font-medium">Diseño requerido:</p>
-                        <p className="text-xs sm:text-sm mt-1 whitespace-pre-wrap">{cake.design}</p>
+                        <p className="text-sm font-semibold text-foreground">Diseño requerido:</p>
+                        <p className="text-sm mt-1 whitespace-pre-wrap text-foreground">{cake.design}</p>
                       </div>
                     )}
                     {cake.dedication && (
-                      <p className="text-xs sm:text-sm">Dedicatoria: "{cake.dedication}"</p>
+                      <p className="text-sm text-foreground">Dedicatoria: "{cake.dedication}"</p>
                     )}
                     {cake.referenceImages && cake.referenceImages.length > 0 && (
                       <div className="mt-2">
-                        <p className="text-xs font-medium mb-1">Imágenes de referencia:</p>
+                        <p className="text-sm font-semibold mb-1 text-foreground">Imágenes de referencia:</p>
                         <div className="flex gap-2 flex-wrap">
                           {cake.referenceImages.map((img, idx) => (
                             <img key={idx} src={img} alt={`Referencia ${idx + 1}`} className="w-16 h-16 object-cover rounded" />
@@ -418,16 +441,39 @@ export default function Decoration({ decorationApi = defaultDecorationApi }: Dec
                     )}
                   </div>
                 ))}
-                {selectedOrder.items?.map((item, i) => (
+                {(selectedOrder.sweetTableCombos?.length || 0) > 0 && selectedOrder.sweetTableCombos.map((c, i) => (
                   <div key={i} className="p-3 sm:p-4 bg-muted/50 rounded-lg space-y-2">
-                    <h4 className="font-medium text-sm sm:text-base">
-                      {item.productName} - {item.quantity} Unidades
+                    <h4 className="font-semibold text-base text-foreground">
+                      Mesa dulce: {c.products.map(p => `${p.quantity} ${p.productName}`).join(', ')}
                     </h4>
-                    {item.notes && (
-                      <p className="text-xs sm:text-sm">Notas: "{item.notes}"</p>
+                    {c.details && (
+                      <p className="text-sm text-foreground">Notas: "{c.details}"</p>
                     )}
                   </div>
                 ))}
+                {(selectedOrder.sweetTableExtras?.length || 0) > 0 && (
+                  <div className="p-3 sm:p-4 bg-muted/50 rounded-lg space-y-2">
+                    <h4 className="font-semibold text-base text-foreground">
+                      Mesa dulce: {selectedOrder.sweetTableExtras.map(e => `${e.quantity} ${e.product?.name || e.productName}`).join(', ')}
+                    </h4>
+                  </div>
+                )}
+                {selectedOrder.items?.map((item, i) => (
+                  <div key={i} className="p-3 sm:p-4 bg-muted/50 rounded-lg space-y-2">
+                    <h4 className="font-semibold text-base text-foreground">
+                      {item.productName} - {item.quantity} Unidades
+                    </h4>
+                    {item.notes && (
+                      <p className="text-sm text-foreground">Notas: "{item.notes}"</p>
+                    )}
+                  </div>
+                ))}
+                {selectedOrder.notes && (
+                  <div className="p-3 sm:p-4 bg-muted/50 rounded-lg space-y-1">
+                    <p className="text-sm font-semibold text-foreground">📝 Notas del pedido:</p>
+                    <p className="text-sm text-foreground whitespace-pre-wrap">{selectedOrder.notes}</p>
+                  </div>
+                )}
               </div>
             )}
           </DialogContent>

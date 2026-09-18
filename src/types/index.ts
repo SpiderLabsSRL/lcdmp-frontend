@@ -177,7 +177,8 @@ export interface SweetTableCombo {
 
 export interface ComboProduct {
   productId: string;
-  product: Product;
+  product?: Product;
+  productName?: string;
   quantity: number;
   pricePerUnit: number;
 }
@@ -207,7 +208,8 @@ export interface Order {
   status: OrderStatus;
   items: OrderItem[];
   customCakes: CustomCake[];
-  sweetTableCombo?: OrderCombo;
+  sweetTableCombos?: OrderCombo[];
+  sweetTableExtras?: OrderItem[];
   deliveryAddress?: string;
   deliveryCost: number;
   deposit: number;
@@ -247,7 +249,9 @@ export interface CustomCake {
 }
 
 export interface OrderCombo {
+  id?: string;
   comboId?: string;
+  name?: string;
   products: ComboProduct[];
   totalQuantity: number;
   price: number;
@@ -267,7 +271,8 @@ export interface CreateOrderData {
   pickupTime: string;
   items?: OrderItem[];
   customCakes?: CustomCake[];
-  sweetTableCombo?: OrderCombo;
+  sweetTableCombos?: OrderCombo[];
+  sweetTableExtras?: OrderItem[];
   deliveryAddress?: string;
   deliveryCost?: number;
   deposit: number;
@@ -287,7 +292,8 @@ export interface UpdateOrderData {
   status?: OrderStatus;
   items?: OrderItem[];
   customCakes?: CustomCake[];
-  sweetTableCombo?: OrderCombo;
+  sweetTableCombos?: OrderCombo[];
+  sweetTableExtras?: OrderItem[];
   deliveryAddress?: string;
   deliveryCost?: number;
   deposit?: number;

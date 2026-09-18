@@ -43,7 +43,6 @@ export default function Baking({ bakingApi = defaultBakingApi }: BakingProps) {
     pendingOrders: bakingOrders.length,
     totalPortions: bakingOrders.reduce((sum, order) => sum + getTotalPortions(order.customCakes), 0),
     urgentOrders: bakingOrders.filter(o => differenceInHours(o.pickupDate, new Date()) < 12).length,
-    completedToday: 0,
   };
 
   // Cargar datos iniciales
@@ -188,18 +187,6 @@ export default function Baking({ bakingApi = defaultBakingApi }: BakingProps) {
               </div>
             </CardContent>
           </Card>
-          
-          <Card>
-            <CardContent className="p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
-              <div className="p-1.5 sm:p-2 bg-green-100 text-green-800 rounded-lg">
-                <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-lg sm:text-2xl font-bold">{stats.completedToday}</p>
-                <p className="text-xs sm:text-sm  truncate">Completados hoy</p>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Baked Products Stock */}
@@ -282,6 +269,22 @@ export default function Baking({ bakingApi = defaultBakingApi }: BakingProps) {
                                   {cake.shape && <p className=" mt-0.5">{cake.shape}</p>}
                                 </div>
                               ))}
+                              {(order.sweetTableCombos?.length || 0) > 0 && (
+                                <div className="text-sm bg-muted/50 p-2 rounded">
+                                  <p className="font-medium">
+                                    {order.sweetTableCombos
+                                      .map(c => `Mesa dulce: ${c.products.map(p => `${p.quantity} ${p.productName}`).join(', ')}`)
+                                      .join(' | ')}
+                                  </p>
+                                </div>
+                              )}
+                              {(order.sweetTableExtras?.length || 0) > 0 && (
+                                <div className="text-sm bg-muted/50 p-2 rounded">
+                                  <p className="font-medium">
+                                    Mesa dulce: {order.sweetTableExtras.map(e => `${e.quantity} ${e.product?.name || e.productName}`).join(', ')}
+                                  </p>
+                                </div>
+                              )}
                               {order.items.map((cake, i) => (
                                 <div key={i} className="text-sm bg-muted/50 p-2 rounded">
                                   <p className="font-medium">{cake.productName} - {cake.quantity} {cake.quantity == 1 ? "unidad" : "unidades"}</p>
@@ -341,6 +344,20 @@ export default function Baking({ bakingApi = defaultBakingApi }: BakingProps) {
                                 {cake.shape && ` (${cake.shape})`}
                               </p>
                             ))}
+                            {(order.sweetTableCombos?.length || 0) > 0 && (
+                              <p className="text-sm">
+                                <strong>
+                                  {order.sweetTableCombos
+                                    .map(c => `Mesa dulce: ${c.products.map(p => `${p.quantity} ${p.productName}`).join(', ')}`)
+                                    .join(' | ')}
+                                </strong>
+                              </p>
+                            )}
+                            {(order.sweetTableExtras?.length || 0) > 0 && (
+                              <p className="text-sm">
+                                <strong>Mesa dulce: {order.sweetTableExtras.map(e => `${e.quantity} ${e.product?.name || e.productName}`).join(', ')}</strong>
+                              </p>
+                            )}
                             {order.items.map((item, i) => (
                               <p key={i} className="text-sm">
                                 <strong>{item.productName} </strong> - {item.quantity} Unidades

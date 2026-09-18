@@ -4,11 +4,12 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Banknote, Plus, QrCode, X } from 'lucide-react';
 import { format } from 'date-fns';
-import { CreateOrderData, CustomCake, Order, UpdateOrderData, OrderItem } from '@/types';
+import { CreateOrderData, CustomCake, Order, UpdateOrderData, OrderItem, OrderCombo, ComboProduct, SweetTableCombo } from '@/types';
 import { toast } from 'sonner';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { getLocalDateString } from '@/utils/DateUtils';
+import { es } from 'date-fns/locale';
 
 export interface OrderFormProps {
   initialData?: Order;
@@ -16,10 +17,11 @@ export interface OrderFormProps {
   onClose: () => void;
   products: any[];
   flavors: any[];
+  sweetTableCombos?: SweetTableCombo[];
   isEditing?: boolean;
 }
 
-export default function OrderForm({ initialData, onSubmit, onClose, products, flavors, isEditing = false }: OrderFormProps) {
+export default function OrderForm({ initialData, onSubmit, onClose, products, flavors, sweetTableCombos = [], isEditing = false }: OrderFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<CreateOrderData | UpdateOrderData>(() => {
     if (initialData) {
@@ -30,7 +32,11 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
         pickupTime: initialData.pickupTime,
         items: initialData.items,
         customCakes: initialData.customCakes,
-        sweetTableCombo: initialData.sweetTableCombo ? initialData.sweetTableCombo : undefined,
+        sweetTableCombos: initialData.sweetTableCombos ? initialData.sweetTableCombos.map(c => ({
+          ...c,
+          products: c.products.map(p => ({ ...p }))
+        })) : [],
+        sweetTableExtras: initialData.sweetTableExtras ? initialData.sweetTableExtras.map(e => ({ ...e })) : [],
         deliveryAddress: initialData.deliveryAddress,
         deliveryCost: initialData.deliveryCost,
         deposit: initialData.deposit,
@@ -43,10 +49,12 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
     return {
       customerName: '',
       customerPhone: '',
-      pickupDate: new Date(),
+      pickupDate: new Date(new Date().setHours(0, 0, 0, 0)),
       pickupTime: '12:00',
       items: [],
       customCakes: [],
+      sweetTableCombos: [],
+      sweetTableExtras: [],
       deliveryCost: 0,
       deposit: 0,
       discount: 0,
@@ -55,10 +63,14 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
     };
   });
 
+  const [showSweetTableSection, setShowSweetTableSection] = useState(
+    (formData.sweetTableCombos?.length || 0) > 0 || (formData.sweetTableExtras?.length || 0) > 0
+  );
+
   const selectedOptions = {
     hasCake: (formData.customCakes?.length || 0) > 0,
     hasProducts: (formData.items?.length || 0) > 0,
-    hasSweetTable: !!formData.sweetTableCombo
+    hasSweetTable: (formData.sweetTableCombos?.length || 0) > 0 || (formData.sweetTableExtras?.length || 0) > 0
   };
 
   const calculateSubtotal = () => {
@@ -71,12 +83,26 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
     (formData.items || []).forEach(item => {
       subtotal += (item.price || 0) * item.quantity;
     });
-    
-    if (formData.sweetTableCombo) {
-      subtotal += formData.sweetTableCombo.price || 0;
-    }
+
+    (formData.sweetTableCombos || []).forEach(combo => {
+      subtotal += combo.price || 0;
+    });
+
+    (formData.sweetTableExtras || []).forEach(extra => {
+      subtotal += (extra.price || 0) * (extra.quantity || 0);
+    });
     
     return subtotal;
+  };
+
+  const sweetTableExtrasTotal = () => {
+    return (formData.sweetTableExtras || []).reduce(
+      (sum, extra) => sum + (extra.price || 0) * (extra.quantity || 0), 0
+    );
+  };
+
+  const comboQuantitySum = (combo: OrderCombo) => {
+    return (combo.products || []).reduce((sum, p) => sum + (p.quantity || 0), 0);
   };
 
   const calculateTotal = () => {
@@ -160,6 +186,110 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
     setFormData({ ...formData, items: updated });
   };
 
+  const addSweetTableCombo = (presetId: string) => {
+    const preset = sweetTableCombos.find(c => c.id === presetId);
+    if (!preset) return;
+
+    const newCombo: OrderCombo = {
+      comboId: preset.id,
+      name: preset.name,
+      totalQuantity: preset.totalQuantity,
+      price: preset.fixedPrice ?? preset.price ?? 0,
+      products: (preset.products || []).map(p => ({
+        productId: p.productId,
+        product: catalogProducts.find((cp: any) => cp.id === p.productId),
+        productName: p.productName,
+        quantity: p.quantity,
+        pricePerUnit: p.pricePerUnit
+      })),
+      details: ''
+    };
+
+    setFormData({
+      ...formData,
+      sweetTableCombos: [...(formData.sweetTableCombos || []), newCombo]
+    });
+  };
+
+  const removeSweetTableCombo = (comboIndex: number) => {
+    const updated = [...(formData.sweetTableCombos || [])];
+    updated.splice(comboIndex, 1);
+    setFormData({ ...formData, sweetTableCombos: updated });
+  };
+
+  const updateSweetTableComboDetails = (comboIndex: number, details: string) => {
+    const updated = [...(formData.sweetTableCombos || [])];
+    updated[comboIndex] = { ...updated[comboIndex], details };
+    setFormData({ ...formData, sweetTableCombos: updated });
+  };
+
+  const addComboProduct = (comboIndex: number) => {
+    const updated = [...(formData.sweetTableCombos || [])];
+    const combo = { ...updated[comboIndex] };
+    combo.products = [...combo.products, { productId: '', product: {} as any, quantity: 1, pricePerUnit: 0 }];
+    updated[comboIndex] = combo;
+    setFormData({ ...formData, sweetTableCombos: updated });
+  };
+
+  const removeComboProduct = (comboIndex: number, productIndex: number) => {
+    const updated = [...(formData.sweetTableCombos || [])];
+    const combo = { ...updated[comboIndex] };
+    combo.products = combo.products.filter((_, i) => i !== productIndex);
+    updated[comboIndex] = combo;
+    setFormData({ ...formData, sweetTableCombos: updated });
+  };
+
+  const updateComboProduct = (comboIndex: number, productIndex: number, field: keyof ComboProduct, value: any) => {
+    const updated = [...(formData.sweetTableCombos || [])];
+    const combo = { ...updated[comboIndex] };
+    const comboProducts = [...combo.products];
+
+    if (field === 'productId') {
+      const selectedProduct = catalogProducts.find((p: any) => p.id === value);
+      comboProducts[productIndex] = {
+        ...comboProducts[productIndex],
+        productId: value,
+        product: selectedProduct || ({} as any),
+        pricePerUnit: selectedProduct ? selectedProduct.basePrice : comboProducts[productIndex].pricePerUnit
+      };
+    } else {
+      comboProducts[productIndex] = { ...comboProducts[productIndex], [field]: value };
+    }
+
+    combo.products = comboProducts;
+    updated[comboIndex] = combo;
+    setFormData({ ...formData, sweetTableCombos: updated });
+  };
+
+  const addExtra = () => {
+    setFormData({
+      ...formData,
+      sweetTableExtras: [...(formData.sweetTableExtras || []), { productId: '', product: {} as any, quantity: 1, price: 0 }]
+    });
+  };
+
+  const removeExtra = (index: number) => {
+    const updated = [...(formData.sweetTableExtras || [])];
+    updated.splice(index, 1);
+    setFormData({ ...formData, sweetTableExtras: updated });
+  };
+
+  const updateExtra = (index: number, field: keyof OrderItem, value: any) => {
+    const updated = [...(formData.sweetTableExtras || [])];
+    if (field === 'productId') {
+      const selectedProduct = catalogProducts.find((p: any) => p.id === value);
+      updated[index] = {
+        ...updated[index],
+        productId: value,
+        product: selectedProduct || ({} as any),
+        price: selectedProduct ? selectedProduct.basePrice : updated[index].price
+      };
+    } else {
+      updated[index] = { ...updated[index], [field]: value };
+    }
+    setFormData({ ...formData, sweetTableExtras: updated });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -173,13 +303,35 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
       return;
     }
 
+    for (const combo of formData.sweetTableCombos || []) {
+      const sum = comboQuantitySum(combo);
+      if (sum !== combo.totalQuantity) {
+        toast.error(
+          `${combo.name || 'La mesa dulce'} debe sumar exactamente ${combo.totalQuantity} porciones (actualmente suma ${sum})`
+        );
+        return;
+      }
+      if (combo.products.some(p => !p.productId)) {
+        toast.error(`${combo.name || 'La mesa dulce'} tiene un producto sin seleccionar`);
+        return;
+      }
+    }
+
+    if ((formData.sweetTableExtras || []).some(e => !e.productId)) {
+      toast.error('Hay un postre adicional sin producto seleccionado');
+      return;
+    }
+
     if (isSubmitting) return;
     setIsSubmitting(true);
+
+    const hasSweetTableFinal = selectedOptions.hasSweetTable;
+    const typesSelected = [selectedOptions.hasCake, selectedOptions.hasProducts, hasSweetTableFinal].filter(Boolean).length;
     
     const submitData = {
       ...formData,
       total,
-      orderType: selectedOptions.hasCake && selectedOptions.hasProducts ? 'mixed' :
+      orderType: typesSelected > 1 ? 'mixed' :
                   selectedOptions.hasCake ? 'cake' :
                   selectedOptions.hasProducts ? 'products' : 'sweet_table'
     };
@@ -230,7 +382,7 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
             required 
             className="text-sm"
             min={getLocalDateString()}
-            value={formData.pickupDate instanceof Date ? format(formData.pickupDate, 'yyyy-MM-dd') : formData.pickupDate}
+            value={formData.pickupDate instanceof Date ? format(formData.pickupDate, 'yyyy-MM-dd', { locale: es }) : formData.pickupDate}
             onChange={(e) => {
               const [year, month, day] = e.target.value.split('-');
               const localDate = new Date(Number(year), Number(month) - 1, Number(day));
@@ -318,19 +470,11 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
             <div className="relative flex items-center">
               <input 
                 type="checkbox" 
-                checked={selectedOptions.hasSweetTable}
+                checked={showSweetTableSection}
                 onChange={(e) => {
+                  setShowSweetTableSection(e.target.checked);
                   if (!e.target.checked) {
-                    setFormData({ ...formData, sweetTableCombo: undefined });
-                  } else if (!formData.sweetTableCombo) {
-                    setFormData({ 
-                      ...formData, 
-                      sweetTableCombo: { 
-                        products: [], 
-                        totalQuantity: 0, 
-                        price: 0 
-                      } 
-                    });
+                    setFormData({ ...formData, sweetTableCombos: [], sweetTableExtras: [] });
                   }
                 }}
                 className="sr-only peer"
@@ -626,75 +770,196 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
         </div>
       )}
 
-      {selectedOptions.hasSweetTable && (
+      {showSweetTableSection && (
         <div className="space-y-4 border rounded-lg p-4">
-          <h3 className="font-semibold text-base">Mesa Dulce</h3>
-          
-          <div className="space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-sm">Cantidad de postres</Label>
-                <Input 
-                  type="number" 
-                  placeholder="Ej: 75" 
-                  className="text-sm"
-                  value={formData.sweetTableCombo?.totalQuantity || ''}
-                  onChange={(e) => {
-                    const value = parseInt(e.target.value);
-                    setFormData({
-                      ...formData,
-                      sweetTableCombo: {
-                        ...formData.sweetTableCombo!,
-                        totalQuantity: value,
-                        products: formData.sweetTableCombo?.products || []
-                      }
-                    });
-                  }}
-                />
-              </div>
-              
-              <div className="space-y-1.5">
-                <Label className="text-sm">Precio total mesa dulce (Bs.) *</Label>
-                <Input 
-                  type="number" 
-                  placeholder="0" 
-                  required
-                  className="text-sm"
-                  value={formData.sweetTableCombo?.price || ''}
-                  onChange={(e) => {
-                    const value = parseFloat(e.target.value);
-                    setFormData({
-                      ...formData,
-                      sweetTableCombo: {
-                        ...formData.sweetTableCombo!,
-                        price: value,
-                        products: formData.sweetTableCombo?.products || []
-                      }
-                    });
-                  }}
-                />
-              </div>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <h3 className="font-semibold text-base">Mesa Dulce</h3>
+            <div className="flex items-center gap-2">
+              <Select onValueChange={(v) => addSweetTableCombo(v)} value="">
+                <SelectTrigger className="text-sm w-full sm:w-64">
+                  <SelectValue placeholder="Agregar mesa predeterminada..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {sweetTableCombos.length === 0 && (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                      No hay mesas dulces configuradas
+                    </div>
+                  )}
+                  {sweetTableCombos.map((combo) => (
+                    <SelectItem key={combo.id} value={combo.id}>
+                      {combo.name} — {combo.totalQuantity} porciones — Bs. {combo.fixedPrice ?? combo.price}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            
-            <div className="space-y-1.5">
-              <Label className="text-sm">Detalles adicionales</Label>
-              <Textarea 
-                placeholder="Tipos de postres, presentación, colores..." 
-                className="text-sm" 
-                rows={2}
-                value={formData.sweetTableCombo?.details || ''}
-                onChange={(e) => {
-                  setFormData({
-                    ...formData,
-                    sweetTableCombo: {
-                      ...formData.sweetTableCombo!,
-                      details: e.target.value,
-                      products: formData.sweetTableCombo?.products || []
-                    }
-                  });
-                }}
-              />
+          </div>
+
+          {/* Mesas dulces predeterminadas seleccionadas */}
+          {(formData.sweetTableCombos || []).length === 0 ? (
+            <p className="text-sm text-center py-2 text-muted-foreground">
+              No hay mesas dulces agregadas. Selecciónalas del listado de arriba.
+            </p>
+          ) : (
+            (formData.sweetTableCombos || []).map((combo, comboIndex) => {
+              const qtySum = comboQuantitySum(combo);
+              const isValid = qtySum === combo.totalQuantity;
+              return (
+                <div key={combo.id || comboIndex} className="border rounded-lg p-3 space-y-3">
+                  <div className="flex justify-between items-start gap-2">
+                    <div>
+                      <p className="font-medium text-sm">{combo.name || `Mesa dulce #${comboIndex + 1}`}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Precio fijo: Bs. {combo.price} (no cambia al modificar los productos)
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeSweetTableCombo(comboIndex)}
+                      className="text-destructive shrink-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {combo.products.map((p, productIndex) => (
+                      <div key={productIndex} className="grid grid-cols-1 sm:grid-cols-[1fr_100px_auto] gap-2 items-end">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Producto</Label>
+                          <Select
+                            value={p.productId}
+                            onValueChange={(v) => updateComboProduct(comboIndex, productIndex, 'productId', v)}
+                          >
+                            <SelectTrigger className="text-sm">
+                              <SelectValue placeholder="Seleccionar producto" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {catalogProducts.map((cp: any) => (
+                                <SelectItem key={cp.id} value={cp.id}>{cp.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Cantidad</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            className="text-sm"
+                            value={p.quantity}
+                            onChange={(e) => updateComboProduct(comboIndex, productIndex, 'quantity', parseInt(e.target.value) || 0)}
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeComboProduct(comboIndex, productIndex)}
+                          className="text-destructive"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addComboProduct(comboIndex)}
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> Agregar producto a la mesa
+                    </Button>
+
+                    <p className={`text-sm font-medium ${isValid ? 'text-green-600' : 'text-destructive'}`}>
+                      Total: {qtySum} / {combo.totalQuantity} porciones {isValid ? '✓' : '(debe coincidir exactamente)'}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Detalles (opcional)</Label>
+                    <Textarea
+                      placeholder="Presentación, colores, indicaciones..."
+                      className="text-sm"
+                      rows={2}
+                      value={combo.details || ''}
+                      onChange={(e) => updateSweetTableComboDetails(comboIndex, e.target.value)}
+                    />
+                  </div>
+                </div>
+              );
+            })
+          )}
+
+          {/* Postres adicionales agregados manualmente */}
+          <div className="border-t pt-3 space-y-3">
+            <div className="flex justify-between items-center">
+              <h4 className="font-medium text-sm">Postres adicionales</h4>
+              <Button type="button" variant="outline" size="sm" onClick={addExtra}>
+                <Plus className="h-4 w-4 mr-1" /> Agregar postre
+              </Button>
             </div>
+
+            {(formData.sweetTableExtras || []).length === 0 ? (
+              <p className="text-sm text-center py-2 text-muted-foreground">
+                Sin postres adicionales. Estos se agregan por separado de las mesas dulces.
+              </p>
+            ) : (
+              (formData.sweetTableExtras || []).map((extra, index) => (
+                <div key={index} className="grid grid-cols-1 sm:grid-cols-[1fr_90px_90px_auto] gap-2 items-end border rounded-lg p-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Producto</Label>
+                    <Select
+                      value={extra.productId}
+                      onValueChange={(v) => updateExtra(index, 'productId', v)}
+                    >
+                      <SelectTrigger className="text-sm">
+                        <SelectValue placeholder="Seleccionar producto" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {catalogProducts.map((cp: any) => (
+                          <SelectItem key={cp.id} value={cp.id}>
+                            {cp.name} - Bs. {cp.basePrice}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Cantidad</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      className="text-sm"
+                      value={extra.quantity}
+                      onChange={(e) => updateExtra(index, 'quantity', parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Subtotal</Label>
+                    <p className="text-sm font-medium py-2">Bs. {((extra.price || 0) * (extra.quantity || 0)).toFixed(2)}</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeExtra(index)}
+                    className="text-destructive"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))
+            )}
+
+            {(formData.sweetTableExtras || []).length > 0 && (
+              <p className="text-sm font-medium text-right">
+                Total adicionales: Bs. {sweetTableExtrasTotal().toFixed(2)}
+              </p>
+            )}
           </div>
         </div>
       )}

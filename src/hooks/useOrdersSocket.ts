@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { getSocket } from '@/lib/socket';
 import type { Order } from '@/types';
+import { getLocalDateString, parseLocalDate } from '@/utils/DateUtils';
 
 interface UseOrdersSocketOptions {
   /**
@@ -48,12 +49,6 @@ export const useOrdersSocket = ({
   useEffect(() => {
     setOrders(initialOrders);
   }, [initialOrders]);
-
-  const parseLocalDate = (dateString: string): Date => {
-    const [year, month, day] = dateString.split('-').map(Number);
-
-    return new Date(year, month - 1, day);
-  };
 
   const parseOrder = useCallback((raw: any): Order => ({
     ...raw,

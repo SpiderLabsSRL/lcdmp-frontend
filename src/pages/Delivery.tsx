@@ -157,18 +157,6 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
               </div>
             </CardContent>
           </Card>
-          
-          <Card>
-            <CardContent className="p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
-              <div className="p-1.5 sm:p-2 bg-green-100 text-green-800 rounded-lg">
-                <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-lg sm:text-2xl font-bold">0</p>
-                <p className="text-xs sm:text-sm  truncate">Entregados hoy</p>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Deliveries */}
@@ -212,6 +200,33 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
                             </Badge>
                           </div>
                           <div className="space-y-2 mt-2">
+                            <div className="text-xs bg-muted/50 p-2 rounded space-y-1">
+                              {order.customCakes.map((cake, i) => (
+                                <p key={i}>
+                                  <strong>{cake.portions} porciones</strong> - {cake.cakeFlavor}{cake.secondCakeFlavor ? `/${cake.secondCakeFlavor}` : ""}
+                                </p>
+                              ))}
+                              {(order.sweetTableCombos?.length || 0) > 0 && (
+                                <p>
+                                  {order.sweetTableCombos
+                                    .map(c => `Mesa dulce: ${c.products.map(p => `${p.quantity} ${p.productName}`).join(', ')}`)
+                                    .join(' | ')}
+                                </p>
+                              )}
+                              {(order.sweetTableExtras?.length || 0) > 0 && (
+                                <p>
+                                  Mesa dulce: {order.sweetTableExtras.map(e => `${e.quantity} ${e.product?.name || e.productName}`).join(', ')}
+                                </p>
+                              )}
+                              {order.items.map((item, i) => (
+                                <p key={i}>
+                                  <strong>{item.productName}</strong> - {item.quantity} Unidades
+                                </p>
+                              ))}
+                              {order.notes && (
+                                <p className="whitespace-pre-wrap">📝 {order.notes}</p>
+                              )}
+                            </div>
                             <div  className="text-xs bg-muted/50 p-2 rounded">
                               <div className="flex items-start gap-2 text-xs ">
                                 <MapPin className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
@@ -280,10 +295,29 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
                         <div className="mt-2 space-y-1">
                           {order.customCakes.map((cake, i) => (
                             <p key={i} className="text-sm">
-                              <strong>{cake.portions} porciones</strong>
-                              <br />
+                              <strong>{cake.portions} porciones</strong> - {cake.cakeFlavor}{cake.secondCakeFlavor ? `/${cake.secondCakeFlavor}` : ""}
                             </p>
                           ))}
+                          {(order.sweetTableCombos?.length || 0) > 0 && (
+                            <p className="text-sm">
+                              {order.sweetTableCombos
+                                .map(c => `Mesa dulce: ${c.products.map(p => `${p.quantity} ${p.productName}`).join(', ')}`)
+                                .join(' | ')}
+                            </p>
+                          )}
+                          {(order.sweetTableExtras?.length || 0) > 0 && (
+                            <p className="text-sm">
+                              Mesa dulce: {order.sweetTableExtras.map(e => `${e.quantity} ${e.product?.name || e.productName}`).join(', ')}
+                            </p>
+                          )}
+                          {order.items.map((item, i) => (
+                            <p key={i} className="text-sm">
+                              <strong>{item.productName}</strong> - {item.quantity} Unidades
+                            </p>
+                          ))}
+                          {order.notes && (
+                            <p className="text-sm whitespace-pre-wrap">📝 {order.notes}</p>
+                          )}
                           <div className='flex items-start gap-1 mt-2 text-sm '>
                             <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
                             <span className="break-words">{order.deliveryAddress}</span>
@@ -381,6 +415,33 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
                           </div>
 
                           <div className="space-y-2 mt-2">
+                            <div className="text-xs bg-muted/50 p-2 rounded space-y-1">
+                              {order.customCakes.map((cake, i) => (
+                                <p key={i}>
+                                  <strong>{cake.portions} porciones</strong> - {cake.cakeFlavor}{cake.secondCakeFlavor ? `/${cake.secondCakeFlavor}` : ""}
+                                </p>
+                              ))}
+                              {(order.sweetTableCombos?.length || 0) > 0 && (
+                                <p>
+                                  {order.sweetTableCombos
+                                    .map(c => `Mesa dulce: ${c.products.map(p => `${p.quantity} ${p.productName}`).join(', ')}`)
+                                    .join(' | ')}
+                                </p>
+                              )}
+                              {(order.sweetTableExtras?.length || 0) > 0 && (
+                                <p>
+                                  Mesa dulce: {order.sweetTableExtras.map(e => `${e.quantity} ${e.product?.name || e.productName}`).join(', ')}
+                                </p>
+                              )}
+                              {order.items.map((item, i) => (
+                                <p key={i}>
+                                  <strong>{item.productName}</strong> - {item.quantity} Unidades
+                                </p>
+                              ))}
+                              {order.notes && (
+                                <p className="whitespace-pre-wrap">📝 {order.notes}</p>
+                              )}
+                            </div>
                             <div className="flex items-center gap-2 text-xs">
                               <a href={`tel:${order.customerPhone}`} className="text-primary flex items-center gap-1">
                                 <Phone className="h-3 w-3" />
@@ -432,6 +493,33 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
                             <Phone className="h-3 w-3" />
                             {order.customerPhone}
                           </a>
+                        </div>
+                        <div className="mt-2 space-y-1">
+                          {order.customCakes.map((cake, i) => (
+                            <p key={i} className="text-sm">
+                              <strong>{cake.portions} porciones</strong> - {cake.cakeFlavor}{cake.secondCakeFlavor ? `/${cake.secondCakeFlavor}` : ""}
+                            </p>
+                          ))}
+                          {(order.sweetTableCombos?.length || 0) > 0 && (
+                            <p className="text-sm">
+                              {order.sweetTableCombos
+                                .map(c => `Mesa dulce: ${c.products.map(p => `${p.quantity} ${p.productName}`).join(', ')}`)
+                                .join(' | ')}
+                            </p>
+                          )}
+                          {(order.sweetTableExtras?.length || 0) > 0 && (
+                            <p className="text-sm">
+                              Mesa dulce: {order.sweetTableExtras.map(e => `${e.quantity} ${e.product?.name || e.productName}`).join(', ')}
+                            </p>
+                          )}
+                          {order.items.map((item, i) => (
+                            <p key={i} className="text-sm">
+                              <strong>{item.productName}</strong> - {item.quantity} Unidades
+                            </p>
+                          ))}
+                          {order.notes && (
+                            <p className="text-sm whitespace-pre-wrap">📝 {order.notes}</p>
+                          )}
                         </div>
                       </div>
 

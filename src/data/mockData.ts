@@ -84,6 +84,7 @@ export const mockOrders: Order[] = [
   },
   {
     id: '2',
+    orderNumber: '0002',
     orderType: 'mixed',
     customerName: 'Carlos López',
     customerPhone: '76543210',
@@ -94,19 +95,27 @@ export const mockOrders: Order[] = [
       { productId: '4', product: mockProducts[3], quantity: 50, price: 15 }
     ],
     customCakes: [],
-    sweetTableCombo: {
-      products: [
-        { productId: '4', product: mockProducts[3], quantity: 50, pricePerUnit: 15 },
-        { productId: '6', product: mockProducts[5], quantity: 30, pricePerUnit: 8 },
-        { productId: '7', product: mockProducts[6], quantity: 20, pricePerUnit: 5 }
-      ],
-      totalQuantity: 100,
-      price: 1190
-    },
+    sweetTableCombos: [
+      {
+        id: '1',
+        comboId: '2',
+        name: 'Combo 100 postres',
+        products: [
+          { productId: '4', product: mockProducts[3], quantity: 50, pricePerUnit: 15 },
+          { productId: '6', product: mockProducts[5], quantity: 30, pricePerUnit: 8 },
+          { productId: '7', product: mockProducts[6], quantity: 20, pricePerUnit: 5 }
+        ],
+        totalQuantity: 100,
+        price: 750
+      }
+    ],
+    sweetTableExtras: [
+      { productId: '6', product: mockProducts[5], quantity: 5, price: 8 }
+    ],
     deliveryCost: 0,
     deposit: 500,
     depositMethod: 'cash',
-    total: 1190,
+    total: 1540,
     createdAt: new Date(),
     createdBy: '2'
   },
@@ -221,6 +230,7 @@ export const mockCombos: SweetTableCombo[] = [
     name: 'Combo 50 postres',
     totalQuantity: 50,
     fixedPrice: 400,
+    price: 400,
     products: [
       { productId: '4', product: mockProducts[3], quantity: 20, pricePerUnit: 15 },
       { productId: '6', product: mockProducts[5], quantity: 15, pricePerUnit: 8 },
@@ -233,6 +243,7 @@ export const mockCombos: SweetTableCombo[] = [
     name: 'Combo 100 postres',
     totalQuantity: 100,
     fixedPrice: 750,
+    price: 750,
     products: [
       { productId: '4', product: mockProducts[3], quantity: 40, pricePerUnit: 15 },
       { productId: '6', product: mockProducts[5], quantity: 30, pricePerUnit: 8 },

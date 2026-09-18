@@ -1,5 +1,5 @@
 import api from '@/api/api';
-import { mockOrders, mockProducts } from '@/data/mockData';
+import { mockOrders, mockProducts, mockCombos } from '@/data/mockData';
 import type { 
   Order, 
   OrderStatus,
@@ -11,7 +11,8 @@ import type {
   UpdateOrderData,
   Flavor,
   Product,
-  PaymentMethod
+  PaymentMethod,
+  SweetTableCombo
 } from '@/types';
 
 export interface IOrdersApi {
@@ -23,6 +24,7 @@ export interface IOrdersApi {
   updateOrderStatus(id: string, status: OrderStatus, paymentMethod?: PaymentMethod): Promise<Order>;
   getFlavors(): Promise<Flavor[]>;
   getProducts(searchTerm?: string): Promise<Product[]>;
+  getSweetTableCombos(): Promise<SweetTableCombo[]>;
 }
 
 export class MockOrdersApi implements IOrdersApi {
@@ -171,9 +173,18 @@ export class MockOrdersApi implements IOrdersApi {
       );
     }
     
-    // Sumar mesa dulce
-    if (orderData.sweetTableCombo) {
-      total += orderData.sweetTableCombo.price;
+    // Sumar mesas dulces predeterminadas (el precio de cada mesa no cambia al modificar su composición)
+    if (orderData.sweetTableCombos) {
+      total += orderData.sweetTableCombos.reduce((sum: number, combo: OrderCombo) => 
+        sum + (combo.price || 0), 0
+      );
+    }
+
+    // Sumar postres adicionales agregados manualmente
+    if (orderData.sweetTableExtras) {
+      total += orderData.sweetTableExtras.reduce((sum: number, extra: OrderItem) => 
+        sum + (extra.price || 0) * (extra.quantity || 0), 0
+      );
     }
     
     // Sumar costo de envío
@@ -217,6 +228,11 @@ export class MockOrdersApi implements IOrdersApi {
     }
     
     return filtered;
+  }
+
+  async getSweetTableCombos(): Promise<SweetTableCombo[]> {
+    await this.simulateNetworkDelay();
+    return [...mockCombos];
   }
 }
 
@@ -275,10 +291,16 @@ export class OrdersApi implements IOrdersApi {
       if (!response.data.success) {
         throw new Error(response.data.message || 'Error al obtener el pedido');
       }
+
+      const [year, month, day] = response.data.data.pickupDate.split('-');
       
       const order = {
         ...response.data.data,
-        pickupDate: new Date(response.data.data.pickupDate),
+        pickupDate: new Date(
+            Number(year),
+            Number(month) - 1,
+            Number(day)
+          ),
         createdAt: new Date(response.data.data.createdAt)
       };
       
@@ -393,6 +415,21 @@ export class OrdersApi implements IOrdersApi {
       return response.data.data as Product[];
     } catch (error: any) {
       console.error('Error en getProducts:', error);
+      throw new Error(error.response?.data?.message || error.message || 'Error de conexión');
+    }
+  }
+
+  async getSweetTableCombos(): Promise<SweetTableCombo[]> {
+    try {
+      const response = await api.get('/sweet-table-combos');
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Error al obtener las mesas dulces');
+      }
+
+      return response.data.data as SweetTableCombo[];
+    } catch (error: any) {
+      console.error('Error en getSweetTableCombos:', error);
       throw new Error(error.response?.data?.message || error.message || 'Error de conexión');
     }
   }

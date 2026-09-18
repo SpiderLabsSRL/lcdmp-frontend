@@ -49,16 +49,16 @@ export default function OrderDetail({ order, onDeliver }: OrderDetailProps) {
         {/* Información del cliente y entrega */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div>
-            <p className="text-xs sm:text-sm ">Cliente</p>
-            <p className="font-medium text-sm sm:text-base">{order.customerName}</p>
-            <p className="text-xs sm:text-sm">{order.customerPhone}</p>
+            <p className="text-sm text-foreground">Cliente</p>
+            <p className="font-semibold text-base text-foreground">{order.customerName}</p>
+            <p className="text-sm text-foreground">{order.customerPhone}</p>
           </div>
           <div>
-            <p className="text-xs sm:text-sm ">Entrega</p>
-            <p className="font-medium text-sm sm:text-base">
+            <p className="text-sm text-foreground">Entrega</p>
+            <p className="font-semibold text-base text-foreground">
               {format(order.pickupDate, "dd 'de' MMMM 'de' yyyy", { locale: es })}
             </p>
-            <p className="text-xs sm:text-sm">{order.pickupTime}</p>
+            <p className="text-sm text-foreground">{order.pickupTime}</p>
           </div>
         </div>
 
@@ -75,36 +75,23 @@ export default function OrderDetail({ order, onDeliver }: OrderDetailProps) {
           </div>
         )}
 
-        <div className="border-t pt-3 sm:pt-4">
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <p className="text-xs ">Tipo de pedido</p>
-            <p className="text-sm font-medium capitalize">{getOrderType(order.orderType)}</p>
-          </div>
-          <div>
-            <p className="text-xs ">Fecha de creación</p>
-            <p className="text-sm">{format(order.createdAt, "dd/MM/yyyy HH:mm")}</p>
-          </div>
-        </div>
-      </div>
-
       {/* Tortas personalizadas */}
       {order.customCakes.length > 0 && (
         <div className="border-t pt-3 sm:pt-4">
-          <h4 className="font-medium text-sm sm:text-base mb-2">🎂 Tortas personalizadas</h4>
+          <h4 className="font-semibold text-base text-foreground mb-2">Tortas personalizadas</h4>
           {order.customCakes.map((cake, i) => (
             <div key={i} className="bg-muted/50 p-3 rounded-lg mb-2">
               <div className="flex justify-between items-start mb-2">
                 <div>
-                  <p className="font-medium">
+                  <p className="font-semibold text-base text-foreground">
                     {cake.quantity > 1 ? `${cake.quantity} x ` : ''}
                     {cake.portions} porciones
                   </p>
-                  <p className="text-sm mt-1">
+                  <p className="text-sm text-foreground mt-1">
                     Sabores: {cake.cakeFlavor}
                     {cake.secondCakeFlavor && ` / ${cake.secondCakeFlavor}`}
                   </p>
-                  <p className="text-sm">
+                  <p className="text-sm text-foreground">
                     Rellenos: {cake.fillingFlavor}
                     {cake.secondFillingFlavor && ` / ${cake.secondFillingFlavor}`}
                   </p>
@@ -112,17 +99,17 @@ export default function OrderDetail({ order, onDeliver }: OrderDetailProps) {
                 <p className="font-bold text-primary">Bs. {cake.price * cake.quantity}</p>
               </div>
               {cake.shape && (
-                <p className="text-sm ">Forma: {cake.shape}</p>
+                <p className="text-sm text-foreground">Forma: {cake.shape}</p>
               )}
               {cake.design && (
-                <p className="text-sm mt-1">🎨 Diseño: {cake.design}</p>
+                <p className="text-sm text-foreground mt-1">Diseño: {cake.design}</p>
               )}
               {cake.dedication && (
-                <p className="text-sm italic">💝 "{cake.dedication}"</p>
+                <p className="text-sm italic text-foreground">"{cake.dedication}"</p>
               )}
               {cake.referenceImages && cake.referenceImages.length > 0 && (
-                <p className="text-sm  mt-1">
-                  📸 {cake.referenceImages.length} imágenes de referencia
+                <p className="text-sm text-foreground mt-1">
+                  {cake.referenceImages.length} imágenes de referencia
                 </p>
               )}
             </div>
@@ -133,19 +120,19 @@ export default function OrderDetail({ order, onDeliver }: OrderDetailProps) {
       {/* Productos del catálogo */}
       {order.items.length > 0 && (
         <div className="border-t pt-3 sm:pt-4">
-          <h4 className="font-medium text-sm sm:text-base mb-2">📦 Productos del catálogo</h4>
+          <h4 className="font-semibold text-base text-foreground mb-2">Productos del catálogo</h4>
           {order.items.map((item, i) => (
             <div key={i} className="bg-muted/50 p-3 rounded-lg mb-2">
               <div className="flex justify-between items-start">
                 <div className="flex-1">
-                  <p className="font-medium">
+                  <p className="font-semibold text-base text-foreground">
                     {item.quantity} x {item.product?.name || item.productName}
                   </p>
                   {item.notes && (
-                    <p className="text-xs  mt-1">📝 {item.notes}</p>
+                    <p className="text-sm text-foreground mt-1">{item.notes}</p>
                   )}
                 </div>
-                <p className="font-medium">Bs. {item.price * item.quantity}</p>
+                <p className="font-semibold text-foreground">Bs. {item.price * item.quantity}</p>
               </div>
             </div>
           ))}
@@ -153,30 +140,56 @@ export default function OrderDetail({ order, onDeliver }: OrderDetailProps) {
       )}
 
       {/* Mesa Dulce */}
-      {order.sweetTableCombo && (
+      {(order.sweetTableCombos?.length || 0) > 0 && (
         <div className="border-t pt-3 sm:pt-4">
-          <h4 className="font-medium text-sm sm:text-base mb-2">🍰 Mesa Dulce</h4>
-          <div className="bg-muted/50 p-3 rounded-lg">
-            <div className="flex justify-between">
-              <div>
-                <p className="font-medium">{order.sweetTableCombo.totalQuantity} postres</p>
-                {order.sweetTableCombo.details && (
-                  <p className="text-sm mt-1">{order.sweetTableCombo.details}</p>
-                )}
+          <h4 className="font-semibold text-base text-foreground mb-2">Mesas Dulces</h4>
+          {order.sweetTableCombos.map((combo, i) => (
+            <div key={combo.id || i} className="bg-muted/50 p-3 rounded-lg mb-2">
+              <div className="flex justify-between">
+                <div>
+                  <p className="font-semibold text-base text-foreground">{combo.name || 'Mesa dulce'} — {combo.totalQuantity} postres</p>
+                  {combo.products.length > 0 && (
+                    <ul className="text-sm text-foreground mt-1 list-disc list-inside">
+                      {combo.products.map((p, pi) => (
+                        <li key={pi}>{p.quantity} x {p.product?.name || p.productName}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {combo.details && (
+                    <p className="text-sm text-foreground mt-1">{combo.details}</p>
+                  )}
+                </div>
+                <p className="font-bold text-primary">Bs. {combo.price}</p>
               </div>
-              <p className="font-bold text-primary">Bs. {order.sweetTableCombo.price}</p>
             </div>
-          </div>
+          ))}
+        </div>
+      )}
+
+      {/* Postres adicionales de Mesa Dulce */}
+      {(order.sweetTableExtras?.length || 0) > 0 && (
+        <div className="border-t pt-3 sm:pt-4">
+          <h4 className="font-semibold text-base text-foreground mb-2">Mesa Dulce</h4>
+          {order.sweetTableExtras.map((extra, i) => (
+            <div key={i} className="bg-muted/50 p-3 rounded-lg mb-2">
+              <div className="flex justify-between items-start">
+                <p className="font-semibold text-base text-foreground">
+                  {extra.quantity} x {extra.product?.name || extra.productName}
+                </p>
+                <p className="font-semibold text-foreground">Bs. {extra.price * extra.quantity}</p>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
       {/* Información de envío */}
       {order.deliveryAddress && (
         <div className="border-t pt-3 sm:pt-4">
-          <h4 className="font-medium text-sm sm:text-base mb-2">🚚 Información de envío</h4>
+          <h4 className="font-semibold text-base text-foreground mb-2">Información de envío</h4>
           <div className="bg-muted/50 p-3 rounded-lg">
-            <p className="text-sm">Dirección: {order.deliveryAddress}</p>
-            <p className="text-sm mt-1">Costo de envío: Bs. {order.deliveryCost}</p>
+            <p className="text-sm text-foreground">Dirección: {order.deliveryAddress}</p>
+            <p className="text-sm text-foreground mt-1">Costo de envío: Bs. {order.deliveryCost}</p>
           </div>
         </div>
       )}
@@ -184,10 +197,10 @@ export default function OrderDetail({ order, onDeliver }: OrderDetailProps) {
       {/* Garantía */}
       {order.guarantee && (
         <div className="border-t pt-3 sm:pt-4">
-          <h4 className="font-medium text-sm sm:text-base mb-2">🔒 Garantía</h4>
+          <h4 className="font-semibold text-base text-foreground mb-2">Garantía</h4>
           <div className="bg-muted/50 p-3 rounded-lg">
-            <p className="text-sm">Artículos: {order.guarantee.items}</p>
-            <p className="text-sm mt-1">Valor: Bs. {order.guarantee.amount}</p>
+            <p className="text-sm text-foreground">Artículos: {order.guarantee.items}</p>
+            <p className="text-sm text-foreground mt-1">Valor: Bs. {order.guarantee.amount}</p>
           </div>
         </div>
       )}
@@ -196,8 +209,8 @@ export default function OrderDetail({ order, onDeliver }: OrderDetailProps) {
       {order.couponCode && (
         <div className="border-t pt-3 sm:pt-4">
           <div className="bg-muted/50 p-3 rounded-lg">
-            <p className="text-sm">🎫 Cupón aplicado: {order.couponCode}</p>
-            <p className="text-sm">Descuento: Bs. {order.discount || 0}</p>
+            <p className="text-sm text-foreground">Cupón aplicado: {order.couponCode}</p>
+            <p className="text-sm text-foreground">Descuento: Bs. {order.discount || 0}</p>
           </div>
         </div>
       )}
@@ -205,9 +218,9 @@ export default function OrderDetail({ order, onDeliver }: OrderDetailProps) {
       {/* Notas adicionales */}
       {order.notes && (
         <div className="border-t pt-3 sm:pt-4">
-          <h4 className="font-medium text-sm sm:text-base mb-2">📝 Notas adicionales</h4>
+          <h4 className="font-semibold text-base text-foreground mb-2">Notas adicionales</h4>
           <div className="bg-muted/50 p-3 rounded-lg">
-            <p className="text-sm whitespace-pre-wrap">{order.notes}</p>
+            <p className="text-sm text-foreground whitespace-pre-wrap">{order.notes}</p>
           </div>
         </div>
       )}
@@ -215,12 +228,12 @@ export default function OrderDetail({ order, onDeliver }: OrderDetailProps) {
         {/* Totales */}
         <div className="border-t pt-3 sm:pt-4">
           <div className="space-y-2">
-            <div className="flex justify-between text-sm">
+            <div className="flex justify-between text-sm text-foreground">
               <span>Subtotal:</span>
               <span>Bs. {order.total + (order.discount || 0) - (order.deliveryCost || 0)}</span>
             </div>
             {order.deliveryCost > 0 && (
-              <div className="flex justify-between text-sm">
+              <div className="flex justify-between text-sm text-foreground">
                 <span>Costo de envío:</span>
                 <span>+ Bs. {order.deliveryCost}</span>
               </div>
@@ -232,21 +245,21 @@ export default function OrderDetail({ order, onDeliver }: OrderDetailProps) {
               </div>
             )}
             <div className="flex justify-between pt-2 border-t">
-              <p className="font-semibold">Total</p>
+              <p className="font-semibold text-base text-foreground">Total</p>
               <p className="text-xl font-bold text-primary">Bs. {order.total}</p>
             </div>
-            <div className="flex justify-between text-sm">
+            <div className="flex justify-between text-sm text-foreground">
               <span>Adelanto pagado:</span>
               <span className="font-medium">Bs. {order.deposit}</span>
             </div>
-            <div className="flex justify-between text-sm">
+            <div className="flex justify-between text-sm text-foreground">
               <span>Saldo pendiente:</span>
               <span className={`font-medium ${order.total - order.deposit > 0 ? 'text-orange-500' : 'text-green-600'}`}>
                 Bs. {order.total - order.deposit}
               </span>
             </div>
             {order.depositMethod && (
-              <div className="flex justify-between text-sm ">
+              <div className="flex justify-between text-sm text-foreground">
                 <span>Método de pago del adelanto:</span>
                 <span className="uppercase">{order.depositMethod}</span>
               </div>
@@ -259,7 +272,7 @@ export default function OrderDetail({ order, onDeliver }: OrderDetailProps) {
           <Badge className={statusConfig[order.status].color}>
             {statusConfig[order.status].label}
           </Badge>
-          <p className="text-xs ">
+          <p className="text-sm text-foreground">
             Creado por: {order.createdByUsername}
           </p>
         </div>
