@@ -236,7 +236,8 @@ export const mockCombos: SweetTableCombo[] = [
       { productId: '6', product: mockProducts[5], quantity: 15, pricePerUnit: 8 },
       { productId: '7', product: mockProducts[6], quantity: 15, pricePerUnit: 5 },
     ],
-    isPreset: true
+    isPreset: true,
+    isActive: true
   },
   {
     id: '2',
@@ -249,7 +250,8 @@ export const mockCombos: SweetTableCombo[] = [
       { productId: '6', product: mockProducts[5], quantity: 30, pricePerUnit: 8 },
       { productId: '7', product: mockProducts[6], quantity: 30, pricePerUnit: 5 },
     ],
-    isPreset: true
+    isPreset: true,
+    isActive: true
   }
 ];
 

@@ -1,5 +1,5 @@
 // src/pages/Products.tsx (versión modificada)
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,9 +13,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { MobileCard, MobileCardHeader, MobileCardRow, useIsMobile } from '@/components/ui/responsive-table';
-import { Plus, Search, Edit2, Trash2, Cake, Package, Filter, X, PlusCircle, Loader2 } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Cake, Package, Filter, X, PlusCircle, Loader2, Gift, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
-import { Flavor, Product, CreateProductData, EditProductData, AddStockData, CreateFlavorData, EditFlavorData } from '@/types';
+import { Flavor, Product, CreateProductData, EditProductData, AddStockData, CreateFlavorData, EditFlavorData, SweetTableCombo, CreateSweetTableComboData, EditSweetTableComboData, ComboProduct } from '@/types';
 import { categories } from '@/types/consts';
 import { IProductsApi, defaultProductsApi } from '@/api/ProductsApi';
 
@@ -25,6 +25,7 @@ interface ProductsProps {
 
 export default function Products({ api = defaultProductsApi }: ProductsProps) {
   const isMobile = useIsMobile();
+  const [activeTab, setActiveTab] = useState('products');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
@@ -37,7 +38,7 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
-  
+
   // Estado para sabores
   const [flavors, setFlavors] = useState<Flavor[]>([]);
   const [editingFlavor, setEditingFlavor] = useState<Flavor | null>(null);
@@ -45,10 +46,19 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
   const [isFlavorDeleteDialogOpen, setIsFlavorDeleteDialogOpen] = useState(false);
   const [loadingFlavors, setLoadingFlavors] = useState(true);
 
+  // Estado para mesas dulces predefinidas
+  const [combos, setCombos] = useState<SweetTableCombo[]>([]);
+  const [isComboDialogOpen, setIsComboDialogOpen] = useState(false);
+  const [editingCombo, setEditingCombo] = useState<SweetTableCombo | null>(null);
+  const [deletingCombo, setDeletingCombo] = useState<SweetTableCombo | null>(null);
+  const [isComboDeleteDialogOpen, setIsComboDeleteDialogOpen] = useState(false);
+  const [loadingCombos, setLoadingCombos] = useState(true);
+
   // Cargar datos iniciales
   useEffect(() => {
     loadProducts();
     loadFlavors();
+    loadCombos();
   }, []);
 
   useEffect(() => {
@@ -78,6 +88,19 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
       toast.error('Error al cargar los sabores');
     } finally {
       setLoadingFlavors(false);
+    }
+  };
+
+  const loadCombos = async () => {
+    try {
+      setLoadingCombos(true);
+      const data = await api.getSweetTableCombos();
+      setCombos(data);
+    } catch (error) {
+      console.error('Error loading sweet table combos:', error);
+      toast.error('Error al cargar las mesas dulces');
+    } finally {
+      setLoadingCombos(false);
     }
   };
 
@@ -277,6 +300,78 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
     }
   };
 
+  const handleCreateCombo = () => {
+    setEditingCombo(null);
+    setIsComboDialogOpen(true);
+  };
+
+  const handleEditCombo = (combo: SweetTableCombo) => {
+    setEditingCombo(combo);
+    setIsComboDialogOpen(true);
+  };
+
+  const handleCloseComboDialog = () => {
+    setIsComboDialogOpen(false);
+    setEditingCombo(null);
+  };
+
+  const handleSaveCombo = async (data: CreateSweetTableComboData) => {
+    try {
+      if (editingCombo) {
+        const editData: EditSweetTableComboData = { id: editingCombo.id, ...data };
+        await api.editSweetTableCombo(editData);
+        toast.success(`Mesa dulce "${data.name}" actualizada exitosamente`);
+      } else {
+        await api.createSweetTableCombo(data);
+        toast.success(`Mesa dulce "${data.name}" creada exitosamente`);
+      }
+      await loadCombos();
+      handleCloseComboDialog();
+    } catch (error) {
+      console.error('Error saving sweet table combo:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al guardar la mesa dulce');
+    }
+  };
+
+  const handleToggleComboStatus = async (combo: SweetTableCombo) => {
+    try {
+      const updatedCombo = await api.toggleSweetTableComboStatus(combo.id, !combo.isActive);
+      setCombos(combos.map(c => c.id === combo.id ? updatedCombo : c));
+      toast.success(`Mesa dulce "${updatedCombo.name}" ${updatedCombo.isActive ? 'activada' : 'desactivada'} exitosamente`);
+    } catch (error) {
+      console.error('Error toggling combo status:', error);
+      toast.error('Error al cambiar el estado de la mesa dulce');
+    }
+  };
+
+  const handleDeleteCombo = (combo: SweetTableCombo) => {
+    setDeletingCombo(combo);
+    setIsComboDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDeleteCombo = async () => {
+    if (!deletingCombo) return;
+
+    setSubmitting(true);
+    try {
+      await api.deleteSweetTableCombo(deletingCombo.id);
+      await loadCombos();
+      setIsComboDeleteDialogOpen(false);
+      toast.success(`Mesa dulce "${deletingCombo.name}" eliminada exitosamente`);
+    } catch (error) {
+      console.error('Error deleting sweet table combo:', error);
+      toast.error('Error al eliminar la mesa dulce');
+    } finally {
+      setSubmitting(false);
+      setDeletingCombo(null);
+    }
+  };
+
+  const handleCancelDeleteCombo = () => {
+    setDeletingCombo(null);
+    setIsComboDeleteDialogOpen(false);
+  };
+
   return (
     <MainLayout>
       <div className="space-y-4 sm:space-y-6 animate-fade-in">
@@ -291,60 +386,76 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
           </div>
           
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <Dialog open={isFlavorDialogOpen} onOpenChange={(open) => {
-              if (!open) setEditingFlavor(null);
-              setIsFlavorDialogOpen(open);
-            }}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="w-full sm:w-auto justify-center">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nuevo Sabor
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="w-[95vw] sm:w-full max-w-lg rounded-lg">
-                <DialogHeader>
-                  <DialogTitle className="text-lg sm:text-xl">
-                    {editingFlavor ? 'Editar Sabor' : 'Nuevo Sabor'}
-                  </DialogTitle>
-                </DialogHeader>
-                <FlavorForm 
-                  onClose={() => {
-                    setIsFlavorDialogOpen(false);
-                    setEditingFlavor(null);
-                  }} 
-                  onSave={editingFlavor ? handleUpdateFlavor : handleAddFlavor}
-                  initialFlavor={editingFlavor}
-                />
-              </DialogContent>
-            </Dialog>
-            
-            <Dialog open={isProductDialogOpen} onOpenChange={(open) => {
-              if (!open) handleCloseProductDialog();
-              setIsProductDialogOpen(open);
-            }}>
-              <DialogContent className="w-[95vw] sm:w-full max-w-lg rounded-lg max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle className="text-lg sm:text-xl">
-                    {editingProduct ? 'Editar Producto' : 'Nuevo Producto'}
-                  </DialogTitle>
-                </DialogHeader>
-                <ProductForm 
-                  onClose={handleCloseProductDialog} 
-                  onSave={handleProductSaved}
-                  initialProduct={editingProduct}
-                />
-              </DialogContent>
-            </Dialog>
+            {activeTab === 'flavors' && (
+              <Dialog open={isFlavorDialogOpen} onOpenChange={(open) => {
+                if (!open) setEditingFlavor(null);
+                setIsFlavorDialogOpen(open);
+              }}>
+                <DialogTrigger asChild>
+                  <Button className="w-full sm:w-auto justify-center">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nuevo Sabor
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="w-[95vw] sm:w-full max-w-lg rounded-lg">
+                  <DialogHeader>
+                    <DialogTitle className="text-lg sm:text-xl">
+                      {editingFlavor ? 'Editar Sabor' : 'Nuevo Sabor'}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <FlavorForm
+                    onClose={() => {
+                      setIsFlavorDialogOpen(false);
+                      setEditingFlavor(null);
+                    }}
+                    onSave={editingFlavor ? handleUpdateFlavor : handleAddFlavor}
+                    initialFlavor={editingFlavor}
+                  />
+                </DialogContent>
+              </Dialog>
+            )}
 
-            <Button 
-              className="w-full sm:w-auto justify-center"
-              onClick={handleCreateProduct}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Nuevo Producto
-            </Button>
+            {activeTab === 'products' && (
+              <>
+                <Dialog open={isProductDialogOpen} onOpenChange={(open) => {
+                  if (!open) handleCloseProductDialog();
+                  setIsProductDialogOpen(open);
+                }}>
+                  <DialogContent className="w-[95vw] sm:w-full max-w-lg rounded-lg max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle className="text-lg sm:text-xl">
+                        {editingProduct ? 'Editar Producto' : 'Nuevo Producto'}
+                      </DialogTitle>
+                    </DialogHeader>
+                    <ProductForm
+                      onClose={handleCloseProductDialog}
+                      onSave={handleProductSaved}
+                      initialProduct={editingProduct}
+                    />
+                  </DialogContent>
+                </Dialog>
+
+                <Button
+                  className="w-full sm:w-auto justify-center"
+                  onClick={handleCreateProduct}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nuevo Producto
+                </Button>
+              </>
+            )}
+
+            {activeTab === 'combos' && (
+              <Button
+                className="w-full sm:w-auto justify-center"
+                onClick={handleCreateCombo}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Nueva Mesa Dulce
+              </Button>
+            )}
           </div>
-          
+
           <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
             <DialogContent>
               <DialogHeader>
@@ -414,6 +525,56 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
               )}
             </DialogContent>
           </Dialog>
+
+          <Dialog open={isComboDialogOpen} onOpenChange={(open) => {
+            if (!open) handleCloseComboDialog();
+            setIsComboDialogOpen(open);
+          }}>
+            <DialogContent className="w-[95vw] sm:w-full max-w-2xl rounded-lg max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="text-lg sm:text-xl">
+                  {editingCombo ? 'Editar Mesa Dulce' : 'Nueva Mesa Dulce'}
+                </DialogTitle>
+              </DialogHeader>
+              <ComboForm
+                onClose={handleCloseComboDialog}
+                onSave={handleSaveCombo}
+                initialCombo={editingCombo}
+                catalogProducts={products}
+              />
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={isComboDeleteDialogOpen} onOpenChange={setIsComboDeleteDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Eliminar mesa dulce</DialogTitle>
+                <DialogDescription>
+                  ¿Estás seguro de que deseas eliminar esta mesa dulce? Esta acción no se puede deshacer. Los pedidos ya creados con esta mesa no se ven afectados.
+                </DialogDescription>
+              </DialogHeader>
+              {deletingCombo && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-muted rounded-lg">
+                    <p className="font-medium">{deletingCombo.name}</p>
+                    <p className="text-sm ">
+                      {deletingCombo.totalQuantity} postres · Bs. {deletingCombo.fixedPrice ?? deletingCombo.price}
+                    </p>
+                  </div>
+                  <div className="flex justify-end gap-3">
+                    <Button variant="outline" onClick={handleCancelDeleteCombo} disabled={submitting}>
+                      Cancelar
+                    </Button>
+                    <Button variant="destructive" onClick={handleConfirmDeleteCombo} disabled={submitting}>
+                      {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Eliminar Mesa Dulce
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* Stock Dialog */}
@@ -434,10 +595,11 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
           </DialogContent>
         </Dialog>
 
-        <Tabs defaultValue="products" className="px-4 sm:px-0">
-          <TabsList className="w-full sm:w-auto grid grid-cols-2 sm:inline-flex">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="px-4 sm:px-0">
+          <TabsList className="w-full sm:w-auto grid grid-cols-3 sm:inline-flex">
             <TabsTrigger value="products">Productos</TabsTrigger>
             <TabsTrigger value="flavors">Sabores</TabsTrigger>
+            <TabsTrigger value="combos">Mesa Dulce</TabsTrigger>
           </TabsList>
 
           <TabsContent value="products" className="space-y-4 mt-4">
@@ -812,6 +974,78 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
               </div>
             )}
           </TabsContent>
+
+          <TabsContent value="combos" className="space-y-4 mt-4">
+            {loadingCombos ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : combos.length === 0 ? (
+              <Card className="mx-4 sm:mx-0">
+                <CardContent className="p-8 text-center space-y-3">
+                  <Gift className="h-10 w-10 mx-auto text-muted-foreground" />
+                  <p className="">No hay mesas dulces configuradas todavía</p>
+                  <Button onClick={handleCreateCombo}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Crear la primera mesa dulce
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 px-4 sm:px-0">
+                {combos.map(combo => (
+                  <Card key={combo.id} className={`transition-opacity ${!combo.isActive ? 'opacity-60' : ''}`}>
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-semibold text-base truncate">{combo.name}</p>
+                            {!combo.isActive && (
+                              <Badge variant="secondary" className="text-xs">Inactiva</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm  mt-0.5">{combo.totalQuantity} postres</p>
+                        </div>
+                        <Switch
+                          checked={combo.isActive}
+                          onCheckedChange={() => handleToggleComboStatus(combo)}
+                        />
+                      </div>
+
+                      <p className="text-2xl font-bold text-primary">Bs. {combo.fixedPrice ?? combo.price}</p>
+
+                      <div className="bg-muted/50 rounded-lg p-2.5 space-y-1">
+                        {combo.products.map((p, i) => (
+                          <p key={i} className="text-sm truncate">
+                            {p.quantity} × {p.productName || p.product?.name}
+                          </p>
+                        ))}
+                      </div>
+
+                      <div className="flex justify-end gap-1 pt-1 border-t">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => handleEditCombo(combo)}
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => handleDeleteCombo(combo)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
         </Tabs>
       </div>
     </MainLayout>
@@ -1144,6 +1378,244 @@ function FlavorForm({ onClose, onSave, initialFlavor }: {
         <Button type="submit" className="w-full sm:w-auto order-1 sm:order-2" disabled={submitting}>
           {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
           {isEditing ? 'Actualizar Sabor' : 'Crear Sabor'}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+interface ComboFormRow {
+  productId: string;
+  quantity: number;
+  pricePerUnit: number;
+}
+
+function ComboForm({ onClose, onSave, initialCombo, catalogProducts }: {
+  onClose: () => void;
+  onSave: (data: CreateSweetTableComboData) => Promise<void>;
+  initialCombo?: SweetTableCombo | null;
+  catalogProducts: Product[];
+}) {
+  const isEditing = !!initialCombo;
+  const [submitting, setSubmitting] = useState(false);
+  const [name, setName] = useState(initialCombo?.name || '');
+  const [isActive, setIsActive] = useState(initialCombo?.isActive ?? true);
+  const [rows, setRows] = useState<ComboFormRow[]>(
+    initialCombo?.products.map(p => ({
+      productId: p.productId,
+      quantity: p.quantity,
+      pricePerUnit: p.pricePerUnit,
+    })) || [{ productId: '', quantity: 1, pricePerUnit: 0 }]
+  );
+  const [price, setPrice] = useState(initialCombo?.fixedPrice ?? initialCombo?.price ?? 0);
+  const [priceManuallyEdited, setPriceManuallyEdited] = useState(false);
+  const isFirstRender = useRef(true);
+
+  const totalQuantity = rows.reduce((sum, r) => sum + (r.quantity || 0), 0);
+  const computedPrice = rows.reduce((sum, r) => sum + (r.quantity || 0) * (r.pricePerUnit || 0), 0);
+
+  // Sugiere el precio automáticamente a partir de los productos, salvo que
+  // el usuario ya lo haya editado a mano. No se dispara al abrir el
+  // formulario en modo edición, para no pisar el precio ya guardado.
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    if (!priceManuallyEdited) {
+      setPrice(computedPrice);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [computedPrice]);
+
+  const addRow = () => {
+    setRows([...rows, { productId: '', quantity: 1, pricePerUnit: 0 }]);
+  };
+
+  const removeRow = (index: number) => {
+    setRows(rows.filter((_, i) => i !== index));
+  };
+
+  const updateRowProduct = (index: number, productId: string) => {
+    const product = catalogProducts.find(p => p.id === productId);
+    // basePrice puede llegar como string desde la API (DECIMAL de Postgres
+    // sin castear), por lo que se normaliza explícitamente a number.
+    const basePrice = product?.basePrice !== undefined ? Number(product.basePrice) : undefined;
+    setRows(rows.map((row, i) =>
+      i === index ? { ...row, productId, pricePerUnit: basePrice ?? row.pricePerUnit } : row
+    ));
+  };
+
+  const updateRowQuantity = (index: number, quantity: number) => {
+    setRows(rows.map((row, i) => i === index ? { ...row, quantity } : row));
+  };
+
+  const updateRowPricePerUnit = (index: number, pricePerUnit: number) => {
+    setRows(rows.map((row, i) => i === index ? { ...row, pricePerUnit } : row));
+  };
+
+  const handleUsesSuggestedPrice = () => {
+    setPrice(computedPrice);
+    setPriceManuallyEdited(false);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!name.trim()) {
+      toast.error('El nombre de la mesa dulce es requerido');
+      return;
+    }
+
+    const validRows = rows.filter(r => r.productId);
+    if (validRows.length === 0) {
+      toast.error('Agrega al menos un producto a la mesa dulce');
+      return;
+    }
+
+    if (validRows.some(r => !r.quantity || r.quantity <= 0)) {
+      toast.error('Cada producto debe tener una cantidad mayor a 0');
+      return;
+    }
+
+    if (!price || price <= 0) {
+      toast.error('El precio debe ser mayor a 0');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await onSave({
+        name: name.trim(),
+        fixedPrice: Number(price),
+        isActive,
+        products: validRows.map(r => ({
+          productId: r.productId,
+          quantity: Number(r.quantity),
+          pricePerUnit: Number(r.pricePerUnit),
+        })),
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4 px-1">
+      <div className="space-y-1.5 sm:space-y-2">
+        <Label className="text-sm">Nombre *</Label>
+        <Input
+          placeholder="Ej: Combo 50 postres"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+          className="text-sm"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label className="text-sm">Productos incluidos *</Label>
+          <span className="text-xs ">Total: {totalQuantity} postres</span>
+        </div>
+
+        <div className="space-y-2">
+          {rows.map((row, index) => (
+            <div key={index} className="flex flex-col sm:flex-row gap-2 sm:items-center bg-muted/50 p-2 rounded-lg">
+              <Select value={row.productId} onValueChange={(v) => updateRowProduct(index, v)}>
+                <SelectTrigger className="text-sm flex-1">
+                  <SelectValue placeholder="Seleccionar producto" />
+                </SelectTrigger>
+                <SelectContent>
+                  {catalogProducts.map(product => (
+                    <SelectItem key={product.id} value={product.id}>{product.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  min="1"
+                  placeholder="Cant."
+                  value={row.quantity || ''}
+                  onChange={(e) => updateRowQuantity(index, parseInt(e.target.value) || 0)}
+                  className="text-sm w-full sm:w-20"
+                />
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="Bs./u"
+                  value={row.pricePerUnit || ''}
+                  onChange={(e) => updateRowPricePerUnit(index, parseFloat(e.target.value) || 0)}
+                  className="text-sm w-full sm:w-24"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  onClick={() => removeRow(index)}
+                  disabled={rows.length === 1}
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <Button type="button" variant="outline" size="sm" onClick={addRow} className="w-full sm:w-auto">
+          <Plus className="h-4 w-4 mr-2" />
+          Agregar producto
+        </Button>
+      </div>
+
+      <div className="space-y-1.5 sm:space-y-2">
+        <div className="flex items-center justify-between flex-wrap gap-1">
+          <Label className="text-sm">Precio (Bs.) *</Label>
+          {Math.abs(computedPrice - price) > 0.01 && (
+            <button
+              type="button"
+              onClick={handleUsesSuggestedPrice}
+              className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+            >
+              <RefreshCw className="h-3 w-3" />
+              Usar precio sugerido: Bs. {computedPrice.toFixed(2)}
+            </button>
+          )}
+        </div>
+        <Input
+          type="number"
+          min="0"
+          step="0.01"
+          placeholder="0"
+          value={price || ''}
+          onChange={(e) => {
+            setPrice(parseFloat(e.target.value) || 0);
+            setPriceManuallyEdited(true);
+          }}
+          className="text-sm"
+        />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Switch
+          id="combo-active"
+          checked={isActive}
+          onCheckedChange={setIsActive}
+          className="scale-75 sm:scale-100"
+        />
+        <Label htmlFor="combo-active" className="text-sm">Mesa dulce activa</Label>
+      </div>
+
+      <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 pt-2">
+        <Button type="button" variant="outline" onClick={onClose} className="w-full sm:w-auto order-2 sm:order-1" disabled={submitting}>
+          Cancelar
+        </Button>
+        <Button type="submit" className="w-full sm:w-auto order-1 sm:order-2" disabled={submitting}>
+          {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          {isEditing ? 'Actualizar Mesa Dulce' : 'Crear Mesa Dulce'}
         </Button>
       </div>
     </form>

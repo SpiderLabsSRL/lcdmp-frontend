@@ -102,7 +102,12 @@ export default function Decoration({ decorationApi = defaultDecorationApi }: Dec
 
   const handleCompleteOrder = (order: Order) => {
     setSelectedOrder(order);
-    setCompletedCakes(new Set(order.customCakes?.map((_, idx) => `cake-${idx}`) || []));
+    const initial = new Set<string>([
+      ...(order.customCakes?.map((_, idx) => `cake-${idx}`) || []),
+      ...(order.sweetTableCombos?.map((_, idx) => `combo-${idx}`) || []),
+      ...(order.sweetTableExtras?.map((_, idx) => `extra-${idx}`) || []),
+    ]);
+    setCompletedCakes(initial);
     setIsCompleteDialogOpen(true);
   };
 
@@ -525,10 +530,63 @@ export default function Decoration({ decorationApi = defaultDecorationApi }: Dec
                       </div>
                     </div>
                   ))}
+                  {selectedOrder.sweetTableCombos?.map((combo, i) => (
+                    <div key={`combo-${i}`} className="flex items-start gap-3 p-2 sm:p-3 bg-muted/50 rounded-lg">
+                      <Checkbox
+                        id={`combo-dec-${i}`}
+                        checked={completedCakes.has(`combo-${i}`)}
+                        onCheckedChange={(checked) => {
+                          const newSet = new Set(completedCakes);
+                          if (checked) {
+                            newSet.add(`combo-${i}`);
+                          } else {
+                            newSet.delete(`combo-${i}`);
+                          }
+                          setCompletedCakes(newSet);
+                        }}
+                      />
+                      <div className="flex-1">
+                        <label
+                          htmlFor={`combo-dec-${i}`}
+                          className="font-medium text-sm cursor-pointer"
+                        >
+                          Mesa dulce: {combo.products.map(p => `${p.quantity} ${p.productName}`).join(', ')}
+                        </label>
+                        {combo.details && (
+                          <p className="text-xs  mt-1 line-clamp-2">{combo.details}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {selectedOrder.sweetTableExtras?.map((extra, i) => (
+                    <div key={`extra-${i}`} className="flex items-start gap-3 p-2 sm:p-3 bg-muted/50 rounded-lg">
+                      <Checkbox
+                        id={`extra-dec-${i}`}
+                        checked={completedCakes.has(`extra-${i}`)}
+                        onCheckedChange={(checked) => {
+                          const newSet = new Set(completedCakes);
+                          if (checked) {
+                            newSet.add(`extra-${i}`);
+                          } else {
+                            newSet.delete(`extra-${i}`);
+                          }
+                          setCompletedCakes(newSet);
+                        }}
+                      />
+                      <div className="flex-1">
+                        <label
+                          htmlFor={`extra-dec-${i}`}
+                          className="font-medium text-sm cursor-pointer"
+                        >
+                          {extra.quantity} x {extra.product?.name || extra.productName}
+                        </label>
+                      </div>
+                    </div>
+                  ))}
                   {selectedOrder.items?.map((item, i) => (
                     <div key={i} className="flex items-start gap-3 p-2 sm:p-3 bg-muted/50 rounded-lg">
-                      <Checkbox 
-                        id={`item-dec-${i}`} 
+                      <Checkbox
+                        id={`item-dec-${i}`}
                         checked={completedCakes.has(`item-${i}`)}
                         onCheckedChange={(checked) => {
                           const newSet = new Set(completedCakes);

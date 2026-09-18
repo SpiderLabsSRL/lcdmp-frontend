@@ -173,6 +173,7 @@ export interface SweetTableCombo {
   products: ComboProduct[];
   isPreset: boolean;
   details?: string;
+  isActive: boolean;
 }
 
 export interface ComboProduct {
@@ -181,6 +182,21 @@ export interface ComboProduct {
   productName?: string;
   quantity: number;
   pricePerUnit: number;
+}
+
+export interface CreateSweetTableComboData {
+  name: string;
+  fixedPrice: number;
+  isActive: boolean;
+  products: {
+    productId: string;
+    quantity: number;
+    pricePerUnit: number;
+  }[];
+}
+
+export interface EditSweetTableComboData extends Partial<CreateSweetTableComboData> {
+  id: string;
 }
 
 // Order Types
