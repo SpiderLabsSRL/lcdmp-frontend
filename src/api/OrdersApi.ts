@@ -1,7 +1,8 @@
 import api from '@/api/api';
 import { mockOrders, mockProducts, mockCombos } from '@/data/mockData';
-import type { 
-  Order, 
+import { getWorkItemsAtStage } from '@/utils/workItems';
+import type {
+  Order,
   OrderStatus,
   CustomCake,
   OrderItem,
@@ -12,7 +13,10 @@ import type {
   Flavor,
   Product,
   PaymentMethod,
-  SweetTableCombo
+  SweetTableCombo,
+  WorkItemType,
+  ProductStatus,
+  ItemStageLogEntry
 } from '@/types';
 
 export interface IOrdersApi {
@@ -22,6 +26,8 @@ export interface IOrdersApi {
   updateOrder(id: string, data: UpdateOrderData): Promise<Order>;
   deleteOrder(id: string): Promise<void>;
   updateOrderStatus(id: string, status: OrderStatus, paymentMethod?: PaymentMethod): Promise<Order>;
+  advanceItemStage(orderId: string, itemType: WorkItemType, itemId: string, toStage: ProductStatus): Promise<Order>;
+  getOrderProductionLog(orderId: string): Promise<ItemStageLogEntry[]>;
   getFlavors(): Promise<Flavor[]>;
   getProducts(searchTerm?: string): Promise<Product[]>;
   getSweetTableCombos(): Promise<SweetTableCombo[]>;
@@ -46,7 +52,11 @@ export class MockOrdersApi implements IOrdersApi {
       if (filters.status) {
         filtered = filtered.filter(o => o.status === filters.status);
       }
-      
+
+      if (filters.itemStage) {
+        filtered = filtered.filter(o => getWorkItemsAtStage([o], filters.itemStage!).length > 0);
+      }
+
       if (filters.startDate && filters.endDate) {
         filtered = filtered.filter(o => 
           o.pickupDate >= filters.startDate! && 
@@ -148,8 +158,25 @@ export class MockOrdersApi implements IOrdersApi {
     
     this.orders[index] = { ...this.orders[index], status };
     console.log('Mock order status updated:', { id, status });
-    
+
     return this.orders[index];
+  }
+
+  async advanceItemStage(orderId: string, itemType: WorkItemType, itemId: string, toStage: ProductStatus): Promise<Order> {
+    await this.simulateNetworkDelay();
+
+    const index = this.orders.findIndex(o => o.id === orderId);
+    if (index === -1) {
+      throw new Error(`Order with id ${orderId} not found`);
+    }
+
+    console.log('Mock advanceItemStage:', { orderId, itemType, itemId, toStage });
+    return this.orders[index];
+  }
+
+  async getOrderProductionLog(orderId: string): Promise<ItemStageLogEntry[]> {
+    await this.simulateNetworkDelay();
+    return [];
   }
 
   private async simulateNetworkDelay(): Promise<void> {
@@ -243,6 +270,7 @@ export class OrdersApi implements IOrdersApi {
       
       if (filters) {
         if (filters.status) params.status = filters.status;
+        if (filters.itemStage) params.itemStage = filters.itemStage;
         if (filters.startDate) params.startDate = filters.startDate.toISOString();
         if (filters.endDate) params.endDate = filters.endDate.toISOString();
         if (filters.customerName) params.customerName = filters.customerName;
@@ -386,7 +414,41 @@ export class OrdersApi implements IOrdersApi {
       throw new Error(error.response?.data?.message || error.message || 'Error al actualizar el estado');
     }
   }
-  
+
+  async advanceItemStage(orderId: string, itemType: WorkItemType, itemId: string, toStage: ProductStatus): Promise<Order> {
+    try {
+      const response = await api.patch(`/orders/${orderId}/items/${itemType}/${itemId}/advance`, { toStage });
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Error al actualizar la etapa');
+      }
+
+      return {
+        ...response.data.data,
+        pickupDate: new Date(response.data.data.pickupDate),
+        createdAt: new Date(response.data.data.createdAt)
+      };
+    } catch (error: any) {
+      console.error('Error en advanceItemStage:', error);
+      throw new Error(error.response?.data?.message || error.message || 'Error al actualizar la etapa');
+    }
+  }
+
+  async getOrderProductionLog(orderId: string): Promise<ItemStageLogEntry[]> {
+    try {
+      const response = await api.get(`/orders/${orderId}/production-log`);
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Error al obtener el historial de producción');
+      }
+
+      return response.data.data as ItemStageLogEntry[];
+    } catch (error: any) {
+      console.error('Error en getOrderProductionLog:', error);
+      throw new Error(error.response?.data?.message || error.message || 'Error de conexión');
+    }
+  }
+
   async getFlavors(): Promise<Flavor[]> {
     try {
       const response = await api.get('/products/flavors');

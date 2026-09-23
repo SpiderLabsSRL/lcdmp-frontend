@@ -213,6 +213,11 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
     await handleUpdateStatus(orderId, 'delivered', paymentMethod)
   };
 
+  const handleCancelOrder = async (orderId: string) => {
+    setSelectedOrder(null);
+    await handleUpdateStatus(orderId, 'cancelled');
+  };
+
   const resetFilters = () => {
     setSearchTerm('');
     setSelectedStatus('all');
@@ -396,39 +401,19 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
                           {config.label}
                         </Badge>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 shrink-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSelectOrder(order);
-                        }}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8 shrink-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditOrder(order);
-                        }}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        className="h-8 w-8 shrink-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteOrder(order.id);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {(order.status !== 'cancelled' && order.status !== 'delivered') && (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 shrink-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditOrder(order);
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      )}
                     </MobileCardHeader>
                     
                     <div className="space-y-2 px-3 pb-3">
@@ -566,56 +551,25 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
                             </p>
                           </TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
-                            <Select
-                              value={order.status}
-                              onValueChange={(value) => handleUpdateStatus(order.id, value as OrderStatus)}
-                            >
-                              <SelectTrigger className={`${config.color} border-0 w-auto`}>
-                                <Icon className="h-3 w-3 mr-1 inline" />
-                                {config.label}
-                              </SelectTrigger>
-                              <SelectContent>
-                                {Object.entries(statusConfig).map(([statusValue, { label }]) => (
-                                  <SelectItem key={statusValue} value={statusValue}>
-                                    {label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <Badge className={`${config.color} w-auto`}>
+                              <Icon className="h-3 w-3 mr-1 inline" />
+                              {config.label}
+                            </Badge>
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleSelectOrder(order);
-                                }}
-                                className="h-8 w-8"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditOrder(order);
-                                }}
-                              >
-                                <Edit className="h-4 w-4 mr-1" /> Editar
-                              </Button>
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteOrder(order.id);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4 mr-1" /> Eliminar
-                              </Button>
+                              {(order.status !== 'cancelled' && order.status !== 'delivered') && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditOrder(order);
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4 mr-1" /> Editar
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -634,9 +588,11 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
             <DialogHeader>
               <DialogTitle className="text-lg sm:text-xl">Pedido #{selectedOrder?.orderNumber}</DialogTitle>
             </DialogHeader>
-            {selectedOrder && <OrderDetail 
-              order={selectedOrder} 
+            {selectedOrder && <OrderDetail
+              order={selectedOrder}
               onDeliver={handleDeliverOrder}
+              onCancel={handleCancelOrder}
+              ordersApi={ordersApi}
             />}
           </DialogContent>
         </Dialog>

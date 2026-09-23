@@ -185,6 +185,8 @@ function buildMockApi(overrides: Partial<IOrdersApi> = {}): IOrdersApi {
     updateOrder: vi.fn().mockResolvedValue(orderWithCake),
     deleteOrder: vi.fn().mockResolvedValue(undefined),
     updateOrderStatus: vi.fn().mockResolvedValue(orderWithCake),
+    advanceItemStage: vi.fn().mockResolvedValue(orderWithCake),
+    getOrderProductionLog: vi.fn().mockResolvedValue([]),
     getFlavors: vi.fn().mockResolvedValue(flavors),
     getProducts: vi.fn().mockResolvedValue(products),
     getSweetTableCombos: vi.fn().mockResolvedValue(combos),
@@ -397,7 +399,7 @@ describe('Orders - row/card click opens detail dialog', () => {
     expect(toast.success).toHaveBeenCalledWith('Pedido eliminado exitosamente');
   });
 
-  it('desktop: changing the row status select does not open the detail dialog', async () => {
+  it('desktop: the row status is a read-only badge, not an editable select, and clicking it does not open the detail dialog', async () => {
     const api = buildMockApi();
     const user = userEvent.setup();
     renderWithProviders(<Orders ordersApi={api} />);
@@ -405,13 +407,31 @@ describe('Orders - row/card click opens detail dialog', () => {
     await waitFor(() => expect(screen.getByText('Maria Lopez')).toBeInTheDocument());
 
     const row = screen.getByText('Maria Lopez').closest('tr')!;
-    const statusTrigger = within(row).getByRole('combobox');
-    await user.click(statusTrigger);
+    expect(within(row).queryByRole('combobox')).not.toBeInTheDocument();
 
-    const option = await screen.findByRole('option', { name: 'Horneando' });
-    await user.click(option);
+    const statusBadge = within(row).getByText('Pendiente');
+    await user.click(statusBadge);
 
-    await waitFor(() => expect(api.updateOrderStatus).toHaveBeenCalledWith('1', 'baking', undefined));
+    expect(api.updateOrderStatus).not.toHaveBeenCalled();
+    expect(screen.queryByText('Pedido #ORD-001')).not.toBeInTheDocument();
+  });
+});
+
+describe('Orders - cancel order from detail dialog', () => {
+  it('cancels the order via the detail dialog and reloads the list', async () => {
+    const api = buildMockApi();
+    const user = userEvent.setup();
+    vi.stubGlobal('confirm', vi.fn(() => true));
+    renderWithProviders(<Orders ordersApi={api} />);
+
+    await waitFor(() => expect(screen.getByText('Maria Lopez')).toBeInTheDocument());
+
+    await user.click(screen.getByText('Maria Lopez'));
+    await screen.findByText('Pedido #ORD-001');
+
+    await user.click(screen.getByRole('button', { name: /Cancelar Pedido/i }));
+
+    await waitFor(() => expect(api.updateOrderStatus).toHaveBeenCalledWith('1', 'cancelled', undefined));
     expect(screen.queryByText('Pedido #ORD-001')).not.toBeInTheDocument();
   });
 });

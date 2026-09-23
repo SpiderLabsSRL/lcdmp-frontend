@@ -1,10 +1,11 @@
 // src/api/DecorationApi.ts
 import api from '@/api/api';
-import type { Order } from '@/types';
+import { getWorkItemsAtStage } from '@/utils/workItems';
+import type { Order, WorkItemType } from '@/types';
 
 export interface IDecorationApi {
   getDecorationOrders(signal?: AbortSignal): Promise<Order[]>;
-  completeDecoration(orderId: string, notes?: string): Promise<void>;
+  completeItem(orderId: string, itemType: WorkItemType, itemId: string): Promise<Order>;
   getOrderDetails(orderId: string): Promise<Order>;
 }
 
@@ -15,7 +16,7 @@ export class MockDecorationApi implements IDecorationApi {
     await new Promise(resolve => setTimeout(resolve, 300));
     
     // Filtrar órdenes que necesitan decoración
-    const decorationOrders = this.orders.filter(o => o.status === 'decorating');
+    const decorationOrders = this.orders.filter(o => getWorkItemsAtStage([o], 'decorating').length > 0);
     
     // Ordenar por urgencia (fecha de entrega más cercana)
     return decorationOrders.sort((a, b) => 
@@ -23,14 +24,14 @@ export class MockDecorationApi implements IDecorationApi {
     );
   }
 
-  async completeDecoration(orderId: string, notes?: string): Promise<void> {
+  async completeItem(orderId: string, itemType: WorkItemType, itemId: string): Promise<Order> {
     await new Promise(resolve => setTimeout(resolve, 300));
-    
+
     const order = this.orders.find(o => o.id === orderId);
     if (!order) throw new Error('Order not found');
-    
-    order.status = 'ready';
-    console.log('Mock decoration completed:', orderId, notes);
+
+    console.log('Mock completeItem (decorating -> ready):', { orderId, itemType, itemId });
+    return order;
   }
 
   async getOrderDetails(orderId: string): Promise<Order> {
@@ -52,7 +53,7 @@ export class DecorationApi implements IDecorationApi {
   async getDecorationOrders(signal?: AbortSignal): Promise<Order[]> {
     try {
       const params: any = {};
-      params.status = 'decorating';
+      params.itemStage = 'decorating';
 			params.limit = 50;
       
       const response = await api.get('/orders', { 
@@ -85,23 +86,21 @@ export class DecorationApi implements IDecorationApi {
     }
   }
 
-  async completeDecoration(orderId: string, notes?: string): Promise<void> {
+  async completeItem(orderId: string, itemType: WorkItemType, itemId: string): Promise<Order> {
     try {
-      const response = await api.patch(`/orders/${orderId}/status`, { status: 'ready' });
-      
+      const response = await api.patch(`/orders/${orderId}/items/${itemType}/${itemId}/advance`, { toStage: 'ready' });
+
       if (!response.data.success) {
-        throw new Error(response.data.message || 'Error al actualizar el estado');
+        throw new Error(response.data.message || 'Error al actualizar la etapa');
       }
-      
-      const order = {
+
+      return {
         ...response.data.data,
         pickupDate: new Date(response.data.data.pickupDate),
         createdAt: new Date(response.data.data.createdAt)
       };
-      
-      return order;
     } catch (error: any) {
-      console.error('Error en completeDecoration:', error);
+      console.error('Error en completeItem:', error);
       throw new Error(error.response?.data?.message || error.message || 'Error al completar la decoración');
     }
   }

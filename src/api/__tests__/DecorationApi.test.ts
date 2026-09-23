@@ -31,7 +31,7 @@ describe('DecorationApi (real, axios-backed)', () => {
   });
 
   describe('getDecorationOrders', () => {
-    it('gets /orders filtered to status=decorating with a limit and maps dates', async () => {
+    it('gets /orders filtered to itemStage=decorating with a limit and maps dates', async () => {
       const rawOrders = [
         { id: '1', pickupDate: '2026-03-05', createdAt: '2026-01-01T10:00:00.000Z' },
       ];
@@ -40,7 +40,7 @@ describe('DecorationApi (real, axios-backed)', () => {
       const result = await decorationApi.getDecorationOrders();
 
       expect(mockedApi.get).toHaveBeenCalledWith('/orders', {
-        params: { status: 'decorating', limit: 50 },
+        params: { itemStage: 'decorating', limit: 50 },
         signal: undefined,
       });
       expect(result[0].pickupDate).toEqual(new Date(2026, 2, 5));
@@ -54,7 +54,7 @@ describe('DecorationApi (real, axios-backed)', () => {
       await decorationApi.getDecorationOrders(controller.signal);
 
       expect(mockedApi.get).toHaveBeenCalledWith('/orders', {
-        params: { status: 'decorating', limit: 50 },
+        params: { itemStage: 'decorating', limit: 50 },
         signal: controller.signal,
       });
     });
@@ -72,26 +72,28 @@ describe('DecorationApi (real, axios-backed)', () => {
     });
   });
 
-  describe('completeDecoration', () => {
-    it('patches /orders/:id/status with status=ready', async () => {
-      const raw = { id: '3', status: 'ready', pickupDate: '2026-03-05T00:00:00.000Z', createdAt: '2026-01-01T00:00:00.000Z' };
+  describe('completeItem', () => {
+    it('patches /orders/:id/items/:itemType/:itemId/advance with toStage=ready and returns the mapped order', async () => {
+      const raw = { id: '3', status: 'decorating', pickupDate: '2026-03-05T00:00:00.000Z', createdAt: '2026-01-01T00:00:00.000Z' };
       mockedApi.patch.mockResolvedValue({ data: { success: true, data: raw } });
 
-      await decorationApi.completeDecoration('3', 'listo');
+      const result = await decorationApi.completeItem('3', 'custom_cake', 'cake-2');
 
-      expect(mockedApi.patch).toHaveBeenCalledWith('/orders/3/status', { status: 'ready' });
+      expect(mockedApi.patch).toHaveBeenCalledWith('/orders/3/items/custom_cake/cake-2/advance', { toStage: 'ready' });
+      expect(result.pickupDate).toEqual(new Date(raw.pickupDate));
+      expect(result.createdAt).toEqual(new Date(raw.createdAt));
     });
 
     it('throws with the backend message when success is false', async () => {
-      mockedApi.patch.mockResolvedValue({ data: { success: false, message: 'Error al actualizar el estado' } });
+      mockedApi.patch.mockResolvedValue({ data: { success: false, message: 'Error al actualizar la etapa' } });
 
-      await expect(decorationApi.completeDecoration('3')).rejects.toThrow('Error al actualizar el estado');
+      await expect(decorationApi.completeItem('3', 'custom_cake', 'cake-2')).rejects.toThrow('Error al actualizar la etapa');
     });
 
     it('throws with a connection error when the request itself fails', async () => {
       mockedApi.patch.mockRejectedValue(new Error('Network Error'));
 
-      await expect(decorationApi.completeDecoration('3')).rejects.toThrow('Network Error');
+      await expect(decorationApi.completeItem('3', 'custom_cake', 'cake-2')).rejects.toThrow('Network Error');
     });
   });
 
@@ -124,9 +126,9 @@ describe('MockDecorationApi (in-memory)', () => {
   let mockApi: MockDecorationApi;
 
   const baseOrders = [
-    { id: '1', status: 'decorating', pickupDate: new Date(2026, 2, 10) },
-    { id: '2', status: 'decorating', pickupDate: new Date(2026, 2, 5) },
-    { id: '3', status: 'pending', pickupDate: new Date(2026, 2, 1) },
+    { id: '1', status: 'decorating', pickupDate: new Date(2026, 2, 10), customCakes: [{ id: 'c1', status: 'decorating' }] },
+    { id: '2', status: 'decorating', pickupDate: new Date(2026, 2, 5), customCakes: [{ id: 'c2', status: 'decorating' }] },
+    { id: '3', status: 'pending', pickupDate: new Date(2026, 2, 1), customCakes: [{ id: 'c3', status: 'pending' }] },
   ] as unknown as Order[];
 
   beforeEach(() => {
@@ -140,18 +142,14 @@ describe('MockDecorationApi (in-memory)', () => {
     expect(orders.map(o => o.id)).toEqual(['2', '1']);
   });
 
-  it('completes decoration and moves the order to ready', async () => {
-    await mockApi.completeDecoration('1', 'notas');
+  it('completeItem returns the existing order without throwing', async () => {
+    const result = await mockApi.completeItem('1', 'custom_cake', 'c1');
 
-    const orders = await mockApi.getDecorationOrders();
-    expect(orders.some(o => o.id === '1')).toBe(false);
-
-    const details = await mockApi.getOrderDetails('1');
-    expect(details.status).toBe('ready');
+    expect(result.id).toBe('1');
   });
 
-  it('throws when completing decoration for a non-existent order', async () => {
-    await expect(mockApi.completeDecoration('missing')).rejects.toThrow('Order not found');
+  it('throws when completing an item for a non-existent order', async () => {
+    await expect(mockApi.completeItem('missing', 'custom_cake', 'c1')).rejects.toThrow('Order not found');
   });
 
   it('returns order details for an existing order', async () => {

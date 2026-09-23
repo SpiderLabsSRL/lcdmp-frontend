@@ -1,13 +1,12 @@
 import api from '@/api/api';
 import { mockOrders, mockBakedProducts } from '@/data/mockData';
-import type { Order, OrderStatus, CustomCake, BakedProduct } from '@/types';
+import { getWorkItemsAtStage } from '@/utils/workItems';
+import type { Order, OrderStatus, CustomCake, BakedProduct, WorkItemType } from '@/types';
 
 export interface IAssemblyApi {
-  getAssemblyOrders(): Promise<Order[]>;
-  //getAvailableBases(): Promise<BakedProduct[]>;
-  //checkMaterialAvailability(orderId: string): Promise<boolean>;
+  getAssemblyOrders(signal?: AbortSignal): Promise<Order[]>;
   updateOrderStatus(id: string, status: OrderStatus): Promise<Order>;
-  completeAssembly(orderId: string, assembledCakes: Map<string, boolean>): Promise<void>;
+  completeItem(orderId: string, itemType: WorkItemType, itemId: string): Promise<Order>;
 }
 
 export class MockAssemblyApi implements IAssemblyApi {
@@ -21,9 +20,9 @@ export class MockAssemblyApi implements IAssemblyApi {
 
   async getAssemblyOrders(): Promise<Order[]> {
     await this.simulateNetworkDelay();
-    
+
     return this.orders
-      .filter(o => o.status === 'assembling')
+      .filter(o => getWorkItemsAtStage([o], 'assembling').length > 0)
       .sort((a, b) => {
         const hoursA = this.getHoursUntilPickup(a.pickupDate);
         const hoursB = this.getHoursUntilPickup(b.pickupDate);
@@ -47,30 +46,16 @@ export class MockAssemblyApi implements IAssemblyApi {
     return this.orders[index];
   }
 
-  async completeAssembly(orderId: string, assembledCakes: Map<string, boolean>): Promise<void> {
+  async completeItem(orderId: string, itemType: WorkItemType, itemId: string): Promise<Order> {
     await this.simulateNetworkDelay();
-    
-    // Update order status to decorating
-    await this.updateOrderStatus(orderId, 'decorating');
-    
-    // Deduct used bases from inventory
-    const order = this.orders.find(o => o.id === orderId);
-    if (order) {
-      const basesNeeded = this.getTotalBasesNeeded(order.customCakes);
-      let remainingToDeduct = basesNeeded;
-      
-      for (const product of this.bakedProducts) {
-        if (product.type === 'cake_base' && remainingToDeduct > 0) {
-          const deduction = Math.min(product.quantity, remainingToDeduct);
-          product.quantity -= deduction;
-          remainingToDeduct -= deduction;
-          
-          if (remainingToDeduct === 0) break;
-        }
-      }
+
+    const index = this.orders.findIndex(o => o.id === orderId);
+    if (index === -1) {
+      throw new Error(`Order with id ${orderId} not found`);
     }
-    
-    console.log(`Assembly completed for order ${orderId}`);
+
+    console.log('Mock completeItem (assembling -> decorating):', { orderId, itemType, itemId });
+    return this.orders[index];
   }
 
   private async simulateNetworkDelay(): Promise<void> {
@@ -95,7 +80,7 @@ export class AssemblyApi implements IAssemblyApi {
   async getAssemblyOrders(signal?: AbortSignal): Promise<Order[]> {
     try {
       const params: any = {};
-      params.status = 'assembling';
+      params.itemStage = 'assembling';
 			params.limit = 50;
       
       const response = await api.get('/orders', { 
@@ -147,33 +132,21 @@ export class AssemblyApi implements IAssemblyApi {
     }
   }
 
-  async completeAssembly(orderId: string, assembledCakes: Map<string, boolean>): Promise<void> {
+  async completeItem(orderId: string, itemType: WorkItemType, itemId: string): Promise<Order> {
     try {
-      const payload = {
-        orderId,
-        assembledCakes: Array.from(assembledCakes.entries()).map(([cakeId, assembled]) => ({
-          cakeId,
-          assembled
-        }))
-      };
-      
-      //const response = await api.post('/assembly/complete', payload);
-      
-      const response = await api.patch(`/orders/${orderId}/status`, { status: 'decorating' });
-      
+      const response = await api.patch(`/orders/${orderId}/items/${itemType}/${itemId}/advance`, { toStage: 'decorating' });
+
       if (!response.data.success) {
-        throw new Error(response.data.message || 'Error al actualizar el estado');
+        throw new Error(response.data.message || 'Error al actualizar la etapa');
       }
-      
-      const order = {
+
+      return {
         ...response.data.data,
         pickupDate: new Date(response.data.data.pickupDate),
         createdAt: new Date(response.data.data.createdAt)
       };
-      
-      return order;
     } catch (error: any) {
-      console.error('Error en completeAssembly:', error);
+      console.error('Error en completeItem:', error);
       throw new Error(error.response?.data?.message || error.message || 'Error al completar el armado');
     }
   }

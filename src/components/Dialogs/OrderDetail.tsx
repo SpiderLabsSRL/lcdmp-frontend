@@ -1,6 +1,7 @@
-import { Order } from "@/types";
-import { format } from 'date-fns';
-import { Badge, Truck } from "lucide-react";
+import { Order, ItemStageLogEntry } from "@/types";
+import { format, differenceInMinutes } from 'date-fns';
+import { Truck, XCircle, ChevronDown, ChevronUp, History } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { statusConfig } from '@/types/consts';
 import { es } from "date-fns/locale";
 import { Button } from "../ui/button";
@@ -16,15 +17,31 @@ import {
 } from "@/components/ui/dialog";
 import { Banknote, QrCode } from "lucide-react";
 import { getOrderType } from "@/pages/Orders";
+import { IOrdersApi, defaultOrdersApi } from "@/api/OrdersApi";
 
 interface OrderDetailProps {
   order: Order;
   onDeliver?: (orderId: string, paymentMethod: PaymentMethod) => void;
+  onCancel?: (orderId: string) => void;
+  ordersApi?: IOrdersApi;
 }
 
-export default function OrderDetail({ order, onDeliver }: OrderDetailProps) {
+const itemStatusLabel = (status?: string) => {
+  if (!status) return null;
+  return statusConfig[status as keyof typeof statusConfig]?.label || status;
+};
+
+const itemStatusColor = (status?: string) => {
+  if (!status) return '';
+  return statusConfig[status as keyof typeof statusConfig]?.color || '';
+};
+
+export default function OrderDetail({ order, onDeliver, onCancel, ordersApi = defaultOrdersApi }: OrderDetailProps) {
   const [showDeliverDialog, setShowDeliverDialog] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  const [showHistory, setShowHistory] = useState(false);
+  const [productionLog, setProductionLog] = useState<ItemStageLogEntry[] | null>(null);
+  const [isLoadingLog, setIsLoadingLog] = useState(false);
 
   const handleDeliverClick = () => {
     setShowDeliverDialog(true);
@@ -41,6 +58,37 @@ export default function OrderDetail({ order, onDeliver }: OrderDetailProps) {
   const handleCancelDeliver = () => {
     setShowDeliverDialog(false);
     setPaymentMethod('cash');
+  };
+
+  const handleCancelOrder = () => {
+    if (!confirm('¿Estás seguro de que deseas cancelar este pedido?')) return;
+    onCancel?.(order.id);
+  };
+
+  const toggleHistory = async () => {
+    const next = !showHistory;
+    setShowHistory(next);
+    if (next && productionLog === null) {
+      setIsLoadingLog(true);
+      try {
+        const log = await ordersApi.getOrderProductionLog(order.id);
+        setProductionLog(log);
+      } catch (error) {
+        console.error('Error loading production log:', error);
+        setProductionLog([]);
+      } finally {
+        setIsLoadingLog(false);
+      }
+    }
+  };
+
+  const formatDuration = (entry: ItemStageLogEntry): string => {
+    if (!entry.completedAt) return 'En curso';
+    const minutes = differenceInMinutes(new Date(entry.completedAt), new Date(entry.enteredAt));
+    if (minutes < 60) return `${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    return rest > 0 ? `${hours}h ${rest}min` : `${hours}h`;
   };
 
   return (
@@ -83,10 +131,15 @@ export default function OrderDetail({ order, onDeliver }: OrderDetailProps) {
             <div key={i} className="bg-muted/50 p-3 rounded-lg mb-2">
               <div className="flex justify-between items-start mb-2">
                 <div>
-                  <p className="font-semibold text-base text-foreground">
-                    {cake.quantity > 1 ? `${cake.quantity} x ` : ''}
-                    {cake.portions} porciones
-                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-semibold text-base text-foreground">
+                      {cake.quantity > 1 ? `${cake.quantity} x ` : ''}
+                      {cake.portions} porciones
+                    </p>
+                    {cake.status && (
+                      <Badge className={itemStatusColor(cake.status)}>{itemStatusLabel(cake.status)}</Badge>
+                    )}
+                  </div>
                   <p className="text-sm text-foreground mt-1">
                     Sabores: {cake.cakeFlavor}
                     {cake.secondCakeFlavor && ` / ${cake.secondCakeFlavor}`}
@@ -125,9 +178,14 @@ export default function OrderDetail({ order, onDeliver }: OrderDetailProps) {
             <div key={i} className="bg-muted/50 p-3 rounded-lg mb-2">
               <div className="flex justify-between items-start">
                 <div className="flex-1">
-                  <p className="font-semibold text-base text-foreground">
-                    {item.quantity} x {item.product?.name || item.productName}
-                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-semibold text-base text-foreground">
+                      {item.quantity} x {item.product?.name || item.productName}
+                    </p>
+                    {item.status && (
+                      <Badge className={itemStatusColor(item.status)}>{itemStatusLabel(item.status)}</Badge>
+                    )}
+                  </div>
                   {item.notes && (
                     <p className="text-sm text-foreground mt-1">{item.notes}</p>
                   )}
@@ -149,9 +207,14 @@ export default function OrderDetail({ order, onDeliver }: OrderDetailProps) {
                 <div>
                   <p className="font-semibold text-base text-foreground">{combo.name || 'Mesa dulce'} — {combo.totalQuantity} postres</p>
                   {combo.products.length > 0 && (
-                    <ul className="text-sm text-foreground mt-1 list-disc list-inside">
+                    <ul className="text-sm text-foreground mt-1 list-disc list-inside space-y-1">
                       {combo.products.map((p, pi) => (
-                        <li key={pi}>{p.quantity} x {p.product?.name || p.productName}</li>
+                        <li key={pi}>
+                          {p.quantity} x {p.product?.name || p.productName}
+                          {p.status && (
+                            <Badge className={`${itemStatusColor(p.status)} ml-2`}>{itemStatusLabel(p.status)}</Badge>
+                          )}
+                        </li>
                       ))}
                     </ul>
                   )}
@@ -173,9 +236,14 @@ export default function OrderDetail({ order, onDeliver }: OrderDetailProps) {
           {order.sweetTableExtras.map((extra, i) => (
             <div key={i} className="bg-muted/50 p-3 rounded-lg mb-2">
               <div className="flex justify-between items-start">
-                <p className="font-semibold text-base text-foreground">
-                  {extra.quantity} x {extra.product?.name || extra.productName}
-                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-semibold text-base text-foreground">
+                    {extra.quantity} x {extra.product?.name || extra.productName}
+                  </p>
+                  {extra.status && (
+                    <Badge className={itemStatusColor(extra.status)}>{itemStatusLabel(extra.status)}</Badge>
+                  )}
+                </div>
                 <p className="font-semibold text-foreground">Bs. {extra.price * extra.quantity}</p>
               </div>
             </div>
@@ -276,6 +344,62 @@ export default function OrderDetail({ order, onDeliver }: OrderDetailProps) {
             Creado por: {order.createdByUsername}
           </p>
         </div>
+
+        {/* Historial de producción */}
+        <div className="border-t pt-3 sm:pt-4">
+          <Button
+            variant="ghost"
+            className="w-full justify-between px-0 hover:bg-transparent"
+            onClick={toggleHistory}
+          >
+            <span className="flex items-center gap-2 font-semibold text-base text-foreground">
+              <History className="h-4 w-4" />
+              Historial de producción
+            </span>
+            {showHistory ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </Button>
+          {showHistory && (
+            <div className="mt-2 space-y-2">
+              {isLoadingLog ? (
+                <p className="text-sm text-foreground">Cargando historial...</p>
+              ) : !productionLog || productionLog.length === 0 ? (
+                <p className="text-sm text-foreground">Sin historial de producción todavía.</p>
+              ) : (
+                productionLog.map(entry => (
+                  <div key={entry.id} className="bg-muted/50 p-3 rounded-lg text-sm text-foreground">
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                      <Badge className={itemStatusColor(entry.stage)}>{itemStatusLabel(entry.stage)}</Badge>
+                      <span className="font-medium">{formatDuration(entry)}</span>
+                    </div>
+                    <p className="mt-1">
+                      Entró: {format(new Date(entry.enteredAt), "dd MMM HH:mm", { locale: es })}
+                    </p>
+                    {entry.completedAt && (
+                      <p>
+                        Completado: {format(new Date(entry.completedAt), "dd MMM HH:mm", { locale: es })}
+                        {entry.completedByName && ` — por ${entry.completedByName}`}
+                      </p>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Cancelar pedido */}
+        {order.status !== 'delivered' && order.status !== 'cancelled' && onCancel && (
+          <div className="border-t pt-3 sm:pt-4">
+            <Button
+              onClick={handleCancelOrder}
+              variant="outline"
+              className="w-full text-destructive hover:text-destructive"
+            >
+              <XCircle className="h-4 w-4 mr-2" />
+              Cancelar Pedido
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Dialog para confirmar entrega */}

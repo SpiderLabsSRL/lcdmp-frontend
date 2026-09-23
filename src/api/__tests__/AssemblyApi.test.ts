@@ -30,7 +30,7 @@ describe('AssemblyApi (real, axios-backed)', () => {
   });
 
   describe('getAssemblyOrders', () => {
-    it('gets /orders filtered to status=assembling with a limit and maps dates', async () => {
+    it('gets /orders filtered to itemStage=assembling with a limit and maps dates', async () => {
       const rawOrders = [
         { id: '1', pickupDate: '2026-03-05', createdAt: '2026-01-01T10:00:00.000Z' },
       ];
@@ -39,7 +39,7 @@ describe('AssemblyApi (real, axios-backed)', () => {
       const result = await assemblyApi.getAssemblyOrders();
 
       expect(mockedApi.get).toHaveBeenCalledWith('/orders', {
-        params: { status: 'assembling', limit: 50 },
+        params: { itemStage: 'assembling', limit: 50 },
         signal: undefined,
       });
       expect(result[0].pickupDate).toEqual(new Date(2026, 2, 5));
@@ -53,7 +53,7 @@ describe('AssemblyApi (real, axios-backed)', () => {
       await assemblyApi.getAssemblyOrders(controller.signal);
 
       expect(mockedApi.get).toHaveBeenCalledWith('/orders', {
-        params: { status: 'assembling', limit: 50 },
+        params: { itemStage: 'assembling', limit: 50 },
         signal: controller.signal,
       });
     });
@@ -96,26 +96,28 @@ describe('AssemblyApi (real, axios-backed)', () => {
     });
   });
 
-  describe('completeAssembly', () => {
-    it('patches /orders/:id/status with status=decorating', async () => {
-      const raw = { id: '4', status: 'decorating', pickupDate: '2026-03-05T00:00:00.000Z', createdAt: '2026-01-01T00:00:00.000Z' };
+  describe('completeItem', () => {
+    it('patches /orders/:id/items/:itemType/:itemId/advance with toStage=decorating and returns the mapped order', async () => {
+      const raw = { id: '4', status: 'assembling', pickupDate: '2026-03-05T00:00:00.000Z', createdAt: '2026-01-01T00:00:00.000Z' };
       mockedApi.patch.mockResolvedValue({ data: { success: true, data: raw } });
 
-      await assemblyApi.completeAssembly('4', new Map([['cake1', true]]));
+      const result = await assemblyApi.completeItem('4', 'custom_cake', 'cake-3');
 
-      expect(mockedApi.patch).toHaveBeenCalledWith('/orders/4/status', { status: 'decorating' });
+      expect(mockedApi.patch).toHaveBeenCalledWith('/orders/4/items/custom_cake/cake-3/advance', { toStage: 'decorating' });
+      expect(result.pickupDate).toEqual(new Date(raw.pickupDate));
+      expect(result.createdAt).toEqual(new Date(raw.createdAt));
     });
 
     it('throws with the backend message when success is false', async () => {
-      mockedApi.patch.mockResolvedValue({ data: { success: false, message: 'Error al actualizar el estado' } });
+      mockedApi.patch.mockResolvedValue({ data: { success: false, message: 'Error al actualizar la etapa' } });
 
-      await expect(assemblyApi.completeAssembly('4', new Map())).rejects.toThrow('Error al actualizar el estado');
+      await expect(assemblyApi.completeItem('4', 'custom_cake', 'cake-3')).rejects.toThrow('Error al actualizar la etapa');
     });
 
     it('throws with a connection error when the request itself fails', async () => {
       mockedApi.patch.mockRejectedValue(new Error('Network Error'));
 
-      await expect(assemblyApi.completeAssembly('4', new Map())).rejects.toThrow('Network Error');
+      await expect(assemblyApi.completeItem('4', 'custom_cake', 'cake-3')).rejects.toThrow('Network Error');
     });
   });
 });
@@ -127,11 +129,12 @@ describe('MockAssemblyApi (in-memory)', () => {
     mockApi = new MockAssemblyApi();
   });
 
-  it('returns only orders with status assembling', async () => {
+  it('returns only orders that have at least one item in the assembling stage', async () => {
     const orders = await mockApi.getAssemblyOrders();
 
     expect(orders.length).toBeGreaterThan(0);
-    expect(orders.every(o => o.status === 'assembling')).toBe(true);
+    // Order '4' is the only mock order with a custom cake in the assembling stage.
+    expect(orders.map(o => o.id)).toEqual(['4']);
   });
 
   it('updates the status of an existing order', async () => {
@@ -144,13 +147,13 @@ describe('MockAssemblyApi (in-memory)', () => {
     await expect(mockApi.updateOrderStatus('missing', 'decorating')).rejects.toThrow('Order with id missing not found');
   });
 
-  it('completeAssembly moves the order out of the assembling queue', async () => {
-    const before = await mockApi.getAssemblyOrders();
-    expect(before.some(o => o.id === '4')).toBe(true);
+  it('completeItem returns the existing order without throwing', async () => {
+    const result = await mockApi.completeItem('4', 'custom_cake', '3');
 
-    await mockApi.completeAssembly('4', new Map([['1', true]]));
+    expect(result.id).toBe('4');
+  });
 
-    const after = await mockApi.getAssemblyOrders();
-    expect(after.some(o => o.id === '4')).toBe(false);
+  it('throws when completing an item for a non-existent order', async () => {
+    await expect(mockApi.completeItem('missing', 'custom_cake', '3')).rejects.toThrow('Order with id missing not found');
   });
 }, 20000);

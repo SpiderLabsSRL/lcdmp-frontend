@@ -65,6 +65,7 @@ describe('useOrdersSocket', () => {
         'order:created',
         'order:updated',
         'order:status_changed',
+        'order:item_stage_changed',
         'order:deleted',
       ])
     );
@@ -219,6 +220,196 @@ describe('useOrdersSocket', () => {
     });
   });
 
+  describe('itemStageFilter', () => {
+    it('adds an order on order:item_stage_changed when a line matches the stage', () => {
+      const { result } = renderHook(() =>
+        useOrdersSocket({ itemStageFilter: 'baking', initialOrders: EMPTY_ORDERS })
+      );
+
+      act(() => {
+        getHandler('order:item_stage_changed')({
+          orderId: 'a1',
+          itemType: 'custom_cake',
+          itemId: 'cake-1',
+          stage: 'baking',
+          order: makeOrder({
+            id: 'a1',
+            status: 'baking',
+            customCakes: [{ id: 'cake-1', status: 'baking' }],
+          }),
+        });
+      });
+
+      expect(result.current.orders).toHaveLength(1);
+      expect(result.current.orders[0].id).toBe('a1');
+    });
+
+    it('updates an order in place on order:item_stage_changed when it still matches', () => {
+      const initial = [
+        makeOrder({
+          id: 'a1',
+          status: 'baking',
+          customerName: 'Old',
+          customCakes: [{ id: 'cake-1', status: 'baking' }],
+        }),
+      ] as unknown as Order[];
+      const { result } = renderHook(() =>
+        useOrdersSocket({ itemStageFilter: 'baking', initialOrders: initial })
+      );
+
+      act(() => {
+        getHandler('order:item_stage_changed')({
+          orderId: 'a1',
+          itemType: 'custom_cake',
+          itemId: 'cake-1',
+          stage: 'baking',
+          order: makeOrder({
+            id: 'a1',
+            status: 'baking',
+            customerName: 'New',
+            customCakes: [{ id: 'cake-1', status: 'baking' }],
+          }),
+        });
+      });
+
+      expect(result.current.orders).toHaveLength(1);
+      expect(result.current.orders[0].customerName).toBe('New');
+    });
+
+    it('removes an order on order:item_stage_changed when no line matches the stage anymore', () => {
+      const initial = [
+        makeOrder({
+          id: 'a1',
+          status: 'assembling',
+          customCakes: [{ id: 'cake-1', status: 'baking' }],
+        }),
+      ] as unknown as Order[];
+      const { result } = renderHook(() =>
+        useOrdersSocket({ itemStageFilter: 'baking', initialOrders: initial })
+      );
+
+      act(() => {
+        getHandler('order:item_stage_changed')({
+          orderId: 'a1',
+          itemType: 'custom_cake',
+          itemId: 'cake-1',
+          stage: 'assembling',
+          order: makeOrder({
+            id: 'a1',
+            status: 'assembling',
+            customCakes: [{ id: 'cake-1', status: 'assembling' }],
+          }),
+        });
+      });
+
+      expect(result.current.orders).toHaveLength(0);
+    });
+
+    it('does nothing on order:item_stage_changed when the order still does not match', () => {
+      const { result } = renderHook(() =>
+        useOrdersSocket({ itemStageFilter: 'baking', initialOrders: EMPTY_ORDERS })
+      );
+
+      act(() => {
+        getHandler('order:item_stage_changed')({
+          orderId: 'unknown',
+          itemType: 'custom_cake',
+          itemId: 'cake-1',
+          stage: 'assembling',
+          order: makeOrder({
+            id: 'unknown',
+            status: 'assembling',
+            customCakes: [{ id: 'cake-1', status: 'assembling' }],
+          }),
+        });
+      });
+
+      expect(result.current.orders).toHaveLength(0);
+    });
+
+    it('respects itemStageFilter on order:created, adding only when a line matches', () => {
+      const { result } = renderHook(() =>
+        useOrdersSocket({ itemStageFilter: 'baking', initialOrders: EMPTY_ORDERS })
+      );
+
+      act(() => {
+        getHandler('order:created')(
+          makeOrder({ id: 'new-1', status: 'pending', customCakes: [{ id: 'c1', status: 'pending' }] })
+        );
+      });
+      expect(result.current.orders).toHaveLength(0);
+
+      act(() => {
+        getHandler('order:created')(
+          makeOrder({ id: 'new-2', status: 'baking', customCakes: [{ id: 'c2', status: 'baking' }] })
+        );
+      });
+      expect(result.current.orders).toHaveLength(1);
+      expect(result.current.orders[0].id).toBe('new-2');
+    });
+
+    it('respects itemStageFilter on order:status_changed, adding/removing based on line status', () => {
+      const initial = [
+        makeOrder({
+          id: 'a1',
+          status: 'baking',
+          customCakes: [{ id: 'cake-1', status: 'baking' }],
+        }),
+      ] as unknown as Order[];
+      const { result } = renderHook(() =>
+        useOrdersSocket({ itemStageFilter: 'baking', initialOrders: initial })
+      );
+
+      act(() => {
+        getHandler('order:status_changed')({
+          id: 'a1',
+          status: 'assembling',
+          order: makeOrder({
+            id: 'a1',
+            status: 'assembling',
+            customCakes: [{ id: 'cake-1', status: 'assembling' }],
+          }),
+        });
+      });
+      expect(result.current.orders).toHaveLength(0);
+
+      act(() => {
+        getHandler('order:status_changed')({
+          id: 'a2',
+          status: 'baking',
+          order: makeOrder({
+            id: 'a2',
+            status: 'baking',
+            customCakes: [{ id: 'cake-2', status: 'baking' }],
+          }),
+        });
+      });
+      expect(result.current.orders).toHaveLength(1);
+      expect(result.current.orders[0].id).toBe('a2');
+    });
+  });
+
+  it('plain statusFilter usage (no itemStageFilter) still works as before (regression guard)', () => {
+    const initial = [makeOrder({ id: 'a1', status: 'pending' })] as unknown as Order[];
+    const { result } = renderHook(() =>
+      useOrdersSocket({ statusFilter: ['pending'], initialOrders: initial })
+    );
+
+    act(() => {
+      getHandler('order:created')(makeOrder({ id: 'a2', status: 'pending' }));
+    });
+    expect(result.current.orders.map((o) => o.id)).toEqual(['a2', 'a1']);
+
+    act(() => {
+      getHandler('order:status_changed')({
+        id: 'a1',
+        status: 'baking',
+        order: makeOrder({ id: 'a1', status: 'baking' }),
+      });
+    });
+    expect(result.current.orders.map((o) => o.id)).toEqual(['a2']);
+  });
+
   it('removes an order on order:deleted', () => {
     const initial = [makeOrder({ id: '1' }), makeOrder({ id: '2' })] as unknown as Order[];
     const { result } = renderHook(() => useOrdersSocket({ initialOrders: initial }));
@@ -242,8 +433,19 @@ describe('useOrdersSocket', () => {
         'order:created',
         'order:updated',
         'order:status_changed',
+        'order:item_stage_changed',
         'order:deleted',
       ])
     );
+  });
+
+  it('unregisters the order:item_stage_changed listener on unmount', () => {
+    const { unmount } = renderHook(() =>
+      useOrdersSocket({ itemStageFilter: 'baking', initialOrders: EMPTY_ORDERS })
+    );
+    unmount();
+
+    const offEvents = mockSocket.off.mock.calls.map((c) => c[0]);
+    expect(offEvents).toContain('order:item_stage_changed');
   });
 });

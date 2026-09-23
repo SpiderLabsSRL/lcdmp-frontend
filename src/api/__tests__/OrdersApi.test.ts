@@ -64,6 +64,18 @@ describe('OrdersApi (real, axios-backed)', () => {
       });
     });
 
+    it('forwards the itemStage filter as its own param', async () => {
+      mockedApi.get.mockResolvedValue({ data: { success: true, data: [] } });
+      const filters: OrderFilters = { itemStage: 'baking' };
+
+      await ordersApi.getOrders(filters);
+
+      expect(mockedApi.get).toHaveBeenCalledWith('/orders', {
+        params: { itemStage: 'baking' },
+        signal: undefined,
+      });
+    });
+
     it('maps pickupDate (local, from Y-M-D) and createdAt on each order', async () => {
       const rawOrders = [{ id: '1', pickupDate: '2026-03-05', createdAt: '2026-01-01T10:00:00.000Z' }];
       mockedApi.get.mockResolvedValue({ data: { success: true, data: rawOrders } });
@@ -231,6 +243,57 @@ describe('OrdersApi (real, axios-backed)', () => {
     });
   });
 
+  describe('advanceItemStage', () => {
+    it('patches /orders/:id/items/:itemType/:itemId/advance with toStage and returns the mapped order', async () => {
+      const raw = { id: '1', status: 'assembling', pickupDate: '2026-03-05T00:00:00.000Z', createdAt: '2026-01-01T00:00:00.000Z' };
+      mockedApi.patch.mockResolvedValue({ data: { success: true, data: raw } });
+
+      const result = await ordersApi.advanceItemStage('1', 'custom_cake', 'cake-1', 'assembling');
+
+      expect(mockedApi.patch).toHaveBeenCalledWith('/orders/1/items/custom_cake/cake-1/advance', { toStage: 'assembling' });
+      expect(result.pickupDate).toEqual(new Date(raw.pickupDate));
+      expect(result.createdAt).toEqual(new Date(raw.createdAt));
+    });
+
+    it('throws with the backend message when success is false', async () => {
+      mockedApi.patch.mockResolvedValue({ data: { success: false, message: 'Error al actualizar la etapa' } });
+
+      await expect(ordersApi.advanceItemStage('1', 'custom_cake', 'cake-1', 'assembling')).rejects.toThrow('Error al actualizar la etapa');
+    });
+
+    it('throws with a connection error when the request itself fails', async () => {
+      mockedApi.patch.mockRejectedValue(new Error('Network Error'));
+
+      await expect(ordersApi.advanceItemStage('1', 'custom_cake', 'cake-1', 'assembling')).rejects.toThrow('Network Error');
+    });
+  });
+
+  describe('getOrderProductionLog', () => {
+    it('gets /orders/:id/production-log and returns the list', async () => {
+      const log = [
+        { id: 'log-1', itemType: 'custom_cake', itemId: 'cake-1', stage: 'baking', enteredAt: '2026-01-01T00:00:00.000Z', completedAt: null, completedById: null, completedByName: null },
+      ];
+      mockedApi.get.mockResolvedValue({ data: { success: true, data: log } });
+
+      const result = await ordersApi.getOrderProductionLog('1');
+
+      expect(mockedApi.get).toHaveBeenCalledWith('/orders/1/production-log');
+      expect(result).toEqual(log);
+    });
+
+    it('throws with the backend message when success is false', async () => {
+      mockedApi.get.mockResolvedValue({ data: { success: false, message: 'Error al obtener el historial de producción' } });
+
+      await expect(ordersApi.getOrderProductionLog('1')).rejects.toThrow('Error al obtener el historial de producción');
+    });
+
+    it('throws with a connection error when the request itself fails', async () => {
+      mockedApi.get.mockRejectedValue(new Error('Network Error'));
+
+      await expect(ordersApi.getOrderProductionLog('1')).rejects.toThrow('Network Error');
+    });
+  });
+
   describe('getFlavors', () => {
     it('gets /products/flavors and returns the list', async () => {
       const flavors = [{ id: '1', name: 'Chocolate' }];
@@ -341,6 +404,14 @@ describe('MockOrdersApi (in-memory)', () => {
       const orders = await mockApi.getOrders({ customerPhone: '7123' });
       expect(orders.every(o => o.customerPhone.includes('7123'))).toBe(true);
     });
+
+    it('filters by itemStage using the flattened work items', async () => {
+      const orders = await mockApi.getOrders({ itemStage: 'baking' });
+
+      expect(orders.length).toBeGreaterThan(0);
+      // Order '1' is the only mock order with a custom cake in the baking stage.
+      expect(orders.map(o => o.id)).toEqual(['1']);
+    });
   });
 
   describe('getOrderById', () => {
@@ -415,6 +486,24 @@ describe('MockOrdersApi (in-memory)', () => {
 
     it('throws when updating the status of a non-existent order', async () => {
       await expect(mockApi.updateOrderStatus('missing', 'assembling')).rejects.toThrow('Order with id missing not found');
+    });
+  });
+
+  describe('advanceItemStage', () => {
+    it('returns the existing order without throwing', async () => {
+      const result = await mockApi.advanceItemStage('1', 'custom_cake', '1', 'assembling');
+      expect(result.id).toBe('1');
+    });
+
+    it('throws when advancing an item for a non-existent order', async () => {
+      await expect(mockApi.advanceItemStage('missing', 'custom_cake', '1', 'assembling')).rejects.toThrow('Order with id missing not found');
+    });
+  });
+
+  describe('getOrderProductionLog', () => {
+    it('returns an empty array', async () => {
+      const log = await mockApi.getOrderProductionLog('1');
+      expect(log).toEqual([]);
     });
   });
 

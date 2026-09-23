@@ -1,14 +1,38 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { getSocket } from '@/lib/socket';
-import type { Order } from '@/types';
+import type { Order, ProductStatus } from '@/types';
 import { getLocalDateString, parseLocalDate } from '@/utils/DateUtils';
+
+const hasLineInStage = (order: Order, stage: ProductStatus): boolean => {
+  const cakes = order.customCakes || [];
+  const items = order.items || [];
+  const comboProducts = (order.sweetTableCombos || []).flatMap(c => c.products || []);
+  const extras = order.sweetTableExtras || [];
+  return (
+    cakes.some(c => c.status === stage) ||
+    items.some(i => i.status === stage) ||
+    comboProducts.some(p => p.status === stage) ||
+    extras.some(e => e.status === stage)
+  );
+};
 
 interface UseOrdersSocketOptions {
   /**
    * Lista de status que esta vista debe mostrar.
    * Si se omite, acepta todos los pedidos (útil para la vista Orders general).
+   * Mutuamente excluyente con itemStageFilter.
    */
   statusFilter?: string[];
+
+  /**
+   * Etapa de LÍNEA (torta/producto/item de combo/extra) que esta vista debe
+   * mostrar — usado por las pantallas de área (Hornos/Armado/Decoración), ya
+   * que un pedido puede tener líneas en distintas etapas a la vez. Un pedido
+   * se muestra si CUALQUIERA de sus líneas está en esta etapa, sin importar
+   * el status (derivado) del pedido completo. Mutuamente excluyente con
+   * statusFilter.
+   */
+  itemStageFilter?: ProductStatus;
 
   /**
    * Lista inicial de pedidos (cargada via REST al montar el componente).
@@ -34,16 +58,22 @@ interface UseOrdersSocketResult {
  */
 export const useOrdersSocket = ({
   statusFilter,
+  itemStageFilter,
   initialOrders = [],
 }: UseOrdersSocketOptions = {}): UseOrdersSocketResult => {
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [isConnected, setIsConnected] = useState(false);
   const statusFilterRef = useRef(statusFilter);
+  const itemStageFilterRef = useRef(itemStageFilter);
 
-  // Mantener la ref actualizada sin re-suscribir
+  // Mantener las refs actualizadas sin re-suscribir
   useEffect(() => {
     statusFilterRef.current = statusFilter;
   }, [statusFilter]);
+
+  useEffect(() => {
+    itemStageFilterRef.current = itemStageFilter;
+  }, [itemStageFilter]);
 
   // Sincronizar cuando cambia initialOrders (por la carga inicial REST)
   useEffect(() => {
@@ -63,6 +93,12 @@ export const useOrdersSocket = ({
     if (!statusFilterRef.current || statusFilterRef.current.length === 0) return true;
     return statusFilterRef.current.includes(status);
   }, []);
+  const matchesOrder = useCallback((order: Order): boolean => {
+    if (itemStageFilterRef.current) {
+      return hasLineInStage(order, itemStageFilterRef.current);
+    }
+    return matchesFilter(order.status);
+  }, [matchesFilter]);
 
   useEffect(() => {
     const socket = getSocket();
@@ -73,7 +109,7 @@ export const useOrdersSocket = ({
     // Nuevo pedido creado
     const onOrderCreated = (rawOrder: any) => {
       const order = parseOrder(rawOrder);
-      if (!matchesFilter(order.status)) return;
+      if (!matchesOrder(order)) return;
 
       setOrders((prev) => {
         // Evitar duplicados
@@ -94,13 +130,13 @@ export const useOrdersSocket = ({
     };
 
     // Cambio de estado — la clave: aparece o desaparece según el filtro
-    const onOrderStatusChanged = ({ id, status, order: rawOrder }: {
+    const onOrderStatusChanged = ({ id, order: rawOrder }: {
       id: string;
       status: string;
       order: any;
     }) => {
       const order = parseOrder(rawOrder);
-      const shouldShow = matchesFilter(status);
+      const shouldShow = matchesOrder(order);
 
       setOrders((prev) => {
         const exists = prev.some((o) => o.id === id);
@@ -122,6 +158,35 @@ export const useOrdersSocket = ({
       });
     };
 
+    // Una línea (torta/producto/item de combo/extra) cambió de etapa — la
+    // clave para las pantallas de área: el pedido aparece o desaparece según
+    // si CUALQUIERA de sus líneas sigue estando en la etapa filtrada.
+    const onItemStageChanged = ({ orderId, order: rawOrder }: {
+      orderId: string;
+      itemType: string;
+      itemId: string;
+      stage: string;
+      order: any;
+    }) => {
+      const order = parseOrder(rawOrder);
+      const shouldShow = matchesOrder(order);
+
+      setOrders((prev) => {
+        const exists = prev.some((o) => o.id === orderId);
+
+        if (shouldShow && exists) {
+          return prev.map((o) => (o.id === orderId ? order : o));
+        }
+        if (shouldShow && !exists) {
+          return [order, ...prev];
+        }
+        if (!shouldShow && exists) {
+          return prev.filter((o) => o.id !== orderId);
+        }
+        return prev;
+      });
+    };
+
     // Pedido eliminado
     const onOrderDeleted = ({ id }: { id: string }) => {
       setOrders((prev) => prev.filter((o) => o.id !== id));
@@ -133,6 +198,7 @@ export const useOrdersSocket = ({
     socket.on("order:created", onOrderCreated);
     socket.on("order:updated", onOrderUpdated);
     socket.on("order:status_changed", onOrderStatusChanged);
+    socket.on("order:item_stage_changed", onItemStageChanged);
     socket.on("order:deleted", onOrderDeleted);
 
     // Estado inicial de conexión
@@ -144,9 +210,10 @@ export const useOrdersSocket = ({
       socket.off("order:created", onOrderCreated);
       socket.off("order:updated", onOrderUpdated);
       socket.off("order:status_changed", onOrderStatusChanged);
+      socket.off("order:item_stage_changed", onItemStageChanged);
       socket.off("order:deleted", onOrderDeleted);
     };
-  }, [parseOrder, matchesFilter]);
+  }, [parseOrder, matchesFilter, matchesOrder]);
 
   return { orders, setOrders, isConnected };
 };

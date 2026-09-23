@@ -177,11 +177,13 @@ export interface SweetTableCombo {
 }
 
 export interface ComboProduct {
+  id?: string;
   productId: string;
   product?: Product;
   productName?: string;
   quantity: number;
   pricePerUnit: number;
+  status?: ProductStatus;
 }
 
 export interface CreateSweetTableComboData {
@@ -241,12 +243,14 @@ export interface Order {
 }
 
 export interface OrderItem {
+  id?: string;
   productId: string;
   product: Product;
   productName?: string;
   quantity: number;
   price: number;
   notes?: string;
+  status?: ProductStatus;
 }
 
 export interface CustomCake {
@@ -262,6 +266,7 @@ export interface CustomCake {
   referenceImages: string[];
   price: number;
   quantity: number;
+  status?: ProductStatus;
 }
 
 export interface OrderCombo {
@@ -322,10 +327,39 @@ export interface UpdateOrderData {
 
 export interface OrderFilters {
   status?: OrderStatus;
+  itemStage?: ProductStatus;
   startDate?: Date;
   endDate?: Date;
   customerName?: string;
   customerPhone?: string;
+}
+
+// Seguimiento de producción por línea (torta/producto/item de combo/extra)
+export type WorkItemType = 'custom_cake' | 'order_item' | 'combo_item' | 'sweet_table_extra';
+
+// Una línea individual de producción, aplanada desde un Order para que las
+// pantallas de área (Hornos/Armado/Decoración) puedan renderizar una tarjeta
+// por torta/producto en vez de una tarjeta por pedido completo.
+export interface WorkItem {
+  itemType: WorkItemType;
+  itemId: string;
+  order: Order;
+  status: ProductStatus;
+  title: string;
+  detail?: string;
+  quantity: number;
+  notes?: string;
+}
+
+export interface ItemStageLogEntry {
+  id: string;
+  itemType: WorkItemType;
+  itemId: string;
+  stage: ProductStatus;
+  enteredAt: string;
+  completedAt: string | null;
+  completedById: string | null;
+  completedByName: string | null;
 }
 
 // Cash Register Types

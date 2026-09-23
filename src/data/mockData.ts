@@ -72,7 +72,7 @@ export const mockOrders: Order[] = [
     status: 'baking',
     items: [],
     customCakes: [
-      { id: '1', portions: 30, shape: 'Redonda', cakeFlavor: 'Chocolate', fillingFlavors: ['Dulce de leche', 'Frutilla'], design: 'Unicornio rosa', dedication: 'Feliz cumple Sofía', referenceImages: [], price: 450, quantity: 1 }
+      { id: '1', portions: 30, shape: 'Redonda', cakeFlavor: 'Chocolate', fillingFlavors: ['Dulce de leche', 'Frutilla'], design: 'Unicornio rosa', dedication: 'Feliz cumple Sofía', referenceImages: [], price: 450, quantity: 1, status: 'baking' }
     ],
     deliveryAddress: 'Av. América #123',
     deliveryCost: 30,
@@ -92,7 +92,7 @@ export const mockOrders: Order[] = [
     pickupTime: '10:00',
     status: 'pending',
     items: [
-      { productId: '4', product: mockProducts[3], quantity: 50, price: 15 }
+      { id: 'item-2-1', productId: '4', product: mockProducts[3], quantity: 50, price: 15, status: 'pending' }
     ],
     customCakes: [],
     sweetTableCombos: [
@@ -101,16 +101,16 @@ export const mockOrders: Order[] = [
         comboId: '2',
         name: 'Combo 100 postres',
         products: [
-          { productId: '4', product: mockProducts[3], quantity: 50, pricePerUnit: 15 },
-          { productId: '6', product: mockProducts[5], quantity: 30, pricePerUnit: 8 },
-          { productId: '7', product: mockProducts[6], quantity: 20, pricePerUnit: 5 }
+          { id: 'combo-2-p1', productId: '4', product: mockProducts[3], quantity: 50, pricePerUnit: 15, status: 'pending' },
+          { id: 'combo-2-p2', productId: '6', product: mockProducts[5], quantity: 30, pricePerUnit: 8, status: 'pending' },
+          { id: 'combo-2-p3', productId: '7', product: mockProducts[6], quantity: 20, pricePerUnit: 5, status: 'pending' }
         ],
         totalQuantity: 100,
         price: 750
       }
     ],
     sweetTableExtras: [
-      { productId: '6', product: mockProducts[5], quantity: 5, price: 8 }
+      { id: 'extra-2-1', productId: '6', product: mockProducts[5], quantity: 5, price: 8, status: 'pending' }
     ],
     deliveryCost: 0,
     deposit: 500,
@@ -129,7 +129,7 @@ export const mockOrders: Order[] = [
     status: 'decorating',
     items: [],
     customCakes: [
-      { id: '2', portions: 20, shape: 'Rectangular', cakeFlavor: 'Vainilla', fillingFlavors: ['Crema pastelera'], design: 'Flores vintage', referenceImages: [], price: 280, quantity: 1 }
+      { id: '2', portions: 20, shape: 'Rectangular', cakeFlavor: 'Vainilla', fillingFlavors: ['Crema pastelera'], design: 'Flores vintage', referenceImages: [], price: 280, quantity: 1, status: 'decorating' }
     ],
     deliveryCost: 0,
     deposit: 280,
@@ -149,7 +149,7 @@ export const mockOrders: Order[] = [
     status: 'assembling',
     items: [],
     customCakes: [
-      { id: '3', portions: 50, shape: 'Dos pisos', cakeFlavor: 'Red Velvet', fillingFlavors: ['Queso crema'], design: 'Boda elegante', dedication: 'R & M', referenceImages: [], price: 800, quantity: 1 }
+      { id: '3', portions: 50, shape: 'Dos pisos', cakeFlavor: 'Red Velvet', fillingFlavors: ['Queso crema'], design: 'Boda elegante', dedication: 'R & M', referenceImages: [], price: 800, quantity: 1, status: 'assembling' }
     ],
     deliveryAddress: 'Zona Sur, calle 21',
     deliveryCost: 50,
@@ -169,7 +169,7 @@ export const mockOrders: Order[] = [
     status: 'ready',
     items: [],
     customCakes: [
-      { id: '4', portions: 15, cakeFlavor: 'Chocolate', fillingFlavors: ['Nutella'], price: 200, quantity: 1, referenceImages: [] }
+      { id: '4', portions: 15, cakeFlavor: 'Chocolate', fillingFlavors: ['Nutella'], price: 200, quantity: 1, referenceImages: [], status: 'ready' }
     ],
     deliveryCost: 25,
     deposit: 200,
@@ -187,7 +187,7 @@ export const mockOrders: Order[] = [
     status: 'ready',
     items: [],
     customCakes: [
-      { id: '4', portions: 15, cakeFlavor: 'Chocolate', fillingFlavors: ['Nutella'], price: 200, quantity: 1, referenceImages: [] }
+      { id: '4', portions: 15, cakeFlavor: 'Chocolate', fillingFlavors: ['Nutella'], price: 200, quantity: 1, referenceImages: [], status: 'ready' }
     ],
     deliveryAddress: 'Av. América #123',
     deliveryCost: 25,

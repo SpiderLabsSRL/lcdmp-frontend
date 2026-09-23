@@ -2,40 +2,38 @@ import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { MobileCard, useIsMobile } from '@/components/ui/responsive-table';
-import { Palette, Clock, AlertTriangle, CheckCircle, Image, Eye, ArrowRight, Loader2, Wifi, WifiOff } from 'lucide-react';
+import { Palette, AlertTriangle, CheckCircle, Loader2, Wifi, WifiOff } from 'lucide-react';
 import { format, differenceInHours } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { IDecorationApi, defaultDecorationApi } from '@/api/DecorationApi';
 import { useOrdersSocket } from '@/hooks/useOrdersSocket';
-import type { Order, CustomCake, OrderItem } from '@/types';
-import { hoursUntilPickupDateTime } from '@/utils/DateUtils';
+import { getWorkItemsAtStage } from '@/utils/workItems';
+import { WorkItemCard } from '@/components/Production/WorkItemCard';
+import type { Order, WorkItem, CustomCake } from '@/types';
 
 interface DecorationProps {
   decorationApi?: IDecorationApi;
 }
 
 export default function Decoration({ decorationApi = defaultDecorationApi }: DecorationProps) {
-  const isMobile = useIsMobile();
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedItem, setSelectedItem] = useState<WorkItem | null>(null);
   const [initialOrders, setInitialOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [decorationNotes, setDecorationNotes] = useState('');
-  const [completedCakes, setCompletedCakes] = useState<Set<string>>(new Set());
 
-  // Socket en tiempo real — filtra solo pedidos con status 'decorating'
-  const { orders: decorationOrders, isConnected } = useOrdersSocket({
-    statusFilter: ['decorating'],
+  // Socket en tiempo real — filtra pedidos con al menos una línea en 'decorating'
+  const { orders, isConnected } = useOrdersSocket({
+    itemStageFilter: 'decorating',
     initialOrders,
   });
+
+  const decorationItems = getWorkItemsAtStage(orders, 'decorating');
 
   useEffect(() => {
     loadDecorationOrders();
@@ -54,67 +52,47 @@ export default function Decoration({ decorationApi = defaultDecorationApi }: Dec
     }
   };
 
-  // Calcular estadísticas
-  const getUrgentOrders = () => {
-    return decorationOrders.filter(o => differenceInHours(new Date(o.pickupDate), new Date()) < 6);
+  const getUrgentItems = () => {
+    return decorationItems.filter(i => differenceInHours(new Date(i.order.pickupDate), new Date()) < 6);
   };
 
-  const getUrgencyBadge = (order: Order) => {
-    const hoursUntil = hoursUntilPickupDateTime(order);
-    if (hoursUntil < 6) return { label: 'Urgente', color: 'bg-red-500' };
-    if (hoursUntil < 12) return { label: 'Pronto', color: 'bg-orange-500' };
-    return { label: 'Normal', color: 'bg-green-500' };
-  };
-
-  const loadOrderDetails = async (orderId: string) => {
-    try {
-      const order = await decorationApi.getOrderDetails(orderId);
-      setSelectedOrder(order);
-    } catch (error) {
-      console.error('Error loading order details:', error);
-      toast.error('Error al cargar los detalles del pedido');
-    }
-  };
-
-  const completeDecoration = async () => {
-    if (!selectedOrder) return;
+  const completeItem = async () => {
+    if (!selectedItem) return;
 
     try {
-      await decorationApi.completeDecoration(selectedOrder.id, decorationNotes);
-      
-      toast.success('Decoración completada, pedido listo para entrega');
-      
-      // Resetear estado — el socket removerá el pedido de la lista automáticamente
+      await decorationApi.completeItem(selectedItem.order.id, selectedItem.itemType, selectedItem.itemId);
+
+      toast.success('Decoración completada, listo para entrega');
+
+      // Resetear estado — el socket removerá el item de la lista automáticamente
       setIsCompleteDialogOpen(false);
-      setSelectedOrder(null);
+      setSelectedItem(null);
       setDecorationNotes('');
-      setCompletedCakes(new Set());
     } catch (error) {
       console.error('Error completing decoration:', error);
       toast.error('Error al completar la decoración');
     }
   };
 
-  const handleViewOrder = (order: Order) => {
-    setSelectedOrder(order);
+  const handleViewItem = (item: WorkItem) => {
+    setSelectedItem(item);
     setIsDetailDialogOpen(true);
   };
 
-  const handleCompleteOrder = (order: Order) => {
-    setSelectedOrder(order);
-    const initial = new Set<string>([
-      ...(order.customCakes?.map((_, idx) => `cake-${idx}`) || []),
-      ...(order.sweetTableCombos?.map((_, idx) => `combo-${idx}`) || []),
-      ...(order.sweetTableExtras?.map((_, idx) => `extra-${idx}`) || []),
-    ]);
-    setCompletedCakes(initial);
+  const handleCompleteItem = (item: WorkItem) => {
+    setSelectedItem(item);
     setIsCompleteDialogOpen(true);
   };
 
-  const getCakeDescription = (cake: CustomCake) => {
-    let description = `${cake.portions} porciones - ${cake.cakeFlavor}${cake.secondCakeFlavor ? `/${cake.secondCakeFlavor}` : ''}`;
-    if (cake.shape) description += ` (${cake.shape})`;
-    return description;
+  const getCakeForItem = (item: WorkItem): CustomCake | undefined => {
+    if (item.itemType !== 'custom_cake') return undefined;
+    return item.order.customCakes.find(c => c.id === item.itemId);
+  };
+
+  const renderDetail = (item: WorkItem) => {
+    const cake = getCakeForItem(item);
+    if (!cake?.design) return null;
+    return <p className=" mt-0.5">🎨 {cake.design.substring(0, 100)}{cake.design.length > 100 ? '...' : ''}</p>;
   };
 
   return (
@@ -148,241 +126,49 @@ export default function Decoration({ decorationApi = defaultDecorationApi }: Dec
                 <Palette className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
               <div className="min-w-0">
-                <p className="text-lg sm:text-2xl font-bold">{decorationOrders.length}</p>
+                <p className="text-lg sm:text-2xl font-bold">{decorationItems.length}</p>
                 <p className="text-xs sm:text-sm  truncate">Pendientes de decorar</p>
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
               <div className="p-1.5 sm:p-2 bg-red-100 text-red-800 rounded-lg">
                 <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
               <div className="min-w-0">
-                <p className="text-lg sm:text-2xl font-bold">{getUrgentOrders().length}</p>
+                <p className="text-lg sm:text-2xl font-bold">{getUrgentItems().length}</p>
                 <p className="text-xs sm:text-sm  truncate">Urgentes (&lt;6h)</p>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Orders List */}
+        {/* Work Items List */}
         <Card className="mx-4 sm:mx-0">
           <CardHeader className="px-4 py-3 sm:px-6">
-            <CardTitle className="text-base sm:text-lg">Pedidos para Decorar</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Productos para Decorar</CardTitle>
           </CardHeader>
           {!isLoading ? (
-
             <CardContent className="px-4 pb-4 sm:px-6">
-              {decorationOrders.length === 0 ? (
+              {decorationItems.length === 0 ? (
                 <p className="text-center  py-8 text-sm">
-                  No hay pedidos pendientes de decorar
+                  No hay productos pendientes de decorar
                 </p>
               ) : (
                 <div className="space-y-3 sm:space-y-4">
-                  {decorationOrders.map(order => {
-                    const urgency = getUrgencyBadge(order);
-                    const hoursUntil = hoursUntilPickupDateTime(order);
-                    
-                    return isMobile ? (
-                      // Mobile Card Layout
-                      <MobileCard 
-                        key={order.id} 
-                        className="overflow-hidden"
-                        onClick={() => handleViewOrder(order)}
-                      >
-                        <div className="flex">
-                          {/* Urgency color bar - vertical a la izquierda */}
-                          <div className={`w-1.5 min-h-full ${urgency.color}`} />
-                          
-                          <div className="flex-1 p-3">
-                            {/* Header con badges */}
-                            <div className="flex items-start justify-between mb-2">
-                              <div>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-bold text-primary text-sm">#{order.orderNumber}</span>
-                                </div>
-                                <p className="text-sm  mt-1">{order.customerName}</p>
-                              </div>
-                            </div>
-
-                            <div className="space-y-2 mt-2">
-                              {order.customCakes?.map((cake, i) => (
-                                <div key={i} className="text-sm bg-muted/50 p-2 rounded">
-                                  <p className="font-medium">{getCakeDescription(cake)}</p>
-                                  {cake.design &&
-                                    <p className=" mt-0.5">🎨 {cake.design.substring(0, 50)}</p>
-                                  }
-                                </div>
-                              ))}
-                              {(order.sweetTableCombos?.length || 0) > 0 && (
-                                <div className="text-sm bg-muted/50 p-2 rounded">
-                                  <p className="font-medium">
-                                    {order.sweetTableCombos
-                                      .map(
-                                        c =>
-                                          `Mesa dulce ${c.products
-                                            .map(p => `${p.quantity} ${p.productName}`)
-                                              .join(', ')}${c.details ? ` - ${c.details}` : ''}`)
-                                      .join(', ')}
-                                  </p>
-                                </div>
-                              )}
-                              {(order.sweetTableExtras?.length || 0) > 0 && (
-                                <div className="text-sm bg-muted/50 p-2 rounded">
-                                  <p className="font-medium">
-                                    Mesa dulce: {order.sweetTableExtras.map(e => `${e.quantity} ${e.product?.name || e.productName}`).join(', ')}
-                                  </p>
-                                </div>
-                              )}
-                              {order.items?.map((item, i) => (
-                                <div key={i} className="text-sm bg-muted/50 p-2 rounded">
-                                  <p className="font-medium">
-                                    <strong>{item.productName} - {item.quantity} Unidades</strong>
-                                  </p>
-                                  {item.notes && (
-                                    <>
-                                      <p className="font-medium">📝 Notas del producto:</p>
-                                      <p className="text-sm whitespace-pre-wrap">{item.notes}</p>
-                                    </>
-                                  )}
-                                </div>
-                              ))}
-                              {order.notes && (
-                                <div key={order.id} className="text-xs bg-muted/50 p-2 rounded">
-                                  <p className="font-medium">📝 Notas del pedido:</p>
-                                  <p className="text-sm whitespace-pre-wrap">{order.notes}</p>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Footer con tiempo y botones */}
-                            <div className="flex items-center justify-between mt-3 pt-2 border-t">
-                              <div className="flex items-center gap-1 ">
-                                <Clock className="h-3.5 w-3.5" />
-                                <span className="text-xs">
-                                  {hoursUntil > 0 ? `${hoursUntil}h` : 'Atrasado'}
-                                </span>
-                                <span className="text-xs ml-1">
-                                  {format(new Date(order.pickupDate), 'dd MMM', { locale: es })} {order.pickupTime}
-                                </span>
-                              </div>
-                              <Button 
-                                size="sm"
-                                className="h-8 text-xs"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleCompleteOrder(order);
-                                }}
-                              >
-                                Completar
-                                <CheckCircle className="h-3 w-3 ml-1" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </MobileCard>
-                    ) : (
-                      // Desktop Layout
-                      <div
-                        key={order.id}
-                        className="flex items-center gap-4 p-4 rounded-lg transition-colors bg-muted/50 hover:bg-muted cursor-pointer"
-                        onClick={() => handleViewOrder(order)}
-                      >
-                        <div className={`w-2 h-full min-h-16 rounded-full ${urgency.color}`} />
-                        
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1 flex-wrap">
-                            <span className="font-medium">#{order.orderNumber}</span>
-                            <Badge className={urgency.color}>{urgency.label}</Badge>
-                          </div>
-                          
-                          <p className="text-sm  mb-3">{order.customerName}</p>
-                          
-                          <div className="space-y-2">
-                            {order.customCakes?.map((cake, i) => (
-                              <div key={i} className="space-y-1">
-                                <p className="text-sm">
-                                  <strong>{cake.portions} porciones</strong> - {cake.cakeFlavor}{cake.secondCakeFlavor ? `/${cake.secondCakeFlavor}` : ''}
-                                  {cake.shape && <span className=""> ({cake.shape})</span>}  
-                                  <br />
-                                  {cake.design && (
-                                    <span className="">
-                                      🎨 {cake.design.substring(0, 100)} {cake.design.length > 100 ? '...' : ''}
-                                    </span>
-                                  )}
-                                </p>
-                              </div>
-                            ))}
-                            {(order.sweetTableCombos?.length || 0) > 0 && (
-                              <div>
-                                <p className="text-sm">
-                                  {order.sweetTableCombos
-                                    .map(
-                                      c =>
-                                        `Mesa dulce ${c.products
-                                          .map(p => `${p.quantity} ${p.productName}`)
-                                            .join(', ')}${c.details ? ` - ${c.details}` : ''}`)
-                                    .join(', ')}
-                                </p>
-                              </div>
-                            )}
-                            {(order.sweetTableExtras?.length || 0) > 0 && (
-                              <div>
-                                <p className="text-sm">
-                                  Mesa dulce: {order.sweetTableExtras.map(e => `${e.quantity} ${e.product?.name || e.productName}`).join(', ')}
-                                </p>
-                              </div>
-                            )}
-                            {order.items?.map((item, i) => (
-                              <div key={i} className="space-y-1">
-                                <p className="text-sm">
-                                  <strong>{item.productName} - {item.quantity} Unidades</strong>
-                                </p>
-                                {item.notes && (
-                                  <>
-                                    <p className="text-sm">📝 Notas del producto:</p>
-                                    <p className="text-sm whitespace-pre-wrap">{item.notes}</p>
-                                  </>
-                                )}
-                              </div>
-                            ))}
-                            {order.notes && (
-                              <>
-                                <p className="text-sm">📝 Notas del pedido:</p>
-                                <p className="text-sm whitespace-pre-wrap">{order.notes}</p>
-                              </>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="text-right">
-                          <div className="flex items-center gap-1  justify-end">
-                            <Clock className="h-4 w-4" />
-                            <span className="text-sm font-medium">
-                              {hoursUntil > 0 ? `${hoursUntil}h` : 'Atrasado'}
-                            </span>
-                          </div>
-                          <p className="text-sm whitespace-nowrap">
-                            {format(new Date(order.pickupDate), 'dd MMM', { locale: es })} {order.pickupTime}
-                          </p>
-                        </div>
-
-                        <Button
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCompleteOrder(order);
-                          }}
-                          className="whitespace-nowrap"
-                        >
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Completar
-                        </Button>
-                      </div>
-                    );
-                  })}
+                  {decorationItems.map(item => (
+                    <WorkItemCard
+                      key={`${item.itemType}-${item.itemId}`}
+                      item={item}
+                      urgentHours={6}
+                      soonHours={12}
+                      detail={renderDetail(item)}
+                      onComplete={handleCompleteItem}
+                      onClick={handleViewItem}
+                    />
+                  ))}
                 </div>
               )}
             </CardContent>
@@ -397,86 +183,65 @@ export default function Decoration({ decorationApi = defaultDecorationApi }: Dec
         <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
           <DialogContent className="w-[95vw] sm:w-full max-w-lg rounded-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-lg sm:text-xl">Detalles del Pedido #{selectedOrder?.orderNumber}</DialogTitle>
+              <DialogTitle className="text-lg sm:text-xl">Detalles del Pedido #{selectedItem?.order.orderNumber}</DialogTitle>
             </DialogHeader>
-            {selectedOrder && (
+            {selectedItem && (
               <div className="space-y-4 px-1">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div>
                     <p className="text-sm text-foreground">Cliente</p>
-                    <p className="font-semibold text-base text-foreground">{selectedOrder.customerName}</p>
+                    <p className="font-semibold text-base text-foreground">{selectedItem.order.customerName}</p>
                   </div>
                   <div>
                     <p className="text-sm text-foreground">Fecha de entrega</p>
                     <p className="font-semibold text-base text-foreground">
-                      {format(new Date(selectedOrder.pickupDate), 'dd MMMM yyyy', { locale: es })}
+                      {format(new Date(selectedItem.order.pickupDate), 'dd MMMM yyyy', { locale: es })}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-foreground">Hora</p>
-                    <p className="font-semibold text-base text-foreground">{selectedOrder.pickupTime}</p>
+                    <p className="font-semibold text-base text-foreground">{selectedItem.order.pickupTime}</p>
                   </div>
                 </div>
 
-                {selectedOrder.customCakes?.map((cake, i) => (
-                  <div key={i} className="p-3 sm:p-4 bg-muted/50 rounded-lg space-y-2">
-                    <h4 className="font-semibold text-base text-foreground">
-                      {cake.cakeFlavor}{cake.secondCakeFlavor ? `/${cake.secondCakeFlavor}` : ""} - {cake.portions} porciones
-                    </h4>
-                    {cake.shape && <p className="text-sm text-foreground">Forma: {cake.shape}</p>}
-                    <p className="text-sm text-foreground">Relleno: {cake.fillingFlavor} {cake.secondFillingFlavor ? `/ ${cake.secondFillingFlavor}` : ''}</p>
-                    {cake.design && (
-                      <div className="p-2 sm:p-3 bg-background rounded border">
-                        <p className="text-sm font-semibold text-foreground">Diseño requerido:</p>
-                        <p className="text-sm mt-1 whitespace-pre-wrap text-foreground">{cake.design}</p>
-                      </div>
-                    )}
-                    {cake.dedication && (
-                      <p className="text-sm text-foreground">Dedicatoria: "{cake.dedication}"</p>
-                    )}
-                    {cake.referenceImages && cake.referenceImages.length > 0 && (
-                      <div className="mt-2">
-                        <p className="text-sm font-semibold mb-1 text-foreground">Imágenes de referencia:</p>
-                        <div className="flex gap-2 flex-wrap">
-                          {cake.referenceImages.map((img, idx) => (
-                            <img key={idx} src={img} alt={`Referencia ${idx + 1}`} className="w-16 h-16 object-cover rounded" />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {(selectedOrder.sweetTableCombos?.length || 0) > 0 && selectedOrder.sweetTableCombos.map((c, i) => (
-                  <div key={i} className="p-3 sm:p-4 bg-muted/50 rounded-lg space-y-2">
-                    <h4 className="font-semibold text-base text-foreground">
-                      Mesa dulce: {c.products.map(p => `${p.quantity} ${p.productName}`).join(', ')}
-                    </h4>
-                    {c.details && (
-                      <p className="text-sm text-foreground">Notas: "{c.details}"</p>
-                    )}
-                  </div>
-                ))}
-                {(selectedOrder.sweetTableExtras?.length || 0) > 0 && (
-                  <div className="p-3 sm:p-4 bg-muted/50 rounded-lg space-y-2">
-                    <h4 className="font-semibold text-base text-foreground">
-                      Mesa dulce: {selectedOrder.sweetTableExtras.map(e => `${e.quantity} ${e.product?.name || e.productName}`).join(', ')}
-                    </h4>
-                  </div>
-                )}
-                {selectedOrder.items?.map((item, i) => (
-                  <div key={i} className="p-3 sm:p-4 bg-muted/50 rounded-lg space-y-2">
-                    <h4 className="font-semibold text-base text-foreground">
-                      {item.productName} - {item.quantity} Unidades
-                    </h4>
-                    {item.notes && (
-                      <p className="text-sm text-foreground">Notas: "{item.notes}"</p>
-                    )}
-                  </div>
-                ))}
-                {selectedOrder.notes && (
+                <div className="p-3 sm:p-4 bg-muted/50 rounded-lg space-y-2">
+                  <h4 className="font-semibold text-base text-foreground">{selectedItem.title}</h4>
+                  {(() => {
+                    const cake = getCakeForItem(selectedItem);
+                    if (!cake) return null;
+                    return (
+                      <>
+                        {cake.design && (
+                          <div className="p-2 sm:p-3 bg-background rounded border">
+                            <p className="text-sm font-semibold text-foreground">Diseño requerido:</p>
+                            <p className="text-sm mt-1 whitespace-pre-wrap text-foreground">{cake.design}</p>
+                          </div>
+                        )}
+                        {cake.dedication && (
+                          <p className="text-sm text-foreground">Dedicatoria: "{cake.dedication}"</p>
+                        )}
+                        {cake.referenceImages && cake.referenceImages.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-sm font-semibold mb-1 text-foreground">Imágenes de referencia:</p>
+                            <div className="flex gap-2 flex-wrap">
+                              {cake.referenceImages.map((img, idx) => (
+                                <img key={idx} src={img} alt={`Referencia ${idx + 1}`} className="w-16 h-16 object-cover rounded" />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                  {selectedItem.notes && (
+                    <p className="text-sm text-foreground">Notas: "{selectedItem.notes}"</p>
+                  )}
+                </div>
+
+                {selectedItem.order.notes && (
                   <div className="p-3 sm:p-4 bg-muted/50 rounded-lg space-y-1">
                     <p className="text-sm font-semibold text-foreground">📝 Notas del pedido:</p>
-                    <p className="text-sm text-foreground whitespace-pre-wrap">{selectedOrder.notes}</p>
+                    <p className="text-sm text-foreground whitespace-pre-wrap">{selectedItem.order.notes}</p>
                   </div>
                 )}
               </div>
@@ -490,133 +255,18 @@ export default function Decoration({ decorationApi = defaultDecorationApi }: Dec
             <DialogHeader>
               <DialogTitle className="text-lg sm:text-xl">Completar Decoración</DialogTitle>
             </DialogHeader>
-            {selectedOrder && (
+            {selectedItem && (
               <div className="space-y-4 px-1">
                 <div className="p-3 sm:p-4 bg-muted/50 rounded-lg">
-                  <p className="font-medium text-sm sm:text-base">Pedido #{selectedOrder.orderNumber}</p>
-                  <p className="text-xs sm:text-sm ">{selectedOrder.customerName}</p>
-                </div>
-
-                <div className="space-y-3">
-                  <Label className="text-sm">Confirmar decoración de:</Label>
-                  {selectedOrder.customCakes?.map((cake, i) => (
-                    <div key={i} className="flex items-start gap-3 p-2 sm:p-3 bg-muted/50 rounded-lg">
-                      <Checkbox 
-                        id={`cake-dec-${i}`} 
-                        checked={completedCakes.has(`cake-${i}`)}
-                        onCheckedChange={(checked) => {
-                          const newSet = new Set(completedCakes);
-                          if (checked) {
-                            newSet.add(`cake-${i}`);
-                          } else {
-                            newSet.delete(`cake-${i}`);
-                          }
-                          setCompletedCakes(newSet);
-                        }}
-                      />
-                      <div className="flex-1">
-                        <label 
-                          htmlFor={`cake-dec-${i}`} 
-                          className="font-medium text-sm cursor-pointer"
-                        >
-                          {cake.cakeFlavor}{cake.secondCakeFlavor ? `/${cake.secondCakeFlavor}` : ''} - {cake.portions} porciones
-                        </label>
-                        {cake.design && (
-                          <p className="text-xs  mt-1 line-clamp-2">{cake.design}</p>
-                        )}
-                        {cake.dedication && (
-                          <p className="text-xs  mt-1 line-clamp-2">{cake.dedication}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {selectedOrder.sweetTableCombos?.map((combo, i) => (
-                    <div key={`combo-${i}`} className="flex items-start gap-3 p-2 sm:p-3 bg-muted/50 rounded-lg">
-                      <Checkbox
-                        id={`combo-dec-${i}`}
-                        checked={completedCakes.has(`combo-${i}`)}
-                        onCheckedChange={(checked) => {
-                          const newSet = new Set(completedCakes);
-                          if (checked) {
-                            newSet.add(`combo-${i}`);
-                          } else {
-                            newSet.delete(`combo-${i}`);
-                          }
-                          setCompletedCakes(newSet);
-                        }}
-                      />
-                      <div className="flex-1">
-                        <label
-                          htmlFor={`combo-dec-${i}`}
-                          className="font-medium text-sm cursor-pointer"
-                        >
-                          Mesa dulce: {combo.products.map(p => `${p.quantity} ${p.productName}`).join(', ')}
-                        </label>
-                        {combo.details && (
-                          <p className="text-xs  mt-1 line-clamp-2">{combo.details}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {selectedOrder.sweetTableExtras?.map((extra, i) => (
-                    <div key={`extra-${i}`} className="flex items-start gap-3 p-2 sm:p-3 bg-muted/50 rounded-lg">
-                      <Checkbox
-                        id={`extra-dec-${i}`}
-                        checked={completedCakes.has(`extra-${i}`)}
-                        onCheckedChange={(checked) => {
-                          const newSet = new Set(completedCakes);
-                          if (checked) {
-                            newSet.add(`extra-${i}`);
-                          } else {
-                            newSet.delete(`extra-${i}`);
-                          }
-                          setCompletedCakes(newSet);
-                        }}
-                      />
-                      <div className="flex-1">
-                        <label
-                          htmlFor={`extra-dec-${i}`}
-                          className="font-medium text-sm cursor-pointer"
-                        >
-                          {extra.quantity} x {extra.product?.name || extra.productName}
-                        </label>
-                      </div>
-                    </div>
-                  ))}
-                  {selectedOrder.items?.map((item, i) => (
-                    <div key={i} className="flex items-start gap-3 p-2 sm:p-3 bg-muted/50 rounded-lg">
-                      <Checkbox
-                        id={`item-dec-${i}`}
-                        checked={completedCakes.has(`item-${i}`)}
-                        onCheckedChange={(checked) => {
-                          const newSet = new Set(completedCakes);
-                          if (checked) {
-                            newSet.add(`item-${i}`);
-                          } else {
-                            newSet.delete(`item-${i}`);
-                          }
-                          setCompletedCakes(newSet);
-                        }}
-                      />
-                      <div className="flex-1">
-                        <label 
-                          htmlFor={`cake-dec-${i}`} 
-                          className="font-medium text-sm cursor-pointer"
-                        >
-                          {item.productName} - {item.quantity} Unidades
-                        </label>
-                        {item.notes && (
-                          <p className="text-xs  mt-1 line-clamp-2">{item.notes}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                  <p className="font-medium text-sm sm:text-base">Pedido #{selectedItem.order.orderNumber}</p>
+                  <p className="text-xs sm:text-sm ">{selectedItem.order.customerName}</p>
+                  <p className="text-sm mt-2">{selectedItem.title}</p>
                 </div>
 
                 <div className="space-y-2">
                   <Label className="text-sm">Notas de decoración (opcional)</Label>
-                  <Textarea 
-                    placeholder="Observaciones adicionales..." 
+                  <Textarea
+                    placeholder="Observaciones adicionales..."
                     className="text-sm min-h-[80px] sm:min-h-[100px]"
                     value={decorationNotes}
                     onChange={(e) => setDecorationNotes(e.target.value)}
@@ -624,21 +274,19 @@ export default function Decoration({ decorationApi = defaultDecorationApi }: Dec
                 </div>
 
                 <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 pt-2">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={() => {
                       setIsCompleteDialogOpen(false);
                       setDecorationNotes('');
-                      setCompletedCakes(new Set());
                     }}
                     className="w-full sm:w-auto order-2 sm:order-1"
                   >
                     Cancelar
                   </Button>
-                  <Button 
-                    onClick={completeDecoration} 
+                  <Button
+                    onClick={completeItem}
                     className="w-full sm:w-auto order-1 sm:order-2"
-                    disabled={completedCakes.size === 0}
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
                     Marcar como Listo
