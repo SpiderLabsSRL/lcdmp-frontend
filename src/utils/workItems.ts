@@ -30,7 +30,7 @@ export function getWorkItemsAtStage(orders: Order[], stage: ProductStatus): Work
         itemId: item.id,
         order,
         status: item.status,
-        title: item.productName || item.product?.name || 'Producto',
+        title: `${item.quantity} ${item.productName || item.product?.name || 'Producto'}`,
         quantity: item.quantity,
         notes: item.notes,
       });
