@@ -682,7 +682,7 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
             {!loading && products.length === 0 && (
               <Card>
                 <CardContent className="p-8 text-center ">
-                  No se encontraron usuarios
+                  No se encontraron productos
                 </CardContent>
               </Card>
             )}
