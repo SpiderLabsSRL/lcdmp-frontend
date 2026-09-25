@@ -72,13 +72,13 @@ describe('DeliveryApi (real, axios-backed)', () => {
   });
 
   describe('completeDelivery', () => {
-    it('patches /orders/:id/status with status=delivered and returns the mapped order', async () => {
+    it('patches /orders/:id/status with status=delivered and the payment method, and returns the mapped order', async () => {
       const raw = { id: '5', status: 'delivered', pickupDate: '2026-03-05T00:00:00.000Z', createdAt: '2026-01-01T00:00:00.000Z' };
       mockedApi.patch.mockResolvedValue({ data: { success: true, data: raw } });
 
-      const result = await deliveryApi.completeDelivery('5');
+      const result = await deliveryApi.completeDelivery('5', 'qr');
 
-      expect(mockedApi.patch).toHaveBeenCalledWith('/orders/5/status', { status: 'delivered' });
+      expect(mockedApi.patch).toHaveBeenCalledWith('/orders/5/status', { status: 'delivered', paymentMethod: 'qr' });
       expect(result.status).toBe('delivered');
       expect(result.pickupDate).toEqual(new Date(raw.pickupDate));
     });
@@ -86,13 +86,13 @@ describe('DeliveryApi (real, axios-backed)', () => {
     it('throws with the backend message when success is false', async () => {
       mockedApi.patch.mockResolvedValue({ data: { success: false, message: 'Error al completar la entrega' } });
 
-      await expect(deliveryApi.completeDelivery('5')).rejects.toThrow('Error al completar la entrega');
+      await expect(deliveryApi.completeDelivery('5', 'cash')).rejects.toThrow('Error al completar la entrega');
     });
 
     it('throws a default message on network error', async () => {
       mockedApi.patch.mockRejectedValue(new Error('Network Error'));
 
-      await expect(deliveryApi.completeDelivery('5')).rejects.toThrow('Network Error');
+      await expect(deliveryApi.completeDelivery('5', 'cash')).rejects.toThrow('Network Error');
     });
   });
 });

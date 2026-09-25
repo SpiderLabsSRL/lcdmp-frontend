@@ -7,13 +7,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { MobileCard, useIsMobile } from '@/components/ui/responsive-table';
-import { Truck, Clock, MapPin, Phone, CheckCircle, Package, Navigation, Loader2, Wifi, WifiOff } from 'lucide-react';
+import { Truck, Clock, MapPin, Phone, CheckCircle, Package, Navigation, Loader2, Wifi, WifiOff, Banknote, QrCode } from 'lucide-react';
 import { format, differenceInHours } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { IDeliveryApi, defaultDeliveryApi } from '@/api/DeliveryApi';
 import { useOrdersSocket } from '@/hooks/useOrdersSocket';
-import type { Order } from '@/types';
+import type { Order, PaymentMethod } from '@/types';
 import { hoursUntilPickupDateTime } from '@/utils/DateUtils';
 
 interface DeliveryProps {
@@ -25,6 +25,7 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
   const [deliveryNotes, setDeliveryNotes] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [initialOrders, setInitialOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -71,12 +72,13 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
   const completeDelivery = async () => {
     if (!selectedOrder) return;
     try {
-      await deliveryApi.completeDelivery(selectedOrder.id);
+      await deliveryApi.completeDelivery(selectedOrder.id, paymentMethod);
       // El socket actualizará la lista automáticamente via order:status_changed
       toast.success('Entrega completada exitosamente');
       setIsCompleteDialogOpen(false);
       setSelectedOrder(null);
       setDeliveryNotes('');
+      setPaymentMethod('cash');
     } catch (error) {
       toast.error('Error al completar la entrega');
     }
@@ -586,6 +588,30 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
                     </p>
                   </div>
                 )}
+
+                <div className="space-y-2">
+                  <Label className="text-sm">Método de pago del saldo</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant={paymentMethod === 'cash' ? 'default' : 'outline'}
+                      onClick={() => setPaymentMethod('cash')}
+                      className="w-full"
+                    >
+                      <Banknote className="h-4 w-4 mr-2" />
+                      Efectivo
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={paymentMethod === 'qr' ? 'default' : 'outline'}
+                      onClick={() => setPaymentMethod('qr')}
+                      className="w-full"
+                    >
+                      <QrCode className="h-4 w-4 mr-2" />
+                      QR
+                    </Button>
+                  </div>
+                </div>
 
                 <div className="space-y-2">
                   <Label className="text-sm">Notas de entrega (opcional)</Label>

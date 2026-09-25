@@ -133,7 +133,7 @@ describe('Delivery', () => {
     expect(screen.getByText('Av. Siempre Viva 123')).toBeInTheDocument();
   });
 
-  it('opens the complete dialog and confirms delivery', async () => {
+  it('opens the complete dialog and confirms delivery with cash by default', async () => {
     const mockApi = buildMockApi({ getDeliveryOrders: vi.fn().mockResolvedValue([deliveryOrder]) });
     const user = userEvent.setup();
     renderWithProviders(<Delivery deliveryApi={mockApi} />);
@@ -146,6 +146,21 @@ describe('Delivery', () => {
 
     await user.click(screen.getByRole('button', { name: /Confirmar Entrega/i }));
 
-    await waitFor(() => expect(mockApi.completeDelivery).toHaveBeenCalledWith('order-1'));
+    await waitFor(() => expect(mockApi.completeDelivery).toHaveBeenCalledWith('order-1', 'cash'));
+  });
+
+  it('confirms delivery with the selected payment method', async () => {
+    const mockApi = buildMockApi({ getDeliveryOrders: vi.fn().mockResolvedValue([deliveryOrder]) });
+    const user = userEvent.setup();
+    renderWithProviders(<Delivery deliveryApi={mockApi} />);
+
+    await screen.findByText('#ORD-300');
+    await user.click(screen.getByRole('button', { name: /Entregado/i }));
+
+    await screen.findByRole('heading', { name: 'Confirmar Entrega' });
+    await user.click(screen.getByRole('button', { name: /^QR$/i }));
+    await user.click(screen.getByRole('button', { name: /Confirmar Entrega/i }));
+
+    await waitFor(() => expect(mockApi.completeDelivery).toHaveBeenCalledWith('order-1', 'qr'));
   });
 });

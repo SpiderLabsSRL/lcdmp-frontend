@@ -1,9 +1,9 @@
 import api from '@/api/api';
-import type { Order } from '@/types';
+import type { Order, PaymentMethod } from '@/types';
 
 export interface IDeliveryApi {
   getDeliveryOrders(signal?: AbortSignal): Promise<Order[]>;
-  completeDelivery(orderId: string): Promise<Order>;
+  completeDelivery(orderId: string, paymentMethod: PaymentMethod): Promise<Order>;
 }
 
 export class DeliveryApi implements IDeliveryApi {
@@ -37,9 +37,9 @@ export class DeliveryApi implements IDeliveryApi {
     }
   }
 
-  async completeDelivery(orderId: string): Promise<Order> {
+  async completeDelivery(orderId: string, paymentMethod: PaymentMethod): Promise<Order> {
     try {
-      const response = await api.patch(`/orders/${orderId}/status`, { status: 'delivered' });
+      const response = await api.patch(`/orders/${orderId}/status`, { status: 'delivered', paymentMethod });
 
       if (!response.data.success) {
         throw new Error(response.data.message || 'Error al completar la entrega');
