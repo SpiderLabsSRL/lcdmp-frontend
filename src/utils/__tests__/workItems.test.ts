@@ -121,7 +121,7 @@ describe('getWorkItemsAtStage', () => {
       itemType: 'order_item',
       itemId: 'i1',
       status: 'baking',
-      title: 'Cupcake',
+      title: '4 Cupcake',
       quantity: 4,
       notes: 'Sin nueces',
     });

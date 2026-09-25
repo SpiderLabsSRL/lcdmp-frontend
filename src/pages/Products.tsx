@@ -4,6 +4,7 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NumberInput } from '@/components/ui/number-input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -182,6 +183,7 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
           pricePerPortion: Number(savedProduct.pricePerPortion),
           stock: savedProduct.stock,
           minStock: savedProduct.minStock,
+          restockQuantity: savedProduct.restockQuantity,
           isActive: savedProduct.isActive,
         };
         await api.editProduct(editData);
@@ -197,6 +199,7 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
           pricePerPortion: savedProduct.pricePerPortion,
           stock: savedProduct.stock,
           minStock: savedProduct.minStock,
+          restockQuantity: savedProduct.restockQuantity,
           isActive: savedProduct.isActive,
         };
         await api.createProduct(createData);
@@ -1090,13 +1093,13 @@ function AddStockForm({ product, onClose, onAddStock }: {
 
       <div className="space-y-1.5 sm:space-y-2">
         <Label className="text-sm">Cantidad a agregar *</Label>
-        <Input 
-          type="number" 
+        <NumberInput
           min="1"
           value={quantity}
-          onChange={(e) => setQuantity(parseInt(e.target.value) || 0)}
+          onChange={setQuantity}
+          fallback={1}
           placeholder="Cantidad"
-          required 
+          required
           className="text-sm"
         />
       </div>
@@ -1136,6 +1139,7 @@ function ProductForm({ onClose, onSave, initialProduct }: {
     pricePerPortion: initialProduct?.pricePerPortion || 0,
     stock: initialProduct?.stock || 0,
     minStock: initialProduct?.minStock || 1,
+    restockQuantity: initialProduct?.restockQuantity ?? undefined,
     isActive: initialProduct?.isActive ?? true,
   });
 
@@ -1171,6 +1175,7 @@ function ProductForm({ onClose, onSave, initialProduct }: {
       location: formData.location as any,
       stock: formData.stock,
       minStock: formData.minStock,
+      restockQuantity: formData.restockQuantity || null,
     };
     
     await onSave(product);
@@ -1233,22 +1238,24 @@ function ProductForm({ onClose, onSave, initialProduct }: {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <div className="space-y-1.5 sm:space-y-2">
           <Label className="text-sm">Precio base (Bs.)</Label>
-          <Input 
-            type="number" 
-            placeholder="0" 
-            value={formData.basePrice || ''}
-            onChange={(e) => handleChange('basePrice', parseFloat(e.target.value) || 0)}
-            className="text-sm" 
+          <NumberInput
+            placeholder="0"
+            value={formData.basePrice}
+            onChange={(v) => handleChange('basePrice', v)}
+            decimal
+            fallback={0}
+            className="text-sm"
           />
         </div>
         <div className="space-y-1.5 sm:space-y-2">
           <Label className="text-sm">Precio por porción (Bs.)</Label>
-          <Input 
-            type="number" 
-            placeholder="0" 
-            value={formData.pricePerPortion || ''}
-            onChange={(e) => handleChange('pricePerPortion', parseFloat(e.target.value) || 0)}
-            className="text-sm" 
+          <NumberInput
+            placeholder="0"
+            value={formData.pricePerPortion}
+            onChange={(v) => handleChange('pricePerPortion', v)}
+            decimal
+            fallback={0}
+            className="text-sm"
           />
         </div>
       </div>
@@ -1256,29 +1263,43 @@ function ProductForm({ onClose, onSave, initialProduct }: {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <div className="space-y-1.5 sm:space-y-2">
           <Label className="text-sm">Stock inicial</Label>
-          <Input 
-            type="number" 
-            placeholder="0" 
-            value={formData.stock || ''}
-            onChange={(e) => handleChange('stock', parseInt(e.target.value) || 0)}
-            className="text-sm" 
+          <NumberInput
+            placeholder="0"
+            value={formData.stock}
+            onChange={(v) => handleChange('stock', v)}
+            fallback={0}
+            className="text-sm"
           />
         </div>
         <div className="space-y-1.5 sm:space-y-2">
           <Label className="text-sm">Stock mínimo</Label>
-          <Input 
-            type="number" 
-            placeholder="0" 
-            value={formData.minStock || ''}
-            onChange={(e) => handleChange('minStock', parseInt(e.target.value) || 0)}
-            className="text-sm" 
+          <NumberInput
+            placeholder="0"
+            value={formData.minStock}
+            onChange={(v) => handleChange('minStock', v)}
+            fallback={0}
+            className="text-sm"
           />
         </div>
       </div>
-      
+
+      <div className="space-y-1.5 sm:space-y-2">
+        <Label className="text-sm">Cantidad de reposición automática (opcional)</Label>
+        <NumberInput
+          placeholder="Sin reposición automática"
+          value={formData.restockQuantity}
+          onChange={(v) => handleChange('restockQuantity', v)}
+          fallback={0}
+          className="text-sm"
+        />
+        <p className="text-xs ">
+          Cuando el stock llegue al mínimo, se creará automáticamente una tarea en Hornos para producir esta cantidad. Déjalo vacío para no reponer automáticamente.
+        </p>
+      </div>
+
       <div className="flex items-center gap-2">
-        <Switch 
-          id="active" 
+        <Switch
+          id="active"
           checked={formData.isActive}
           onCheckedChange={(v) => handleChange('isActive', v)}
           className="scale-75 sm:scale-100" 
@@ -1533,21 +1554,22 @@ function ComboForm({ onClose, onSave, initialCombo, catalogProducts }: {
                 </SelectContent>
               </Select>
               <div className="flex gap-2">
-                <Input
-                  type="number"
+                <NumberInput
                   min="1"
                   placeholder="Cant."
-                  value={row.quantity || ''}
-                  onChange={(e) => updateRowQuantity(index, parseInt(e.target.value) || 0)}
+                  value={row.quantity}
+                  onChange={(v) => updateRowQuantity(index, v)}
+                  fallback={0}
                   className="text-sm w-full sm:w-20"
                 />
-                <Input
-                  type="number"
+                <NumberInput
                   min="0"
                   step="0.01"
                   placeholder="Bs./u"
-                  value={row.pricePerUnit || ''}
-                  onChange={(e) => updateRowPricePerUnit(index, parseFloat(e.target.value) || 0)}
+                  value={row.pricePerUnit}
+                  onChange={(v) => updateRowPricePerUnit(index, v)}
+                  decimal
+                  fallback={0}
                   className="text-sm w-full sm:w-24"
                 />
                 <Button
@@ -1585,16 +1607,17 @@ function ComboForm({ onClose, onSave, initialCombo, catalogProducts }: {
             </button>
           )}
         </div>
-        <Input
-          type="number"
+        <NumberInput
           min="0"
           step="0.01"
           placeholder="0"
-          value={price || ''}
-          onChange={(e) => {
-            setPrice(parseFloat(e.target.value) || 0);
+          value={price}
+          onChange={(v) => {
+            setPrice(v);
             setPriceManuallyEdited(true);
           }}
+          decimal
+          fallback={0}
           className="text-sm"
         />
       </div>

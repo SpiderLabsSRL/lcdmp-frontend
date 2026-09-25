@@ -76,6 +76,7 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
 
   const { orders, setOrders, isConnected } = useOrdersSocket({
     statusFilter,
+    excludeOrderType: 'restock',
     initialOrders,
   });
 
@@ -89,8 +90,11 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
     try {
       setLoading(true);
       
-      const filters: OrderFilters = {};
-      
+      // Los pedidos de reposición de stock ('restock') son internos — no
+      // tienen cliente real y se confirman desde la pantalla de Reposición,
+      // no acá.
+      const filters: OrderFilters = { excludeOrderType: 'restock' };
+
       if (selectedStatus !== 'all') {
         filters.status = selectedStatus as OrderStatus;
       }

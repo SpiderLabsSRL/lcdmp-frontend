@@ -10,7 +10,7 @@ export class DeliveryApi implements IDeliveryApi {
   async getDeliveryOrders(signal?: AbortSignal): Promise<Order[]> {
     try {
       const response = await api.get('/orders', {
-        params: { status: 'ready', limit: 50 },
+        params: { status: 'ready', excludeOrderType: 'restock', limit: 50 },
         signal,
       });
 

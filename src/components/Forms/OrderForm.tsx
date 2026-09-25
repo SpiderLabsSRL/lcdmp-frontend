@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NumberInput } from '@/components/ui/number-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Banknote, Plus, QrCode, X } from 'lucide-react';
 import { format } from 'date-fns';
@@ -530,11 +531,11 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-sm">Cantidad</Label>
-                  <Input 
-                    type="number" 
+                  <NumberInput
                     min="1"
-                    value={cake.quantity || 1}
-                    onChange={(e) => updateCake(index, 'quantity', parseInt(e.target.value))}
+                    value={cake.quantity}
+                    onChange={(v) => updateCake(index, 'quantity', v)}
+                    fallback={1}
                     className="text-sm"
                   />
                 </div>
@@ -675,13 +676,14 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
 
               <div className="space-y-1.5">
                 <Label className="text-sm">Precio (Bs.) *</Label>
-                <Input 
-                  type="number"
-                  placeholder="0" 
+                <NumberInput
+                  placeholder="0"
                   required
                   className="text-sm"
-                  value={cake.price || ''}
-                  onChange={(e) => updateCake(index, 'price', parseFloat(e.target.value))}
+                  value={cake.price}
+                  onChange={(v) => updateCake(index, 'price', v)}
+                  decimal
+                  fallback={0}
                 />
               </div>
             </div>
@@ -739,12 +741,12 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-sm">Cantidad *</Label>
-                  <Input 
-                    type="number" 
+                  <NumberInput
                     min="1"
                     required
                     value={item.quantity}
-                    onChange={(e) => updateProduct(index, 'quantity', parseInt(e.target.value))}
+                    onChange={(v) => updateProduct(index, 'quantity', v)}
+                    fallback={1}
                     className="text-sm"
                   />
                 </div>
@@ -845,12 +847,12 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
                         </div>
                         <div className="space-y-1">
                           <Label className="text-xs">Cantidad</Label>
-                          <Input
-                            type="number"
+                          <NumberInput
                             min="0"
                             className="text-sm"
                             value={p.quantity}
-                            onChange={(e) => updateComboProduct(comboIndex, productIndex, 'quantity', parseInt(e.target.value) || 0)}
+                            onChange={(v) => updateComboProduct(comboIndex, productIndex, 'quantity', v)}
+                            fallback={0}
                           />
                         </div>
                         <Button
@@ -930,12 +932,12 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Cantidad</Label>
-                    <Input
-                      type="number"
+                    <NumberInput
                       min="1"
                       className="text-sm"
                       value={extra.quantity}
-                      onChange={(e) => updateExtra(index, 'quantity', parseInt(e.target.value) || 0)}
+                      onChange={(v) => updateExtra(index, 'quantity', v)}
+                      fallback={1}
                     />
                   </div>
                   <div className="space-y-1">
@@ -978,12 +980,13 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label className="text-sm">Costo de envío</Label>
-            <Input 
-              type="number" 
-              placeholder="0" 
+            <NumberInput
+              placeholder="0"
               className="text-sm"
-              value={formData.deliveryCost || 0}
-              onChange={(e) => updateFormField('deliveryCost', parseFloat(e.target.value))}
+              value={formData.deliveryCost}
+              onChange={(v) => updateFormField('deliveryCost', v)}
+              decimal
+              fallback={0}
             />
           </div>
           {/*
@@ -1005,23 +1008,25 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="space-y-1.5">
             <Label className="text-sm">Adelanto *</Label>
-            <Input 
-              type="number" 
-              placeholder="0" 
+            <NumberInput
+              placeholder="0"
               required
               className="text-sm"
-              value={formData.deposit || 0}
-              onChange={(e) => updateFormField('deposit', parseFloat(e.target.value))}
+              value={formData.deposit}
+              onChange={(v) => updateFormField('deposit', v)}
+              decimal
+              fallback={0}
             />
           </div>
           <div className="space-y-1.5">
             <Label className="text-sm">Descuento</Label>
-            <Input 
-              type="number" 
-              placeholder="0" 
+            <NumberInput
+              placeholder="0"
               className="text-sm"
-              value={formData.discount || 0}
-              onChange={(e) => updateFormField('discount', parseFloat(e.target.value))}
+              value={formData.discount}
+              onChange={(v) => updateFormField('discount', v)}
+              decimal
+              fallback={0}
             />
           </div>
         </div>

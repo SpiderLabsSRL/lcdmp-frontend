@@ -186,7 +186,7 @@ describe('Products - Productos tab', () => {
     const api = buildMockApi({ getProducts: vi.fn().mockResolvedValue([]) });
     renderWithProviders(<Products api={api} />);
 
-    await waitFor(() => expect(screen.getByText('No se encontraron usuarios')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('No se encontraron productos')).toBeInTheDocument());
   });
 
   it('renders the populated product table with category, price and stock', async () => {
@@ -222,6 +222,47 @@ describe('Products - Productos tab', () => {
       expect.objectContaining({ name: 'Torta red velvet', basePrice: 200 })
     );
     expect(toast.success).toHaveBeenCalledWith('Producto "Torta red velvet" creado exitosamente');
+  });
+
+  it('creates a product with an automatic restock quantity configured', async () => {
+    const api = buildMockApi();
+    const user = userEvent.setup();
+    renderWithProviders(<Products api={api} />);
+
+    await waitFor(() => expect(screen.getByText('Torta de chocolate')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /Nuevo Producto/i }));
+    await user.type(screen.getByPlaceholderText('Nombre del producto'), 'Empanadas de queso');
+    const priceInputs = screen.getAllByPlaceholderText('0');
+    await user.type(priceInputs[0], '5');
+    await user.type(screen.getByPlaceholderText('Sin reposición automática'), '20');
+
+    await user.click(screen.getByRole('button', { name: 'Crear Producto' }));
+
+    await waitFor(() => expect(api.createProduct).toHaveBeenCalled());
+    expect(api.createProduct).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Empanadas de queso', restockQuantity: 20 })
+    );
+  });
+
+  it('creates a product with no restock quantity (null) when left empty', async () => {
+    const api = buildMockApi();
+    const user = userEvent.setup();
+    renderWithProviders(<Products api={api} />);
+
+    await waitFor(() => expect(screen.getByText('Torta de chocolate')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /Nuevo Producto/i }));
+    await user.type(screen.getByPlaceholderText('Nombre del producto'), 'Brownie');
+    const priceInputs = screen.getAllByPlaceholderText('0');
+    await user.type(priceInputs[0], '5');
+
+    await user.click(screen.getByRole('button', { name: 'Crear Producto' }));
+
+    await waitFor(() => expect(api.createProduct).toHaveBeenCalled());
+    expect(api.createProduct).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Brownie', restockQuantity: null })
+    );
   });
 
   it('edits an existing product via the row edit button', async () => {

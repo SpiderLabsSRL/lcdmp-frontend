@@ -31,6 +31,7 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
   // Socket en tiempo real — filtra solo pedidos con status 'ready'
   const { orders: allReadyOrders, isConnected } = useOrdersSocket({
     statusFilter: ['ready'],
+    excludeOrderType: 'restock',
     initialOrders,
   });
 

@@ -448,4 +448,83 @@ describe('useOrdersSocket', () => {
     const offEvents = mockSocket.off.mock.calls.map((c) => c[0]);
     expect(offEvents).toContain('order:item_stage_changed');
   });
+
+  describe('excludeOrderType', () => {
+    it('does not add a new order on order:created when its orderType is excluded', () => {
+      const { result } = renderHook(() =>
+        useOrdersSocket({ excludeOrderType: 'restock', initialOrders: EMPTY_ORDERS })
+      );
+
+      act(() => {
+        getHandler('order:created')(makeOrder({ id: 'r1', orderType: 'restock', status: 'baking' }));
+      });
+
+      expect(result.current.orders).toHaveLength(0);
+    });
+
+    it('adds a new order on order:created when its orderType is not excluded', () => {
+      const { result } = renderHook(() =>
+        useOrdersSocket({ excludeOrderType: 'restock', initialOrders: EMPTY_ORDERS })
+      );
+
+      act(() => {
+        getHandler('order:created')(makeOrder({ id: 'c1', orderType: 'cake', status: 'pending' }));
+      });
+
+      expect(result.current.orders).toHaveLength(1);
+    });
+
+    it('removes an order from the list on order:status_changed if its orderType is excluded', () => {
+      const initial = [makeOrder({ id: 'r1', orderType: 'restock', status: 'baking' })] as unknown as Order[];
+      const { result } = renderHook(() =>
+        useOrdersSocket({ excludeOrderType: 'restock', initialOrders: initial })
+      );
+
+      act(() => {
+        getHandler('order:status_changed')({
+          id: 'r1',
+          status: 'ready',
+          order: makeOrder({ id: 'r1', orderType: 'restock', status: 'ready' }),
+        });
+      });
+
+      expect(result.current.orders).toHaveLength(0);
+    });
+  });
+
+  describe('orderTypeFilter', () => {
+    it('only adds orders that match the given orderType on order:created', () => {
+      const { result } = renderHook(() =>
+        useOrdersSocket({ statusFilter: ['ready'], orderTypeFilter: 'restock', initialOrders: EMPTY_ORDERS })
+      );
+
+      act(() => {
+        getHandler('order:created')(makeOrder({ id: 'c1', orderType: 'cake', status: 'ready' }));
+      });
+      expect(result.current.orders).toHaveLength(0);
+
+      act(() => {
+        getHandler('order:created')(makeOrder({ id: 'r1', orderType: 'restock', status: 'ready' }));
+      });
+      expect(result.current.orders).toHaveLength(1);
+      expect(result.current.orders[0].id).toBe('r1');
+    });
+
+    it('removes an order on order:status_changed once it no longer matches the orderType filter', () => {
+      const initial = [makeOrder({ id: 'r1', orderType: 'restock', status: 'ready' })] as unknown as Order[];
+      const { result } = renderHook(() =>
+        useOrdersSocket({ statusFilter: ['ready'], orderTypeFilter: 'restock', initialOrders: initial })
+      );
+
+      act(() => {
+        getHandler('order:status_changed')({
+          id: 'r1',
+          status: 'delivered',
+          order: makeOrder({ id: 'r1', orderType: 'restock', status: 'delivered' }),
+        });
+      });
+
+      expect(result.current.orders).toHaveLength(0);
+    });
+  });
 });

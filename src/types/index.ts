@@ -104,6 +104,9 @@ export interface Product {
   location: 'production' | 'store';
   stock: number;
   minStock: number;
+  // Cantidad a producir cuando el stock llega al mínimo. Si no está definida,
+  // el producto no se repone automáticamente (es opt-in por producto).
+  restockQuantity?: number | null;
 }
 
 // Flavor Types
@@ -123,6 +126,7 @@ export interface CreateProductData {
   pricePerPortion: number;
   stock: number;
   minStock: number;
+  restockQuantity?: number | null;
   isActive: boolean;
 }
 
@@ -203,6 +207,10 @@ export interface EditSweetTableComboData extends Partial<CreateSweetTableComboDa
 
 // Order Types
 export type OrderType = 'cake' | 'products' | 'sweet_table' | 'mixed';
+// 'restock' se crea internamente (ver maybeCreateRestockOrder en el backend)
+// cuando el stock de un producto llega a su mínimo — nunca a través del
+// formulario público de creación de pedidos, por eso vive aparte de OrderType.
+export type SystemOrderType = OrderType | 'restock';
 
 export type OrderStatus = 
   | 'pending' 
@@ -218,7 +226,7 @@ export type PaymentMethod = 'cash' | 'qr';
 export interface Order {
   id: string;
   orderNumber: string;
-  orderType: OrderType;
+  orderType: SystemOrderType;
   customerName: string;
   customerPhone: string;
   pickupDate: Date;
@@ -332,6 +340,8 @@ export interface OrderFilters {
   endDate?: Date;
   customerName?: string;
   customerPhone?: string;
+  orderType?: SystemOrderType;
+  excludeOrderType?: SystemOrderType;
 }
 
 // Seguimiento de producción por línea (torta/producto/item de combo/extra)

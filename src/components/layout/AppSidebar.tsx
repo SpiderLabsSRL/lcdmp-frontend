@@ -13,6 +13,7 @@ import {
   ChefHat,
   Palette,
   Hammer,
+  PackagePlus,
   LogOut,
   Menu,
   X
@@ -44,6 +45,7 @@ const navItems: NavItem[] = [
   { icon: Hammer, label: 'Armado', href: '/assembly', roles: ['assembler', 'admin'] },
   { icon: Palette, label: 'Decoración', href: '/decoration', roles: ['designer', 'admin'] },
   { icon: Truck, label: 'Delivery', href: '/delivery', roles: ['delivery', 'admin'] },
+  { icon: PackagePlus, label: 'Reposición', href: '/restock', roles: ['admin', 'baker', 'assembler', 'designer'] },
   { icon: CreditCard, label: 'Caja', href: '/cash-register', roles: ['admin', 'seller'] },
   { icon: Users, label: 'Usuarios', href: '/users', roles: ['admin'] },
   { icon: Settings, label: 'Configuración', href: '/settings', roles: ['admin'] },

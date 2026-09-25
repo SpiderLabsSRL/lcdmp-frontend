@@ -225,6 +225,46 @@ describe('OrderForm - custom cakes', () => {
     expect(within(getTotalsRow('Subtotal:')).getByText('Bs. 600.00')).toBeInTheDocument();
   });
 
+  // Regression test for a reported bug: clearing a number field and typing a
+  // new digit produced "12" instead of "2" (the field would snap back to its
+  // fallback value mid-edit). Drives the input with realistic keystrokes
+  // (user.clear + user.type) instead of the setNumberValue() workaround used
+  // elsewhere in this file, to prove the actual browser interaction works.
+  it('lets the cake quantity be cleared and retyped with real keystrokes without concatenating digits', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(screen.getByLabelText('Torta personalizada'));
+    const card = screen.getByText('Torta #1').closest('.relative') as HTMLElement;
+    const quantityInput = within(card).getAllByRole('spinbutton')[0] as HTMLInputElement;
+
+    expect(quantityInput).toHaveValue(1);
+
+    await user.clear(quantityInput);
+    expect(quantityInput.value).toBe('');
+
+    await user.type(quantityInput, '2');
+
+    expect(quantityInput).toHaveValue(2);
+  });
+
+  it('lets the cake price be cleared without snapping back to 0 mid-edit, and typing "1" never leaves a leading zero', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(screen.getByLabelText('Torta personalizada'));
+    const card = screen.getByText('Torta #1').closest('.relative') as HTMLElement;
+    const priceInput = within(card).getByPlaceholderText('0') as HTMLInputElement;
+
+    await user.clear(priceInput);
+    expect(priceInput.value).toBe('');
+
+    await user.type(priceInput, '1');
+
+    expect(priceInput).toHaveValue(1);
+    expect(priceInput.value).not.toBe('01');
+  });
+
   it('removes a cake when more than one is present', async () => {
     const user = userEvent.setup();
     renderForm();

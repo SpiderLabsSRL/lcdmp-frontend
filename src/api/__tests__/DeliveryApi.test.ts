@@ -39,7 +39,7 @@ describe('DeliveryApi (real, axios-backed)', () => {
       const result = await deliveryApi.getDeliveryOrders();
 
       expect(mockedApi.get).toHaveBeenCalledWith('/orders', {
-        params: { status: 'ready', limit: 50 },
+        params: { status: 'ready', excludeOrderType: 'restock', limit: 50 },
         signal: undefined,
       });
       expect(result[0].pickupDate).toEqual(new Date(2026, 2, 5));
@@ -53,7 +53,7 @@ describe('DeliveryApi (real, axios-backed)', () => {
       await deliveryApi.getDeliveryOrders(controller.signal);
 
       expect(mockedApi.get).toHaveBeenCalledWith('/orders', {
-        params: { status: 'ready', limit: 50 },
+        params: { status: 'ready', excludeOrderType: 'restock', limit: 50 },
         signal: controller.signal,
       });
     });

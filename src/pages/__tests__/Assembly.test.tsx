@@ -159,7 +159,7 @@ describe('Assembly', () => {
     expect(screen.getByText(/Relleno: Dulce de leche/)).toBeInTheDocument();
     expect(screen.getByText('Mesa dulce: 12 Cupcakes')).toBeInTheDocument();
     expect(screen.getByText('Mesa dulce: 20 Galletas')).toBeInTheDocument();
-    expect(screen.getByText('Pan dulce')).toBeInTheDocument();
+    expect(screen.getByText('5 Pan dulce')).toBeInTheDocument();
     expect(screen.getAllByText(/Sin azúcar/).length).toBeGreaterThan(0);
 
     // Stats: 4 pending lines.

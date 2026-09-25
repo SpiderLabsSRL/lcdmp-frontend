@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { NumberInput } from '@/components/ui/number-input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 
@@ -105,11 +105,11 @@ export function AdjustStockDialog({
 
           <div className="space-y-2">
             <Label>Cantidad</Label>
-            <Input
-              type="number"
+            <NumberInput
               min={1}
               value={quantity}
-              onChange={(e) => setQuantity(Number(e.target.value))}
+              onChange={setQuantity}
+              fallback={1}
               className="text-lg"
             />
           </div>

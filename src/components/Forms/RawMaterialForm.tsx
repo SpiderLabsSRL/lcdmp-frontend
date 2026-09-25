@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NumberInput } from '@/components/ui/number-input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { RawMaterial, Category } from '@/types';
@@ -91,22 +92,22 @@ export function RawMaterialForm({ initialData, categories, onClose, onSave }: Ra
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <div className="space-y-1.5">
           <Label className="text-sm">Cantidad inicial</Label>
-          <Input 
-            type="number" 
-            placeholder="0" 
+          <NumberInput
+            placeholder="0"
             className="text-sm"
             value={formData.quantity}
-            onChange={(e) => setFormData(prev => ({ ...prev, quantity: Number(e.target.value) }))}
+            onChange={(v) => setFormData(prev => ({ ...prev, quantity: v }))}
+            fallback={0}
           />
         </div>
         <div className="space-y-1.5">
           <Label className="text-sm">Stock mínimo</Label>
-          <Input 
-            type="number" 
-            placeholder="0" 
+          <NumberInput
+            placeholder="0"
             className="text-sm"
             value={formData.minStock}
-            onChange={(e) => setFormData(prev => ({ ...prev, minStock: Number(e.target.value) }))}
+            onChange={(v) => setFormData(prev => ({ ...prev, minStock: v }))}
+            fallback={0}
           />
         </div>
       </div>

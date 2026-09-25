@@ -13,6 +13,7 @@ const makeOrdersApi = (overrides: Partial<IOrdersApi> = {}): IOrdersApi => ({
   deleteOrder: vi.fn(),
   updateOrderStatus: vi.fn(),
   advanceItemStage: vi.fn(),
+  confirmRestock: vi.fn(),
   getOrderProductionLog: vi.fn().mockResolvedValue([]),
   getFlavors: vi.fn(),
   getProducts: vi.fn(),

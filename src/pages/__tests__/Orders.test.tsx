@@ -186,6 +186,7 @@ function buildMockApi(overrides: Partial<IOrdersApi> = {}): IOrdersApi {
     deleteOrder: vi.fn().mockResolvedValue(undefined),
     updateOrderStatus: vi.fn().mockResolvedValue(orderWithCake),
     advanceItemStage: vi.fn().mockResolvedValue(orderWithCake),
+    confirmRestock: vi.fn().mockResolvedValue(orderWithCake),
     getOrderProductionLog: vi.fn().mockResolvedValue([]),
     getFlavors: vi.fn().mockResolvedValue(flavors),
     getProducts: vi.fn().mockResolvedValue(products),
@@ -384,19 +385,31 @@ describe('Orders - row/card click opens detail dialog', () => {
     expect(screen.queryByText('Pedido #ORD-001')).not.toBeInTheDocument();
   });
 
-  it('desktop: clicking Eliminar does not open the detail dialog and calls deleteOrder', async () => {
+  it('desktop: the row has no delete button; cancelling is only offered from inside the detail dialog', async () => {
     const api = buildMockApi();
-    const user = userEvent.setup();
     renderWithProviders(<Orders ordersApi={api} />);
 
     await waitFor(() => expect(screen.getByText('Maria Lopez')).toBeInTheDocument());
 
     const row = screen.getByText('Maria Lopez').closest('tr')!;
-    await user.click(within(row).getByRole('button', { name: /Eliminar/i }));
+    expect(within(row).queryByRole('button', { name: /Eliminar/i })).not.toBeInTheDocument();
+  });
 
-    await waitFor(() => expect(api.deleteOrder).toHaveBeenCalledWith('1'));
-    expect(screen.queryByText('Pedido #ORD-001')).not.toBeInTheDocument();
-    expect(toast.success).toHaveBeenCalledWith('Pedido eliminado exitosamente');
+  it('desktop: hides the Editar button for a cancelled or delivered order', async () => {
+    const api = buildMockApi({
+      getOrders: vi.fn().mockResolvedValue([
+        { ...orderWithCake, status: 'cancelled' },
+        { ...orderWithCombo, status: 'delivered' },
+      ]),
+    });
+    renderWithProviders(<Orders ordersApi={api} />);
+
+    await waitFor(() => expect(screen.getByText('Maria Lopez')).toBeInTheDocument());
+
+    const cancelledRow = screen.getByText('Maria Lopez').closest('tr')!;
+    const deliveredRow = screen.getByText('Juan Perez').closest('tr')!;
+    expect(within(cancelledRow).queryByRole('button', { name: /Editar/i })).not.toBeInTheDocument();
+    expect(within(deliveredRow).queryByRole('button', { name: /Editar/i })).not.toBeInTheDocument();
   });
 
   it('desktop: the row status is a read-only badge, not an editable select, and clicking it does not open the detail dialog', async () => {

@@ -35,6 +35,23 @@ interface UseOrdersSocketOptions {
   itemStageFilter?: ProductStatus;
 
   /**
+   * Tipo de pedido a excluir siempre, sin importar el filtro anterior — usado
+   * por Orders.tsx/Delivery.tsx para que un pedido interno de reposición de
+   * stock ('restock', creado automáticamente al vender un producto) nunca
+   * aparezca ahí en tiempo real, igual que ya se excluye en la carga inicial.
+   * Mutuamente excluyente con orderTypeFilter.
+   */
+  excludeOrderType?: string;
+
+  /**
+   * Lo opuesto a excludeOrderType: solo muestra pedidos de este tipo — usado
+   * por la pantalla de Reposición, que solo debe reaccionar a pedidos
+   * internos 'restock' (junto con statusFilter: ['ready']). Mutuamente
+   * excluyente con excludeOrderType.
+   */
+  orderTypeFilter?: string;
+
+  /**
    * Lista inicial de pedidos (cargada via REST al montar el componente).
    * El hook la usa como estado base y la actualiza con los eventos del socket.
    */
@@ -59,12 +76,16 @@ interface UseOrdersSocketResult {
 export const useOrdersSocket = ({
   statusFilter,
   itemStageFilter,
+  excludeOrderType,
+  orderTypeFilter,
   initialOrders = [],
 }: UseOrdersSocketOptions = {}): UseOrdersSocketResult => {
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [isConnected, setIsConnected] = useState(false);
   const statusFilterRef = useRef(statusFilter);
   const itemStageFilterRef = useRef(itemStageFilter);
+  const excludeOrderTypeRef = useRef(excludeOrderType);
+  const orderTypeFilterRef = useRef(orderTypeFilter);
 
   // Mantener las refs actualizadas sin re-suscribir
   useEffect(() => {
@@ -74,6 +95,14 @@ export const useOrdersSocket = ({
   useEffect(() => {
     itemStageFilterRef.current = itemStageFilter;
   }, [itemStageFilter]);
+
+  useEffect(() => {
+    excludeOrderTypeRef.current = excludeOrderType;
+  }, [excludeOrderType]);
+
+  useEffect(() => {
+    orderTypeFilterRef.current = orderTypeFilter;
+  }, [orderTypeFilter]);
 
   // Sincronizar cuando cambia initialOrders (por la carga inicial REST)
   useEffect(() => {
@@ -94,6 +123,12 @@ export const useOrdersSocket = ({
     return statusFilterRef.current.includes(status);
   }, []);
   const matchesOrder = useCallback((order: Order): boolean => {
+    if (excludeOrderTypeRef.current && order.orderType === excludeOrderTypeRef.current) {
+      return false;
+    }
+    if (orderTypeFilterRef.current && order.orderType !== orderTypeFilterRef.current) {
+      return false;
+    }
     if (itemStageFilterRef.current) {
       return hasLineInStage(order, itemStageFilterRef.current);
     }
