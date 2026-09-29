@@ -171,8 +171,7 @@ describe('OrderForm - initial render (create mode)', () => {
     const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement;
     expect(dateInput.value).toBe(getLocalDateString());
 
-    const timeInput = document.querySelector('input[type="time"]') as HTMLInputElement;
-    expect(timeInput.value).toBe('12:00');
+    expect(screen.getByRole('button', { name: '12:00' })).toBeInTheDocument();
 
     expect(within(getTotalsRow('Subtotal:')).getByText('Bs. 0.00')).toBeInTheDocument();
     expect(within(getTotalsRow('Total a pagar:')).getByText('Bs. 0.00')).toBeInTheDocument();
@@ -577,8 +576,7 @@ describe('OrderForm - editing an existing order', () => {
 
     const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement;
     expect(dateInput.value).toBe('2026-10-10');
-    const timeInput = document.querySelector('input[type="time"]') as HTMLInputElement;
-    expect(timeInput.value).toBe('15:30');
+    expect(screen.getByRole('button', { name: '15:30' })).toBeInTheDocument();
 
     // Cake section pre-filled
     const cakeCard = screen.getByText('Torta #1').closest('.relative') as HTMLElement;

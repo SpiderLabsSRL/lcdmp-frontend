@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NumberInput } from '@/components/ui/number-input';
+import { TimePicker } from '@/components/ui/time-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Banknote, Plus, QrCode, X } from 'lucide-react';
 import { format } from 'date-fns';
@@ -393,12 +394,9 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
         </div>
         <div className="space-y-1.5 sm:space-y-2">
           <Label className="text-sm">Hora de entrega *</Label>
-          <Input 
-            type="time" 
-            required 
-            className="text-sm"
-            value={formData.pickupTime || ''}
-            onChange={(e) => updateFormField('pickupTime', e.target.value)}
+          <TimePicker
+            value={formData.pickupTime || '12:00'}
+            onChange={(v) => updateFormField('pickupTime', v)}
           />
         </div>
       </div>
