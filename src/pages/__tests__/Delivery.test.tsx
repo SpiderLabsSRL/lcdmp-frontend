@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -79,6 +79,17 @@ const pickupOrder = makeOrder({
   id: 'order-2',
   orderNumber: 'ORD-301',
   customerName: 'Marta Salas',
+  deliveryCost: 0,
+});
+
+// Un pedido puede llegar con costo de envío asignado antes de que se defina
+// la dirección exacta — igual debe aparecer en "Entregas a Domicilio", no en
+// "Recogidas en Tienda". Usa el deliveryCost por defecto de makeOrder (20) y
+// no define deliveryAddress a propósito.
+const deliveryOrderWithoutAddress = makeOrder({
+  id: 'order-3',
+  orderNumber: 'ORD-302',
+  customerName: 'Pedro Rojas',
 });
 
 function buildMockApi(overrides: Partial<IDeliveryApi> = {}): IDeliveryApi {
@@ -131,6 +142,27 @@ describe('Delivery', () => {
     expect(screen.getByText(/Pan de queso/)).toBeInTheDocument();
     expect(screen.getByText(/Timbre no funciona/)).toBeInTheDocument();
     expect(screen.getByText('Av. Siempre Viva 123')).toBeInTheDocument();
+  });
+
+  it('places an order that only has a delivery cost (no address yet) under "Entregas a Domicilio", not "Recogidas en Tienda"', async () => {
+    const mockApi = buildMockApi({
+      getDeliveryOrders: vi.fn().mockResolvedValue([pickupOrder, deliveryOrderWithoutAddress]),
+    });
+    renderWithProviders(<Delivery deliveryApi={mockApi} />);
+
+    await screen.findByText('#ORD-301');
+
+    const deliveriesCard = screen.getByText('Entregas a Domicilio').closest('.mx-4') as HTMLElement;
+    const pickupsCard = screen.getByText('Recogidas en Tienda').closest('.mx-4') as HTMLElement;
+
+    expect(within(deliveriesCard).getByText('#ORD-302')).toBeInTheDocument();
+    expect(within(deliveriesCard).queryByText('#ORD-301')).not.toBeInTheDocument();
+
+    expect(within(pickupsCard).getByText('#ORD-301')).toBeInTheDocument();
+    expect(within(pickupsCard).queryByText('#ORD-302')).not.toBeInTheDocument();
+
+    // No hay dirección: no debe intentar mostrar un botón "Mapa" roto.
+    expect(within(deliveriesCard).queryByRole('button', { name: /Mapa/i })).not.toBeInTheDocument();
   });
 
   it('opens the complete dialog and confirms delivery with cash by default', async () => {

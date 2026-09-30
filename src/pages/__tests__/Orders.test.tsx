@@ -267,6 +267,36 @@ describe('Orders - loading & list states', () => {
     expect(screen.getByText('#ORD-001')).toBeInTheDocument();
     expect(screen.getByText('20p Chocolate')).toBeInTheDocument();
   });
+
+  it('shows a delivery badge next to orders that need shipping (desktop), without hiding the status badge', async () => {
+    // deliveryAddress set, deliveryCost still 0 — either one alone should count as "needs shipping".
+    const shippedOrder: Order = { ...orderWithCake, id: '5', orderNumber: 'ORD-005', deliveryAddress: 'Av. Siempre Viva 123' };
+    const api = buildMockApi({ getOrders: vi.fn().mockResolvedValue([shippedOrder, orderWithCombo]) });
+    renderWithProviders(<Orders ordersApi={api} />);
+
+    await waitFor(() => expect(screen.getByText('Maria Lopez')).toBeInTheDocument());
+
+    const shippedRow = screen.getByText('#ORD-005').closest('tr')!;
+    expect(within(shippedRow).getByTitle('Pedido con envío a domicilio')).toBeInTheDocument();
+    // Status badge is untouched by the delivery indicator.
+    expect(within(shippedRow).getByText('Pendiente')).toBeInTheDocument();
+
+    const nonShippedRow = screen.getByText('Juan Perez').closest('tr')!;
+    expect(within(nonShippedRow).queryByTitle('Pedido con envío a domicilio')).not.toBeInTheDocument();
+    expect(within(nonShippedRow).getByText('Horneando')).toBeInTheDocument();
+  });
+
+  it('shows a delivery badge next to orders that need shipping (mobile)', async () => {
+    mockedUseIsMobile.mockReturnValue(true);
+    const shippedOrder: Order = { ...orderWithCake, id: '5', orderNumber: 'ORD-005', deliveryCost: 15 };
+    const api = buildMockApi({ getOrders: vi.fn().mockResolvedValue([shippedOrder, orderWithCombo]) });
+    renderWithProviders(<Orders ordersApi={api} />);
+
+    await waitFor(() => expect(screen.getByText('Maria Lopez')).toBeInTheDocument());
+
+    expect(screen.getByTitle('Pedido con envío a domicilio')).toBeInTheDocument();
+    expect(screen.getByText('Pendiente')).toBeInTheDocument();
+  });
 });
 
 describe('Orders - filters', () => {

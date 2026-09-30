@@ -15,6 +15,7 @@ import { IDeliveryApi, defaultDeliveryApi } from '@/api/DeliveryApi';
 import { useOrdersSocket } from '@/hooks/useOrdersSocket';
 import type { Order, PaymentMethod } from '@/types';
 import { hoursUntilPickupDateTime } from '@/utils/DateUtils';
+import { isDeliveryOrder } from '@/utils/orderUtils';
 
 interface DeliveryProps {
   deliveryApi?: IDeliveryApi;
@@ -38,11 +39,11 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
 
   // Separar entre entregas a domicilio y recogidas en tienda
   const deliveryOrders = allReadyOrders
-    .filter(o => o.deliveryAddress)
+    .filter(isDeliveryOrder)
     .sort((a, b) => differenceInHours(a.pickupDate, new Date()) - differenceInHours(b.pickupDate, new Date()));
 
   const pickupOrders = allReadyOrders
-    .filter(o => !o.deliveryAddress)
+    .filter(o => !isDeliveryOrder(o))
     .sort((a, b) => differenceInHours(a.pickupDate, new Date()) - differenceInHours(b.pickupDate, new Date()));
 
   useEffect(() => {
@@ -231,10 +232,12 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
                               )}
                             </div>
                             <div  className="text-xs bg-muted/50 p-2 rounded">
-                              <div className="flex items-start gap-2 text-xs ">
-                                <MapPin className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
-                                <span className="line-clamp-2">{order.deliveryAddress}</span>
-                              </div>
+                              {order.deliveryAddress && (
+                                <div className="flex items-start gap-2 text-xs ">
+                                  <MapPin className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                                  <span className="line-clamp-2">{order.deliveryAddress}</span>
+                                </div>
+                              )}
                               <div className="flex items-start gap-2 text-xs">
                                 <a href={`tel:${order.customerPhone}`} className="text-primary flex items-center gap-1">
                                   <Phone className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
@@ -321,10 +324,12 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
                           {order.notes && (
                             <p className="text-sm whitespace-pre-wrap">📝 {order.notes}</p>
                           )}
-                          <div className='flex items-start gap-1 mt-2 text-sm '>
-                            <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                            <span className="break-words">{order.deliveryAddress}</span>
-                          </div>
+                          {order.deliveryAddress && (
+                            <div className='flex items-start gap-1 mt-2 text-sm '>
+                              <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                              <span className="break-words">{order.deliveryAddress}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -347,15 +352,17 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
                       </div>
 
                       <div className="flex flex-col gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => openMaps(order.deliveryAddress!)}
-                        >
-                          <Navigation className="h-4 w-4 mr-1" />
-                          Mapa
-                        </Button>
-                        <Button 
+                        {order.deliveryAddress && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openMaps(order.deliveryAddress!)}
+                          >
+                            <Navigation className="h-4 w-4 mr-1" />
+                            Mapa
+                          </Button>
+                        )}
+                        <Button
                           size="sm"
                           onClick={() => { setSelectedOrder(order); setIsCompleteDialogOpen(true); }}
                         >
