@@ -1163,6 +1163,18 @@ function ProductForm({ onClose, onSave, initialProduct }: {
       return;
     }
 
+    if (formData.stock < 0) {
+      toast.error('El stock inicial no puede ser negativo');
+      setSubmitting(false);
+      return;
+    }
+
+    if (formData.minStock < 0) {
+      toast.error('El stock mínimo no puede ser negativo');
+      setSubmitting(false);
+      return;
+    }
+
     const product: Product = {
       id: initialProduct?.id || Date.now().toString(),
       name: formData.name,

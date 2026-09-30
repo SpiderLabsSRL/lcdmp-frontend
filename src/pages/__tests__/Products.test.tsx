@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -222,6 +222,44 @@ describe('Products - Productos tab', () => {
       expect.objectContaining({ name: 'Torta red velvet', basePrice: 200 })
     );
     expect(toast.success).toHaveBeenCalledWith('Producto "Torta red velvet" creado exitosamente');
+  });
+
+  it('blocks submit and shows an error when stock inicial is negative', async () => {
+    const api = buildMockApi();
+    const user = userEvent.setup();
+    renderWithProviders(<Products api={api} />);
+
+    await waitFor(() => expect(screen.getByText('Torta de chocolate')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /Nuevo Producto/i }));
+    await user.type(screen.getByPlaceholderText('Nombre del producto'), 'Torta red velvet');
+    const priceInputs = screen.getAllByPlaceholderText('0');
+    await user.type(priceInputs[0], '200');
+    fireEvent.change(priceInputs[2], { target: { value: '-5' } }); // Stock inicial
+
+    await user.click(screen.getByRole('button', { name: 'Crear Producto' }));
+
+    expect(toast.error).toHaveBeenCalledWith('El stock inicial no puede ser negativo');
+    expect(api.createProduct).not.toHaveBeenCalled();
+  });
+
+  it('blocks submit and shows an error when stock mínimo is negative', async () => {
+    const api = buildMockApi();
+    const user = userEvent.setup();
+    renderWithProviders(<Products api={api} />);
+
+    await waitFor(() => expect(screen.getByText('Torta de chocolate')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /Nuevo Producto/i }));
+    await user.type(screen.getByPlaceholderText('Nombre del producto'), 'Torta red velvet');
+    const priceInputs = screen.getAllByPlaceholderText('0');
+    await user.type(priceInputs[0], '200');
+    fireEvent.change(priceInputs[3], { target: { value: '-1' } }); // Stock mínimo
+
+    await user.click(screen.getByRole('button', { name: 'Crear Producto' }));
+
+    expect(toast.error).toHaveBeenCalledWith('El stock mínimo no puede ser negativo');
+    expect(api.createProduct).not.toHaveBeenCalled();
   });
 
   it('creates a product with an automatic restock quantity configured', async () => {
