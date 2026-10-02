@@ -18,6 +18,7 @@ import {
 import { Banknote, QrCode } from "lucide-react";
 import { getOrderType } from "@/pages/Orders";
 import { IOrdersApi, defaultOrdersApi } from "@/api/OrdersApi";
+import { getLocalDateString } from "@/utils/DateUtils";
 
 interface OrderDetailProps {
   order: Order;
@@ -200,6 +201,12 @@ export default function OrderDetail({ order, onDeliver, onCancel, onMarkAtStore,
                     </p>
                     {item.status && (
                       <Badge className={itemStatusColor(item.status)}>{itemStatusLabel(item.status)}</Badge>
+                    )}
+                    {item.fromStock && <Badge variant="outline">De stock</Badge>}
+                    {item.fromStock && item.status !== 'delivered'
+                      && getLocalDateString(order.pickupDate) <= getLocalDateString()
+                      && (item.storeStock ?? Infinity) < item.quantity && (
+                      <Badge variant="destructive">Sin stock en tienda</Badge>
                     )}
                   </div>
                   {item.notes && (

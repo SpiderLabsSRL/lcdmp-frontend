@@ -749,11 +749,34 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
                   />
                 </div>
               </div>
-              
+              {item.productId && (() => {
+                const catalogProduct = catalogProducts.find((cp: any) => cp.id === item.productId);
+                const available = (catalogProduct?.storeStock ?? 0) - (catalogProduct?.reservedStock ?? 0);
+                return (
+                  <div className="space-y-1">
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-primary"
+                        checked={!!item.fromStock}
+                        onChange={(e) => updateProduct(index, 'fromStock', e.target.checked)}
+                      />
+                      <span>Usar de stock</span>
+                      <span className="text-muted-foreground">(disponible en tienda: {Math.max(available, 0)})</span>
+                    </label>
+                    {item.fromStock && (
+                      <p className="text-xs text-muted-foreground">
+                        Queda lista de inmediato. El stock se descuenta al entregar y se reserva el día de retiro.
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+
               <div className="space-y-1.5">
                 <Label className="text-sm">Notas (opcional)</Label>
-                <Input 
-                  placeholder="Ej: Sin gluten, decoración especial..." 
+                <Input
+                  placeholder="Ej: Sin gluten, decoración especial..."
                   className="text-sm"
                   value={item.notes || ''}
                   onChange={(e) => updateProduct(index, 'notes', e.target.value)}

@@ -1140,6 +1140,9 @@ function AddStockForm({ product, onClose, onAddStock, onTransfer }: {
         <Label className="text-sm">Stock actual en {locationType === 'store' ? 'tienda' : 'planta'}</Label>
         <p className="text-lg font-semibold">{currentStock} unidades</p>
         {isTransfer && <p className="text-sm text-muted-foreground">Tienda: {product.storeStock} unidades</p>}
+        {locationType === 'store' && !!product.reservedStock && (
+          <p className="text-sm text-muted-foreground">{product.reservedStock} reservadas para pedidos de hoy</p>
+        )}
       </div>
 
       <div className="space-y-1.5 sm:space-y-2">

@@ -13,6 +13,31 @@ export interface SaleData {
   total: number;
   paymentMethod: 'cash' | 'qr';
   timestamp: Date;
+  // Confirma que la venta pise unidades reservadas por pedidos de hoy.
+  overrideReservation?: boolean;
+}
+
+export interface ReservationConflict {
+  productId: string;
+  lines: {
+    id: string;
+    orderId: string;
+    quantity: number;
+    orderNumber: string;
+    pickupDate: string;
+    pickupTime: string | null;
+  }[];
+}
+
+// La venta se llevaría stock reservado: hay que confirmar antes de seguir.
+export class ReservationConflictError extends Error {
+  conflicts: ReservationConflict[];
+
+  constructor(message: string, conflicts: ReservationConflict[]) {
+    super(message);
+    this.name = 'ReservationConflictError';
+    this.conflicts = conflicts;
+  }
 }
 
 export interface ISalesApi {
@@ -65,7 +90,8 @@ export class SalesApi implements ISalesApi {
       const payload = {
         items: sale.items,
         total: sale.total,
-        paymentMethod: sale.paymentMethod
+        paymentMethod: sale.paymentMethod,
+        overrideReservation: sale.overrideReservation === true
       };
 
       const response = await api.post('/sales', payload);
@@ -75,6 +101,9 @@ export class SalesApi implements ISalesApi {
       }
     } catch (error: any) {
       console.error('Error en createSale:', error);
+      if (error.response?.data?.code === 'RESERVATION_CONFLICT') {
+        throw new ReservationConflictError(error.response.data.message, error.response.data.conflicts);
+      }
       const message = error.response?.data?.message || error.message || 'Error al procesar la venta';
       throw new Error(message);
     }

@@ -117,6 +117,17 @@ describe('OrderDetail', () => {
     expect(screen.getByText('15:00')).toBeInTheDocument();
   });
 
+  it('marks from-stock lines and warns about missing store stock only once the pickup day has come', () => {
+    const line = { productId: 'p1', product: { name: 'Cupcake' } as any, quantity: 3, price: 10, status: 'ready' as const, fromStock: true, storeStock: 1 };
+    const { rerender } = render(<OrderDetail order={{ ...baseOrder, pickupDate: new Date(2999, 0, 1), items: [line] }} ordersApi={makeOrdersApi()} />);
+
+    expect(screen.getByText('De stock')).toBeInTheDocument();
+    expect(screen.queryByText('Sin stock en tienda')).not.toBeInTheDocument();
+
+    rerender(<OrderDetail order={{ ...baseOrder, pickupDate: new Date(2020, 0, 1), items: [line] }} ordersApi={makeOrdersApi()} />);
+    expect(screen.getByText('Sin stock en tienda')).toBeInTheDocument();
+  });
+
   it('renders the status badge and creator username', () => {
     render(<OrderDetail order={baseOrder} />);
 

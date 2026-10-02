@@ -106,6 +106,9 @@ export interface Product {
   // lugar por producto.
   stock: number;
   storeStock: number;
+  // Unidades de tienda comprometidas con pedidos de hoy ("usar de stock"). El
+  // disponible para vender es storeStock - reservedStock.
+  reservedStock?: number;
   productionStock: number;
   minStock: number;
   // Cantidad a producir cuando el stock llega al mínimo. Si no está definida,
@@ -269,6 +272,10 @@ export interface OrderItem {
   price: number;
   notes?: string;
   status?: ProductStatus;
+  // "Usar de stock": la línea nace lista y el stock de tienda se descuenta al entregar.
+  fromStock?: boolean;
+  // Stock de tienda actual del producto (solo lectura, para avisar si no alcanza al retirar).
+  storeStock?: number;
 }
 
 export interface CustomCake {

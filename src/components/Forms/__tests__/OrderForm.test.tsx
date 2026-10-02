@@ -305,6 +305,29 @@ describe('OrderForm - catalog products', () => {
   });
 });
 
+describe('OrderForm - usar de stock', () => {
+  it('offers the "Usar de stock" check once a product is chosen and sends fromStock in the payload', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm();
+
+    await user.click(screen.getByLabelText('Productos del catálogo'));
+    const card = screen.getByText('Producto #1').closest('.space-y-3') as HTMLElement;
+    expect(within(card).queryByLabelText(/Usar de stock/)).not.toBeInTheDocument();
+
+    await chooseOption(user, within(card).getByRole('combobox'), /Cupcake Vainilla - Bs\. 15/);
+    expect(within(card).getByText(/disponible en tienda: 100/)).toBeInTheDocument();
+
+    await user.click(within(card).getByLabelText(/Usar de stock/));
+    expect(within(card).getByText(/Queda lista de inmediato/)).toBeInTheDocument();
+
+    await fillRequiredCustomerFields(user);
+    await user.click(screen.getByRole('button', { name: 'Crear Pedido' }));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit.mock.calls[0][0].items[0].fromStock).toBe(true);
+  });
+});
+
 describe('OrderForm - sweet table combos', () => {
   it('seeds a combo from the preset dropdown with the right totalQuantity, price and products', async () => {
     const user = userEvent.setup();
