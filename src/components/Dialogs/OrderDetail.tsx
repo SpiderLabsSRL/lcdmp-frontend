@@ -1,6 +1,6 @@
 import { Order, ItemStageLogEntry } from "@/types";
 import { format, differenceInMinutes } from 'date-fns';
-import { Truck, XCircle, ChevronDown, ChevronUp, History } from "lucide-react";
+import { Truck, XCircle, ChevronDown, ChevronUp, History, Store } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { statusConfig } from '@/types/consts';
 import { es } from "date-fns/locale";
@@ -23,6 +23,7 @@ interface OrderDetailProps {
   order: Order;
   onDeliver?: (orderId: string, paymentMethod: PaymentMethod) => void;
   onCancel?: (orderId: string) => void;
+  onMarkAtStore?: (orderId: string) => void;
   ordersApi?: IOrdersApi;
 }
 
@@ -36,7 +37,7 @@ const itemStatusColor = (status?: string) => {
   return statusConfig[status as keyof typeof statusConfig]?.color || '';
 };
 
-export default function OrderDetail({ order, onDeliver, onCancel, ordersApi = defaultOrdersApi }: OrderDetailProps) {
+export default function OrderDetail({ order, onDeliver, onCancel, onMarkAtStore, ordersApi = defaultOrdersApi }: OrderDetailProps) {
   const [showDeliverDialog, setShowDeliverDialog] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [showHistory, setShowHistory] = useState(false);
@@ -109,6 +110,21 @@ export default function OrderDetail({ order, onDeliver, onCancel, ordersApi = de
             <p className="text-sm text-foreground">{order.pickupTime}</p>
           </div>
         </div>
+
+        {/* Trasladar a tienda — acción manual, 'ready' no implica que ya se
+            llevó físicamente (puede quedar esperando en planta) */}
+        {order.status === 'ready' && order.currentLocationType === 'production' && onMarkAtStore && (
+          <div className="border-t pt-3 sm:pt-4">
+            <Button
+              onClick={() => onMarkAtStore(order.id)}
+              variant="outline"
+              className="w-full"
+            >
+              <Store className="h-4 w-4 mr-2" />
+              Marcar como trasladado a tienda
+            </Button>
+          </div>
+        )}
 
         {/* Botón de entregar */}
         {order.status !== 'delivered' && onDeliver && (
@@ -337,9 +353,16 @@ export default function OrderDetail({ order, onDeliver, onCancel, ordersApi = de
 
         {/* Estado del pedido */}
         <div className="border-t pt-3 flex flex-wrap justify-between items-center gap-2">
-          <Badge className={statusConfig[order.status].color}>
-            {statusConfig[order.status].label}
-          </Badge>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge className={statusConfig[order.status].color}>
+              {statusConfig[order.status].label}
+            </Badge>
+            {(order.status === 'ready' || order.status === 'delivered') && order.currentLocationType && (
+              <Badge variant="outline" className="border-info text-info">
+                {order.currentLocationType === 'store' ? 'En tienda' : 'En planta'}
+              </Badge>
+            )}
+          </div>
           <p className="text-sm text-foreground">
             Creado por: {order.createdByUsername}
           </p>

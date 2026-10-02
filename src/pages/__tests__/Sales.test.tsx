@@ -23,8 +23,9 @@ const cupcake: Product = {
   portionSize: 1,
   pricePerPortion: 15,
   isActive: true,
-  location: 'store',
   stock: 10,
+  storeStock: 10,
+  productionStock: 0,
   minStock: 2,
 };
 
@@ -37,8 +38,9 @@ const cookie: Product = {
   portionSize: 1,
   pricePerPortion: 5,
   isActive: true,
-  location: 'store',
   stock: 20,
+  storeStock: 20,
+  productionStock: 0,
   minStock: 5,
 };
 

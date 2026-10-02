@@ -36,8 +36,9 @@ const products: Product[] = [
     portionSize: 1,
     pricePerPortion: 15,
     isActive: true,
-    location: 'store',
     stock: 100,
+    storeStock: 100,
+    productionStock: 0,
     minStock: 5,
   },
   {
@@ -49,8 +50,9 @@ const products: Product[] = [
     portionSize: 1,
     pricePerPortion: 10,
     isActive: true,
-    location: 'store',
     stock: 100,
+    storeStock: 100,
+    productionStock: 0,
     minStock: 5,
   },
   {
@@ -62,8 +64,9 @@ const products: Product[] = [
     portionSize: 1,
     pricePerPortion: 5,
     isActive: true,
-    location: 'store',
     stock: 100,
+    storeStock: 100,
+    productionStock: 0,
     minStock: 5,
   },
 ];

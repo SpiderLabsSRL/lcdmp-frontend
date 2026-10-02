@@ -26,6 +26,7 @@ export interface IOrdersApi {
   updateOrder(id: string, data: UpdateOrderData): Promise<Order>;
   deleteOrder(id: string): Promise<void>;
   updateOrderStatus(id: string, status: OrderStatus, paymentMethod?: PaymentMethod): Promise<Order>;
+  markOrderAtStore(id: string): Promise<Order>;
   advanceItemStage(orderId: string, itemType: WorkItemType, itemId: string, toStage: ProductStatus): Promise<Order>;
   confirmRestock(orderId: string, itemId: string, actualQuantity: number): Promise<Order>;
   getOrderProductionLog(orderId: string): Promise<ItemStageLogEntry[]>;
@@ -167,6 +168,20 @@ export class MockOrdersApi implements IOrdersApi {
     
     this.orders[index] = { ...this.orders[index], status };
     console.log('Mock order status updated:', { id, status });
+
+    return this.orders[index];
+  }
+
+  async markOrderAtStore(id: string): Promise<Order> {
+    await this.simulateNetworkDelay();
+
+    const index = this.orders.findIndex(o => o.id === id);
+    if (index === -1) {
+      throw new Error(`Order with id ${id} not found`);
+    }
+
+    this.orders[index] = { ...this.orders[index], currentLocationType: 'store' };
+    console.log('Mock order marked at store:', { id });
 
     return this.orders[index];
   }
@@ -435,6 +450,25 @@ export class OrdersApi implements IOrdersApi {
     } catch (error: any) {
       console.error('Error en updateOrderStatus:', error);
       throw new Error(error.response?.data?.message || error.message || 'Error al actualizar el estado');
+    }
+  }
+
+  async markOrderAtStore(id: string): Promise<Order> {
+    try {
+      const response = await api.patch(`/orders/${id}/mark-at-store`);
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Error al marcar el pedido como trasladado');
+      }
+
+      return {
+        ...response.data.data,
+        pickupDate: new Date(response.data.data.pickupDate),
+        createdAt: new Date(response.data.data.createdAt)
+      };
+    } catch (error: any) {
+      console.error('Error en markOrderAtStore:', error);
+      throw new Error(error.response?.data?.message || error.message || 'Error al marcar el pedido como trasladado');
     }
   }
 

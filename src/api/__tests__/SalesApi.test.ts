@@ -112,7 +112,7 @@ describe('MockSalesApi (in-memory)', () => {
     const products = await mockApi.getProducts();
 
     expect(products.length).toBeGreaterThan(0);
-    expect(products.every(p => p.isActive && p.location === 'store' && p.stock > 0)).toBe(true);
+    expect(products.every(p => p.isActive && p.storeStock > 0)).toBe(true);
   });
 
   it('filters products by search term (case-insensitive)', async () => {

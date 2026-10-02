@@ -37,12 +37,19 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
     initialOrders,
   });
 
+  // Un pedido 'ready' recién puede aparecer acá si ya se puede entregar:
+  // - Recogida en tienda: tiene que estar YA trasladado a la tienda, no basta
+  //   con estar 'ready' (puede seguir esperando en planta).
+  // - Envío a domicilio: se puede despachar directo desde planta, el
+  //   repartidor lo recoge ahí sin pasar por la tienda.
+  const visibleOrders = allReadyOrders.filter(o => isDeliveryOrder(o) || o.currentLocationType === 'store');
+
   // Separar entre entregas a domicilio y recogidas en tienda
-  const deliveryOrders = allReadyOrders
+  const deliveryOrders = visibleOrders
     .filter(isDeliveryOrder)
     .sort((a, b) => differenceInHours(a.pickupDate, new Date()) - differenceInHours(b.pickupDate, new Date()));
 
-  const pickupOrders = allReadyOrders
+  const pickupOrders = visibleOrders
     .filter(o => !isDeliveryOrder(o))
     .sort((a, b) => differenceInHours(a.pickupDate, new Date()) - differenceInHours(b.pickupDate, new Date()));
 
@@ -155,7 +162,7 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
               </div>
               <div className="min-w-0">
                 <p className="text-lg sm:text-2xl font-bold">
-                  {allReadyOrders.filter(o => differenceInHours(o.pickupDate, new Date()) < 2).length}
+                  {visibleOrders.filter(o => differenceInHours(o.pickupDate, new Date()) < 2).length}
                 </p>
                 <p className="text-xs sm:text-sm  truncate">Urgentes (&lt;2h)</p>
               </div>

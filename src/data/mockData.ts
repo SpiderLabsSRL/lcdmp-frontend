@@ -35,14 +35,14 @@ export const mockBakedProducts: BakedProduct[] = [
 
 // Finished Products
 export const mockProducts: Product[] = [
-  { id: '1', name: 'Torta de Chocolate', description: 'Torta clásica de chocolate con ganache', basePrice: 180, category: 'cake', portionSize: 10, pricePerPortion: 12, isActive: true, location: 'store', stock: 3, minStock: 1 },
-  { id: '2', name: 'Torta de Vainilla', description: 'Torta de vainilla con buttercream', basePrice: 160, category: 'cake', portionSize: 10, pricePerPortion: 11, isActive: true, location: 'store', stock: 2, minStock: 1 },
-  { id: '3', name: 'Torta Red Velvet', description: 'Torta red velvet con frosting de queso crema', basePrice: 200, category: 'cake', portionSize: 10, pricePerPortion: 14, isActive: true, location: 'production', stock: 1, minStock: 1 },
-  { id: '4', name: 'Cupcake Decorado', description: 'Cupcake con diseño personalizado', basePrice: 15, category: 'cupcake', portionSize: 1, pricePerPortion: 15, isActive: true, location: 'store', stock: 24, minStock: 12 },
-  { id: '5', name: 'Cheesecake', description: 'Cheesecake New York style', basePrice: 150, category: 'dessert', portionSize: 12, pricePerPortion: 15, isActive: true, location: 'store', stock: 2, minStock: 1 },
-  { id: '6', name: 'Brownie', description: 'Brownie con nueces', basePrice: 8, category: 'dessert', portionSize: 1, pricePerPortion: 8, isActive: true, location: 'store', stock: 20, minStock: 10 },
-  { id: '7', name: 'Alfajores', description: 'Alfajores de maicena con dulce de leche', basePrice: 5, category: 'dessert', portionSize: 1, pricePerPortion: 5, isActive: true, location: 'store', stock: 30, minStock: 15 },
-  { id: '8', name: 'Torta Selva Negra', description: 'Torta de chocolate con cerezas y crema', basePrice: 220, category: 'cake', portionSize: 30, pricePerPortion: 15, isActive: true, location: 'production', stock: 0, minStock: 1 },
+  { id: '1', name: 'Torta de Chocolate', description: 'Torta clásica de chocolate con ganache', basePrice: 180, category: 'cake', portionSize: 10, pricePerPortion: 12, isActive: true, stock: 3, storeStock: 3, productionStock: 0, minStock: 1 },
+  { id: '2', name: 'Torta de Vainilla', description: 'Torta de vainilla con buttercream', basePrice: 160, category: 'cake', portionSize: 10, pricePerPortion: 11, isActive: true, stock: 2, storeStock: 2, productionStock: 0, minStock: 1 },
+  { id: '3', name: 'Torta Red Velvet', description: 'Torta red velvet con frosting de queso crema', basePrice: 200, category: 'cake', portionSize: 10, pricePerPortion: 14, isActive: true, stock: 1, storeStock: 0, productionStock: 1, minStock: 1 },
+  { id: '4', name: 'Cupcake Decorado', description: 'Cupcake con diseño personalizado', basePrice: 15, category: 'cupcake', portionSize: 1, pricePerPortion: 15, isActive: true, stock: 24, storeStock: 24, productionStock: 0, minStock: 12 },
+  { id: '5', name: 'Cheesecake', description: 'Cheesecake New York style', basePrice: 150, category: 'dessert', portionSize: 12, pricePerPortion: 15, isActive: true, stock: 2, storeStock: 2, productionStock: 0, minStock: 1 },
+  { id: '6', name: 'Brownie', description: 'Brownie con nueces', basePrice: 8, category: 'dessert', portionSize: 1, pricePerPortion: 8, isActive: true, stock: 20, storeStock: 20, productionStock: 0, minStock: 10 },
+  { id: '7', name: 'Alfajores', description: 'Alfajores de maicena con dulce de leche', basePrice: 5, category: 'dessert', portionSize: 1, pricePerPortion: 5, isActive: true, stock: 30, storeStock: 30, productionStock: 0, minStock: 15 },
+  { id: '8', name: 'Torta Selva Negra', description: 'Torta de chocolate con cerezas y crema', basePrice: 220, category: 'cake', portionSize: 30, pricePerPortion: 15, isActive: true, stock: 0, storeStock: 0, productionStock: 0, minStock: 1 },
 ];
 
 // Flavors

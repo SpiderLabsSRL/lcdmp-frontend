@@ -125,7 +125,6 @@ export class BakingApi implements IBakingApi {
       
       return response.data.data.map((product: any) => ({
         ...product,
-        lastUpdated: new Date(product.lastUpdated),
         expiresAt: product.expiresAt ? new Date(product.expiresAt) : undefined,
         createdAt: new Date(product.createdAt)
       }));

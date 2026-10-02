@@ -25,7 +25,8 @@ export class MockSalesApi implements ISalesApi {
 
    async getProducts(searchTerm: string = ''): Promise<Product[]> {
     await new Promise(resolve => setTimeout(resolve, 300));
-    let filtered = this.products.filter(p => p.isActive && p.location === 'store' && p.stock > 0);
+    // Caja solo vende lo que hay en TIENDA — lo que sigue en planta no está disponible.
+    let filtered = this.products.filter(p => p.isActive && p.storeStock > 0);
     
     if (searchTerm.trim()) {
       filtered = filtered.filter(p => 

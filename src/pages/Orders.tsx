@@ -218,6 +218,18 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
     await handleUpdateStatus(orderId, 'delivered', paymentMethod)
   };
 
+  const handleMarkAtStore = async (orderId: string) => {
+    setSelectedOrder(null);
+    try {
+      await ordersApi.markOrderAtStore(orderId);
+      await loadOrders();
+      toast.success('Pedido marcado como trasladado a tienda');
+    } catch (error: any) {
+      console.error('Error marking order at store:', error);
+      toast.error(error.message || 'Error al marcar el pedido como trasladado');
+    }
+  };
+
   const handleCancelOrder = async (orderId: string) => {
     setSelectedOrder(null);
     await handleUpdateStatus(orderId, 'cancelled');
@@ -410,6 +422,11 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
                           <Icon className="h-3 w-3 mr-1 inline" />
                           {config.label}
                         </Badge>
+                        {(order.status === 'ready' || order.status === 'delivered') && order.currentLocationType && (
+                          <Badge variant="outline" className="text-xs px-2 py-0.5">
+                            {order.currentLocationType === 'store' ? 'En tienda' : 'En planta'}
+                          </Badge>
+                        )}
                       </div>
                       {(order.status !== 'cancelled' && order.status !== 'delivered') && (
                         <Button
@@ -570,10 +587,17 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
                             </p>
                           </TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
-                            <Badge className={`${config.color} w-auto`}>
-                              <Icon className="h-3 w-3 mr-1 inline" />
-                              {config.label}
-                            </Badge>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <Badge className={`${config.color} w-auto`}>
+                                <Icon className="h-3 w-3 mr-1 inline" />
+                                {config.label}
+                              </Badge>
+                              {(order.status === 'ready' || order.status === 'delivered') && order.currentLocationType && (
+                                <Badge variant="outline" className="w-auto">
+                                  {order.currentLocationType === 'store' ? 'En tienda' : 'En planta'}
+                                </Badge>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
@@ -611,6 +635,7 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
               order={selectedOrder}
               onDeliver={handleDeliverOrder}
               onCancel={handleCancelOrder}
+              onMarkAtStore={handleMarkAtStore}
               ordersApi={ordersApi}
             />}
           </DialogContent>

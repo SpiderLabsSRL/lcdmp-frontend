@@ -126,7 +126,7 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
 
   const cakeFlavors = flavors.filter((f: any) => f.type === 'cake' && f.isActive);
   const fillingFlavors = flavors.filter((f: any) => f.type === 'filling' && f.isActive);
-  const catalogProducts = products.filter((p: any) => p.isActive && p.location === 'store');
+  const catalogProducts = products.filter((p: any) => p.isActive);
 
   const addCake = () => {
     const newCake: Partial<CustomCake> = {

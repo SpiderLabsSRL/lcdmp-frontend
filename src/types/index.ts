@@ -101,8 +101,12 @@ export interface Product {
   portionSize: number;
   pricePerPortion: number;
   isActive: boolean;
-  location: 'production' | 'store';
+  // Total entre ubicaciones (storeStock + productionStock) — el stock puede
+  // estar repartido entre tienda y planta al mismo tiempo, no es un único
+  // lugar por producto.
   stock: number;
+  storeStock: number;
+  productionStock: number;
   minStock: number;
   // Cantidad a producir cuando el stock llega al mínimo. Si no está definida,
   // el producto no se repone automáticamente (es opt-in por producto).
@@ -121,9 +125,10 @@ export interface CreateProductData {
   name: string;
   description: string;
   category: 'cake' | 'cupcake' | 'dessert' | 'bread' | 'special';
-  location: 'production' | 'store';
   basePrice: number;
   pricePerPortion: number;
+  // Stock inicial — se guarda como stock de TIENDA (lo vendible). La planta
+  // arranca en 0 y solo se le agrega después, vía "Agregar stock".
   stock: number;
   minStock: number;
   restockQuantity?: number | null;
@@ -137,6 +142,7 @@ export interface EditProductData extends Partial<CreateProductData> {
 export interface AddStockData {
   productId: string;
   quantity: number;
+  locationType: 'production' | 'store';
 }
 
 export interface CreateFlavorData {
@@ -232,6 +238,10 @@ export interface Order {
   pickupDate: Date;
   pickupTime: string;
   status: OrderStatus;
+  // Dónde está físicamente el pedido AHORA MISMO — no se deriva del status:
+  // 'ready' no implica que ya se trasladó a la tienda, es una acción manual
+  // aparte (ver OrdersApi.markOrderAtStore).
+  currentLocationType?: 'production' | 'store';
   items: OrderItem[];
   customCakes: CustomCake[];
   sweetTableCombos?: OrderCombo[];

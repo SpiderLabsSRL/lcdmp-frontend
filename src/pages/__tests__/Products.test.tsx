@@ -59,8 +59,9 @@ const baseProducts: Product[] = [
     portionSize: 10,
     pricePerPortion: 12,
     isActive: true,
-    location: 'store',
     stock: 5,
+    storeStock: 5,
+    productionStock: 0,
     minStock: 2,
   },
   {
@@ -72,8 +73,9 @@ const baseProducts: Product[] = [
     portionSize: 1,
     pricePerPortion: 15,
     isActive: true,
-    location: 'production',
     stock: 1,
+    storeStock: 0,
+    productionStock: 1,
     minStock: 5,
   },
 ];
@@ -106,6 +108,7 @@ function buildMockApi(overrides: Partial<IProductsApi> = {}): IProductsApi {
     editProduct: vi.fn().mockResolvedValue(baseProducts[0]),
     deleteProduct: vi.fn().mockResolvedValue(undefined),
     addProductStock: vi.fn().mockResolvedValue(baseProducts[0]),
+    transferStockToStore: vi.fn().mockResolvedValue(baseProducts[1]),
     getFlavors: vi.fn().mockResolvedValue(baseFlavors),
     createFlavor: vi.fn().mockResolvedValue(baseFlavors[0]),
     editFlavor: vi.fn().mockResolvedValue(baseFlavors[0]),
@@ -364,7 +367,68 @@ describe('Products - Productos tab', () => {
 
     await user.click(screen.getByRole('button', { name: /Agregar Stock/i }));
 
-    await waitFor(() => expect(api.addProductStock).toHaveBeenCalledWith({ productId: 'p1', quantity: 10 }));
+    await waitFor(() => expect(api.addProductStock).toHaveBeenCalledWith({ productId: 'p1', quantity: 10, locationType: 'store' }));
+  });
+
+  it('adds stock to the production location when selected in the stock dialog', async () => {
+    const api = buildMockApi();
+    const user = userEvent.setup();
+    renderWithProviders(<Products api={api} />);
+
+    await waitFor(() => expect(screen.getByText('Torta de chocolate')).toBeInTheDocument());
+
+    const row = screen.getByText('Torta de chocolate').closest('tr')!;
+    await user.click(within(row).getByTitle('Agregar stock'));
+
+    // p1's storeStock is 5 and productionStock is 0 (default fixture).
+    expect(screen.getByText('5 unidades')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Planta' }));
+    expect(screen.getByText('0 unidades')).toBeInTheDocument();
+
+    const qtyInput = screen.getByPlaceholderText('Cantidad');
+    await user.clear(qtyInput);
+    await user.type(qtyInput, '10');
+
+    await user.click(screen.getByRole('button', { name: /Agregar Stock/i }));
+
+    await waitFor(() => expect(api.addProductStock).toHaveBeenCalledWith({ productId: 'p1', quantity: 10, locationType: 'production' }));
+  });
+
+  it('hides the transfer button when there is no plant stock', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Products api={buildMockApi()} />);
+
+    await waitFor(() => expect(screen.getByText('Torta de chocolate')).toBeInTheDocument());
+    await user.click(within(screen.getByText('Torta de chocolate').closest('tr')!).getByTitle('Agregar stock'));
+
+    // p1 tiene productionStock 0
+    expect(screen.queryByRole('button', { name: 'Planta → Tienda' })).not.toBeInTheDocument();
+  });
+
+  it('transfers plant stock to the store and blocks quantities above plant stock', async () => {
+    const api = buildMockApi();
+    const user = userEvent.setup();
+    renderWithProviders(<Products api={api} />);
+
+    await waitFor(() => expect(screen.getByText('Cupcake vainilla')).toBeInTheDocument());
+
+    const row = screen.getByText('Cupcake vainilla').closest('tr')!;
+    await user.click(within(row).getByTitle('Agregar stock'));
+    await user.click(screen.getByRole('button', { name: 'Planta → Tienda' }));
+
+    // p2: planta 1, tienda 0 — pedir 2 no debe llamar a la API
+    const qtyInput = screen.getByPlaceholderText('Cantidad');
+    await user.clear(qtyInput);
+    await user.type(qtyInput, '2');
+    await user.click(screen.getByRole('button', { name: 'Trasladar a Tienda' }));
+    expect(api.transferStockToStore).not.toHaveBeenCalled();
+
+    await user.clear(qtyInput);
+    await user.type(qtyInput, '1');
+    expect(screen.getByText('Planta 0 · Tienda 1')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Trasladar a Tienda' }));
+
+    await waitFor(() => expect(api.transferStockToStore).toHaveBeenCalledWith('p2', 1));
   });
 });
 

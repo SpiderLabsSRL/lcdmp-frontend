@@ -8,6 +8,7 @@ export interface IProductsApi {
   editProduct(product: EditProductData): Promise<Product>;
   deleteProduct(productId: string): Promise<void>;
   addProductStock(data: AddStockData): Promise<Product>;
+  transferStockToStore(productId: string, quantity: number): Promise<Product>;
 
   getFlavors(): Promise<Flavor[]>;
   createFlavor(flavor: CreateFlavorData): Promise<Flavor>;
@@ -44,31 +45,38 @@ export class MockProductsApi implements IProductsApi {
 
   async createProduct(productData: CreateProductData): Promise<Product> {
     await new Promise(resolve => setTimeout(resolve, 300));
-    
+
+    // El stock inicial se guarda como stock de TIENDA; la planta arranca en 0.
     const newProduct: Product = {
       ...productData,
       id: Date.now().toString(),
       portionSize: 10, // Default value
+      storeStock: productData.stock,
+      productionStock: 0,
     };
-    
+
     this.products.push(newProduct);
     return newProduct;
   }
 
   async editProduct(productData: EditProductData): Promise<Product> {
     await new Promise(resolve => setTimeout(resolve, 300));
-    
+
     const index = this.products.findIndex(p => p.id === productData.id);
     if (index === -1) {
       throw new Error('Product not found');
     }
-    
-    const updatedProduct = {
-      ...this.products[index],
+
+    const current = this.products[index];
+    const storeStock = productData.stock !== undefined ? productData.stock : current.storeStock;
+    const updatedProduct: Product = {
+      ...current,
       ...productData,
       id: productData.id,
+      storeStock,
+      stock: storeStock + current.productionStock,
     };
-    
+
     this.products[index] = updatedProduct;
     return updatedProduct;
   }
@@ -86,18 +94,37 @@ export class MockProductsApi implements IProductsApi {
 
   async addProductStock(data: AddStockData): Promise<Product> {
     await new Promise(resolve => setTimeout(resolve, 300));
-    
+
     const index = this.products.findIndex(p => p.id === data.productId);
     if (index === -1) {
       throw new Error('Product not found');
     }
-    
-    const updatedProduct = {
-      ...this.products[index],
-      stock: this.products[index].stock + data.quantity,
+
+    const current = this.products[index];
+    const storeStock = data.locationType === 'store' ? current.storeStock + data.quantity : current.storeStock;
+    const productionStock = data.locationType === 'production' ? current.productionStock + data.quantity : current.productionStock;
+    const updatedProduct: Product = {
+      ...current,
+      storeStock,
+      productionStock,
+      stock: storeStock + productionStock,
     };
-    
+
     this.products[index] = updatedProduct;
+    return updatedProduct;
+  }
+
+  async transferStockToStore(productId: string, quantity: number): Promise<Product> {
+    const current = this.products.find(p => p.id === productId);
+    if (!current) throw new Error('Product not found');
+    if (current.productionStock < quantity) throw new Error('Stock insuficiente en planta');
+
+    const updatedProduct: Product = {
+      ...current,
+      storeStock: current.storeStock + quantity,
+      productionStock: current.productionStock - quantity,
+    };
+    this.products[this.products.indexOf(current)] = updatedProduct;
     return updatedProduct;
   }
 
@@ -315,7 +342,8 @@ export class ProductsApi implements IProductsApi {
   async addProductStock(data: AddStockData): Promise<Product> {
     try {
       const response = await api.post(`/products/${data.productId}/stock`, {
-        quantity: data.quantity
+        quantity: data.quantity,
+        locationType: data.locationType
       });
 
       if (!response.data.success) {
@@ -325,6 +353,21 @@ export class ProductsApi implements IProductsApi {
       return response.data.data as Product;
     } catch (error: any) {
       console.error('Error en addProductStock:', error);
+      throw new Error(error.response?.data?.message || error.message || 'Error de conexión');
+    }
+  }
+
+  async transferStockToStore(productId: string, quantity: number): Promise<Product> {
+    try {
+      const response = await api.post(`/products/${productId}/transfer-to-store`, { quantity });
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Error al trasladar stock');
+      }
+
+      return response.data.data as Product;
+    } catch (error: any) {
+      console.error('Error en transferStockToStore:', error);
       throw new Error(error.response?.data?.message || error.message || 'Error de conexión');
     }
   }

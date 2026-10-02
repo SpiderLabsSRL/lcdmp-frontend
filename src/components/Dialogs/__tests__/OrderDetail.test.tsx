@@ -12,6 +12,7 @@ const makeOrdersApi = (overrides: Partial<IOrdersApi> = {}): IOrdersApi => ({
   updateOrder: vi.fn(),
   deleteOrder: vi.fn(),
   updateOrderStatus: vi.fn(),
+  markOrderAtStore: vi.fn(),
   advanceItemStage: vi.fn(),
   confirmRestock: vi.fn(),
   getOrderProductionLog: vi.fn().mockResolvedValue([]),
@@ -293,6 +294,57 @@ describe('OrderDetail', () => {
       await user.click(screen.getByRole('button', { name: /Cancelar Pedido/ }));
 
       expect(onCancel).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('location (production vs. store)', () => {
+    it('does not render a location badge for an order that is not ready/delivered yet', () => {
+      render(<OrderDetail order={{ ...baseOrder, status: 'baking', currentLocationType: 'production' }} />);
+
+      expect(screen.queryByText('En planta')).not.toBeInTheDocument();
+      expect(screen.queryByText('En tienda')).not.toBeInTheDocument();
+    });
+
+    it('renders "En planta" for a ready order still in production', () => {
+      render(<OrderDetail order={{ ...baseOrder, status: 'ready', currentLocationType: 'production' }} />);
+
+      expect(screen.getByText('En planta')).toBeInTheDocument();
+    });
+
+    it('renders "En tienda" for a ready order already moved to the store', () => {
+      render(<OrderDetail order={{ ...baseOrder, status: 'ready', currentLocationType: 'store' }} />);
+
+      expect(screen.getByText('En tienda')).toBeInTheDocument();
+    });
+
+    it('does not render the "mark at store" button when the order is not ready yet', () => {
+      render(<OrderDetail order={{ ...baseOrder, status: 'baking', currentLocationType: 'production' }} onMarkAtStore={vi.fn()} />);
+
+      expect(screen.queryByRole('button', { name: /Marcar como trasladado a tienda/ })).not.toBeInTheDocument();
+    });
+
+    it('does not render the "mark at store" button when the order is already at the store', () => {
+      render(<OrderDetail order={{ ...baseOrder, status: 'ready', currentLocationType: 'store' }} onMarkAtStore={vi.fn()} />);
+
+      expect(screen.queryByRole('button', { name: /Marcar como trasladado a tienda/ })).not.toBeInTheDocument();
+    });
+
+    it('does not render the "mark at store" button when onMarkAtStore is not provided', () => {
+      render(<OrderDetail order={{ ...baseOrder, status: 'ready', currentLocationType: 'production' }} />);
+
+      expect(screen.queryByRole('button', { name: /Marcar como trasladado a tienda/ })).not.toBeInTheDocument();
+    });
+
+    it('renders the "mark at store" button and calls onMarkAtStore for a ready order still in production', async () => {
+      const user = userEvent.setup();
+      const onMarkAtStore = vi.fn();
+      render(<OrderDetail order={{ ...baseOrder, status: 'ready', currentLocationType: 'production' }} onMarkAtStore={onMarkAtStore} />);
+
+      const button = screen.getByRole('button', { name: /Marcar como trasladado a tienda/ });
+      expect(button).toBeInTheDocument();
+      await user.click(button);
+
+      expect(onMarkAtStore).toHaveBeenCalledWith('order-1');
     });
   });
 

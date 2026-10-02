@@ -178,7 +178,6 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
           name: savedProduct.name,
           description: savedProduct.description,
           category: savedProduct.category,
-          location: savedProduct.location,
           basePrice: savedProduct.basePrice,
           pricePerPortion: Number(savedProduct.pricePerPortion),
           stock: savedProduct.stock,
@@ -194,7 +193,6 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
           name: savedProduct.name,
           description: savedProduct.description,
           category: savedProduct.category,
-          location: savedProduct.location,
           basePrice: savedProduct.basePrice,
           pricePerPortion: savedProduct.pricePerPortion,
           stock: savedProduct.stock,
@@ -213,9 +211,9 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
     }
   };
 
-  const handleStockAdded = async (productId: string, quantity: number) => {
+  const handleStockAdded = async (productId: string, quantity: number, locationType: 'production' | 'store') => {
     try {
-      const stockData: AddStockData = { productId, quantity };
+      const stockData: AddStockData = { productId, quantity, locationType };
       await api.addProductStock(stockData);
       await loadProducts(); // Recargar la lista
       handleCloseStockDialog();
@@ -223,6 +221,18 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
     } catch (error) {
       console.error('Error adding stock:', error);
       toast.error('Error al agregar stock');
+    }
+  };
+
+  const handleStockTransferred = async (productId: string, quantity: number) => {
+    try {
+      await api.transferStockToStore(productId, quantity);
+      await loadProducts();
+      handleCloseStockDialog();
+      toast.success(`Se trasladaron ${quantity} unidades a tienda`);
+    } catch (error: any) {
+      console.error('Error transferring stock:', error);
+      toast.error(error.message || 'Error al trasladar stock');
     }
   };
 
@@ -593,6 +603,7 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
                 product={stockProduct} 
                 onClose={handleCloseStockDialog}
                 onAddStock={handleStockAdded}
+                onTransfer={handleStockTransferred}
               />
             )}
           </DialogContent>
@@ -727,16 +738,14 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
                               <p className="font-medium">Bs. {product.basePrice}</p>
                             </div>
                             <div>
-                              <p className="text-xs ">Stock</p>
-                              <p className={product.stock <= product.minStock ? 'text-destructive font-medium' : ''}>
-                                {product.stock} / {product.minStock}
+                              <p className="text-xs ">Stock (tienda / mínimo)</p>
+                              <p className={product.storeStock <= product.minStock ? 'text-destructive font-medium' : ''}>
+                                {product.storeStock} / {product.minStock}
                               </p>
                             </div>
                             <div>
-                              <p className="text-xs ">Ubicación</p>
-                              <Badge variant={product.location === 'store' ? 'default' : 'secondary'} className="text-xs">
-                                {product.location === 'store' ? 'Tienda' : 'Producción'}
-                              </Badge>
+                              <p className="text-xs ">En planta</p>
+                              <p>{product.productionStock}</p>
                             </div>
                           </div>
   
@@ -785,8 +794,8 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
                           <TableHead className="whitespace-nowrap">Producto</TableHead>
                           <TableHead className="whitespace-nowrap">Categoría</TableHead>
                           <TableHead className="whitespace-nowrap">Precio Base</TableHead>
-                          <TableHead className="whitespace-nowrap">Ubicación</TableHead>
-                          <TableHead className="whitespace-nowrap">Stock</TableHead>
+                          <TableHead className="whitespace-nowrap">Tienda / Mínimo</TableHead>
+                          <TableHead className="whitespace-nowrap">En planta</TableHead>
                           <TableHead className="text-right whitespace-nowrap">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -820,16 +829,12 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
                               </TableCell>
                               <TableCell className="font-medium whitespace-nowrap">Bs. {product.basePrice}</TableCell>
                               <TableCell>
-                                <Badge variant={product.location === 'store' ? 'default' : 'secondary'} className="whitespace-nowrap">
-                                  {product.location === 'store' ? 'Tienda' : 'Producción'}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <span className={product.stock <= product.minStock ? 'text-destructive font-medium' : ''}>
-                                  {product.stock}
+                                <span className={product.storeStock <= product.minStock ? 'text-destructive font-medium' : ''}>
+                                  {product.storeStock}
                                 </span>
                                 <span className=""> / {product.minStock}</span>
                               </TableCell>
+                              <TableCell>{product.productionStock}</TableCell>
                               <TableCell className="text-right whitespace-nowrap">
                                 <Button 
                                   variant="ghost" 
@@ -1057,13 +1062,18 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
 
 // Los componentes AddStockForm, ProductForm y FlavorForm se mantienen igual
 // (incluir los mismos componentes que estaban en el archivo original)
-function AddStockForm({ product, onClose, onAddStock }: { 
-  product: Product; 
+function AddStockForm({ product, onClose, onAddStock, onTransfer }: {
+  product: Product;
   onClose: () => void;
-  onAddStock: (productId: string, quantity: number) => void;
+  onAddStock: (productId: string, quantity: number, locationType: 'production' | 'store') => void;
+  onTransfer: (productId: string, quantity: number) => void;
 }) {
   const [quantity, setQuantity] = useState<number>(1);
+  const [locationType, setLocationType] = useState<'production' | 'store' | 'transfer'>('store');
   const [submitting, setSubmitting] = useState(false);
+
+  const isTransfer = locationType === 'transfer';
+  const currentStock = locationType === 'store' ? product.storeStock : product.productionStock;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1071,9 +1081,17 @@ function AddStockForm({ product, onClose, onAddStock }: {
       toast.error('La cantidad debe ser mayor a 0');
       return;
     }
+    if (isTransfer && quantity > product.productionStock) {
+      toast.error('No hay suficiente stock en planta');
+      return;
+    }
     setSubmitting(true);
     try {
-      await onAddStock(product.id, quantity);
+      if (isTransfer) {
+        await onTransfer(product.id, quantity);
+        return;
+      }
+      await onAddStock(product.id, quantity, locationType);
       toast.success(`Se agregaron ${quantity} unidades al stock de "${product.name}"`);
       onClose();
     } catch (error) {
@@ -1087,12 +1105,45 @@ function AddStockForm({ product, onClose, onAddStock }: {
   return (
     <form onSubmit={handleSubmit} className="space-y-4 px-1">
       <div className="space-y-1.5 sm:space-y-2">
-        <Label className="text-sm">Stock actual</Label>
-        <p className="text-lg font-semibold">{product.stock} unidades</p>
+        <Label className="text-sm">¿Dónde se agrega?</Label>
+        <div className={`grid gap-2 ${product.productionStock > 0 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          <Button
+            type="button"
+            variant={locationType === 'store' ? 'default' : 'outline'}
+            onClick={() => setLocationType('store')}
+            className="w-full"
+          >
+            Tienda
+          </Button>
+          <Button
+            type="button"
+            variant={locationType === 'production' ? 'default' : 'outline'}
+            onClick={() => setLocationType('production')}
+            className="w-full"
+          >
+            Planta
+          </Button>
+          {product.productionStock > 0 && (
+            <Button
+              type="button"
+              variant={isTransfer ? 'default' : 'outline'}
+              onClick={() => setLocationType('transfer')}
+              className="w-full"
+            >
+              Planta → Tienda
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="space-y-1.5 sm:space-y-2">
-        <Label className="text-sm">Cantidad a agregar *</Label>
+        <Label className="text-sm">Stock actual en {locationType === 'store' ? 'tienda' : 'planta'}</Label>
+        <p className="text-lg font-semibold">{currentStock} unidades</p>
+        {isTransfer && <p className="text-sm text-muted-foreground">Tienda: {product.storeStock} unidades</p>}
+      </div>
+
+      <div className="space-y-1.5 sm:space-y-2">
+        <Label className="text-sm">Cantidad a {isTransfer ? 'trasladar' : 'agregar'} *</Label>
         <NumberInput
           min="1"
           value={quantity}
@@ -1105,8 +1156,12 @@ function AddStockForm({ product, onClose, onAddStock }: {
       </div>
 
       <div className="space-y-1.5 sm:space-y-2">
-        <Label className="text-sm">Stock después de agregar</Label>
-        <p className="text-lg font-semibold text-primary">{product.stock + quantity} unidades</p>
+        <Label className="text-sm">{isTransfer ? 'Stock después de trasladar' : 'Stock después de agregar'}</Label>
+        <p className="text-lg font-semibold text-primary">
+          {isTransfer
+            ? `Planta ${currentStock - quantity} · Tienda ${product.storeStock + quantity}`
+            : `${currentStock + quantity} unidades`}
+        </p>
       </div>
 
       <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 pt-2">
@@ -1115,7 +1170,7 @@ function AddStockForm({ product, onClose, onAddStock }: {
         </Button>
         <Button type="submit" className="w-full sm:w-auto order-1 sm:order-2" disabled={submitting}>
           {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          Agregar Stock
+          {isTransfer ? 'Trasladar a Tienda' : 'Agregar Stock'}
         </Button>
       </div>
     </form>
@@ -1134,10 +1189,11 @@ function ProductForm({ onClose, onSave, initialProduct }: {
     name: initialProduct?.name || '',
     description: initialProduct?.description || '',
     category: initialProduct?.category || 'cake',
-    location: initialProduct?.location || 'store',
     basePrice: initialProduct?.basePrice || 0,
     pricePerPortion: initialProduct?.pricePerPortion || 0,
-    stock: initialProduct?.stock || 0,
+    // El stock del formulario es el de TIENDA específicamente — el de planta
+    // no se edita acá, solo vía "Agregar stock" con su propia ubicación.
+    stock: initialProduct?.storeStock ?? 0,
     minStock: initialProduct?.minStock || 1,
     restockQuantity: initialProduct?.restockQuantity ?? undefined,
     isActive: initialProduct?.isActive ?? true,
@@ -1184,8 +1240,9 @@ function ProductForm({ onClose, onSave, initialProduct }: {
       portionSize: 10,
       pricePerPortion: formData.pricePerPortion,
       isActive: formData.isActive,
-      location: formData.location as any,
       stock: formData.stock,
+      storeStock: formData.stock,
+      productionStock: initialProduct?.productionStock ?? 0,
       minStock: formData.minStock,
       restockQuantity: formData.restockQuantity || null,
     };
@@ -1218,35 +1275,20 @@ function ProductForm({ onClose, onSave, initialProduct }: {
         />
       </div>
       
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-        <div className="space-y-1.5 sm:space-y-2">
-          <Label className="text-sm">Categoría *</Label>
-          <Select value={formData.category} onValueChange={(v) => handleChange('category', v)}>
-            <SelectTrigger className="text-sm">
-              <SelectValue placeholder="Seleccionar" />
-            </SelectTrigger>
-            <SelectContent>
-              {categories.map(cat => (
-                <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        
-        <div className="space-y-1.5 sm:space-y-2">
-          <Label className="text-sm">Ubicación</Label>
-          <Select value={formData.location} onValueChange={(v) => handleChange('location', v)}>
-            <SelectTrigger className="text-sm">
-              <SelectValue placeholder="Seleccionar" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="store">Tienda</SelectItem>
-              <SelectItem value="production">Producción</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="space-y-1.5 sm:space-y-2">
+        <Label className="text-sm">Categoría *</Label>
+        <Select value={formData.category} onValueChange={(v) => handleChange('category', v)}>
+          <SelectTrigger className="text-sm">
+            <SelectValue placeholder="Seleccionar" />
+          </SelectTrigger>
+          <SelectContent>
+            {categories.map(cat => (
+              <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
-      
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <div className="space-y-1.5 sm:space-y-2">
           <Label className="text-sm">Precio base (Bs.)</Label>
@@ -1274,7 +1316,7 @@ function ProductForm({ onClose, onSave, initialProduct }: {
       
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <div className="space-y-1.5 sm:space-y-2">
-          <Label className="text-sm">Stock inicial</Label>
+          <Label className="text-sm">{isEditing ? 'Stock en tienda' : 'Stock inicial (tienda)'}</Label>
           <NumberInput
             placeholder="0"
             value={formData.stock}
@@ -1282,6 +1324,11 @@ function ProductForm({ onClose, onSave, initialProduct }: {
             fallback={0}
             className="text-sm"
           />
+          {isEditing && (
+            <p className="text-xs ">
+              En planta: {initialProduct?.productionStock ?? 0} unidades (se agrega desde "Agregar stock")
+            </p>
+          )}
         </div>
         <div className="space-y-1.5 sm:space-y-2">
           <Label className="text-sm">Stock mínimo</Label>

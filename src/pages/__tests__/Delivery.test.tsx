@@ -80,6 +80,18 @@ const pickupOrder = makeOrder({
   orderNumber: 'ORD-301',
   customerName: 'Marta Salas',
   deliveryCost: 0,
+  currentLocationType: 'store',
+});
+
+// Una recogida en tienda 'ready' pero que todavía sigue en planta (nadie la
+// trasladó todavía) no debe aparecer en ninguna sección — a diferencia de un
+// envío a domicilio, que sí puede despacharse directo desde planta.
+const pickupOrderStillInProduction = makeOrder({
+  id: 'order-4',
+  orderNumber: 'ORD-303',
+  customerName: 'Ana Vargas',
+  deliveryCost: 0,
+  currentLocationType: 'production',
 });
 
 // Un pedido puede llegar con costo de envío asignado antes de que se defina
@@ -142,6 +154,18 @@ describe('Delivery', () => {
     expect(screen.getByText(/Pan de queso/)).toBeInTheDocument();
     expect(screen.getByText(/Timbre no funciona/)).toBeInTheDocument();
     expect(screen.getByText('Av. Siempre Viva 123')).toBeInTheDocument();
+  });
+
+  it('hides a "ready" pickup order that is still in production, but shows a "ready" delivery order that is', async () => {
+    const mockApi = buildMockApi({
+      getDeliveryOrders: vi.fn().mockResolvedValue([pickupOrderStillInProduction, deliveryOrderWithoutAddress]),
+    });
+    renderWithProviders(<Delivery deliveryApi={mockApi} />);
+
+    await screen.findByText('#ORD-302');
+
+    expect(screen.queryByText('#ORD-303')).not.toBeInTheDocument();
+    expect(screen.getByText('No hay recogidas pendientes')).toBeInTheDocument();
   });
 
   it('places an order that only has a delivery cost (no address yet) under "Entregas a Domicilio", not "Recogidas en Tienda"', async () => {

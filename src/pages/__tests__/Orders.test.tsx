@@ -185,6 +185,7 @@ function buildMockApi(overrides: Partial<IOrdersApi> = {}): IOrdersApi {
     updateOrder: vi.fn().mockResolvedValue(orderWithCake),
     deleteOrder: vi.fn().mockResolvedValue(undefined),
     updateOrderStatus: vi.fn().mockResolvedValue(orderWithCake),
+    markOrderAtStore: vi.fn().mockResolvedValue(orderWithCake),
     advanceItemStage: vi.fn().mockResolvedValue(orderWithCake),
     confirmRestock: vi.fn().mockResolvedValue(orderWithCake),
     getOrderProductionLog: vi.fn().mockResolvedValue([]),
@@ -296,6 +297,45 @@ describe('Orders - loading & list states', () => {
 
     expect(screen.getByTitle('Pedido con envío a domicilio')).toBeInTheDocument();
     expect(screen.getByText('Pendiente')).toBeInTheDocument();
+  });
+
+  it('shows a location badge for ready orders (desktop), but not for orders still in earlier stages', async () => {
+    const readyInProduction: Order = { ...orderWithCake, id: '5', orderNumber: 'ORD-005', customerName: 'Rosa Mendez', status: 'ready', currentLocationType: 'production' };
+    const readyAtStore: Order = { ...orderWithCake, id: '6', orderNumber: 'ORD-006', customerName: 'Lucia Flores', status: 'ready', currentLocationType: 'store' };
+    const api = buildMockApi({ getOrders: vi.fn().mockResolvedValue([readyInProduction, readyAtStore, orderWithCombo]) });
+    renderWithProviders(<Orders ordersApi={api} />);
+
+    await waitFor(() => expect(screen.getByText('Juan Perez')).toBeInTheDocument());
+
+    const inProductionRow = screen.getByText('#ORD-005').closest('tr')!;
+    expect(within(inProductionRow).getByText('En planta')).toBeInTheDocument();
+
+    const atStoreRow = screen.getByText('#ORD-006').closest('tr')!;
+    expect(within(atStoreRow).getByText('En tienda')).toBeInTheDocument();
+
+    // orderWithCombo is 'baking' — too early for a location badge to be useful.
+    const bakingRow = screen.getByText('Juan Perez').closest('tr')!;
+    expect(within(bakingRow).queryByText('En planta')).not.toBeInTheDocument();
+    expect(within(bakingRow).queryByText('En tienda')).not.toBeInTheDocument();
+  });
+
+  it('opens the detail dialog with a "mark at store" button for a ready order still in production, and calls markOrderAtStore', async () => {
+    const readyInProduction: Order = { ...orderWithCake, id: '5', orderNumber: 'ORD-005', status: 'ready', currentLocationType: 'production' };
+    const api = buildMockApi({
+      getOrders: vi.fn().mockResolvedValue([readyInProduction]),
+      getOrderById: vi.fn().mockResolvedValue(readyInProduction),
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<Orders ordersApi={api} />);
+
+    await waitFor(() => expect(screen.getByText('#ORD-005')).toBeInTheDocument());
+    await user.click(screen.getByText('#ORD-005'));
+
+    const button = await screen.findByRole('button', { name: /Marcar como trasladado a tienda/ });
+    await user.click(button);
+
+    expect(api.markOrderAtStore).toHaveBeenCalledWith('5');
+    await waitFor(() => expect(api.getOrders).toHaveBeenCalledTimes(2)); // initial load + reload after marking
   });
 });
 
