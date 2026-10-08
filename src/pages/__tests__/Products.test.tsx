@@ -432,6 +432,45 @@ describe('Products - Productos tab', () => {
   });
 });
 
+describe('Products - recetas de materia prima', () => {
+  const materialsApi = {
+    getProductRecipe: vi.fn().mockResolvedValue({ baking: [], assembling: [], decorating: [] }),
+    saveProductRecipe: vi.fn().mockResolvedValue({}),
+    getCakeRecipe: vi.fn().mockResolvedValue({ baking: [], assembling: [] }),
+    saveCakeRecipe: vi.fn().mockResolvedValue({}),
+  } as any;
+  const inventoryApi = { getRawMaterials: vi.fn().mockResolvedValue([]) } as any;
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it('opens the recipe dialog of a product with its three stages', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Products api={buildMockApi()} materialsApi={materialsApi} inventoryApi={inventoryApi} />);
+
+    await waitFor(() => expect(screen.getByText('Torta de chocolate')).toBeInTheDocument());
+    const row = screen.getByText('Torta de chocolate').closest('tr')!;
+    await user.click(within(row).getByTitle('Receta'));
+
+    expect(await screen.findByText('Receta - Torta de chocolate')).toBeInTheDocument();
+    expect(materialsApi.getProductRecipe).toHaveBeenCalledWith('p1');
+    expect(inventoryApi.getRawMaterials).toHaveBeenCalled();
+    expect(screen.getByText('Horneado')).toBeInTheDocument();
+    expect(screen.getByText('Armado')).toBeInTheDocument();
+    expect(screen.getByText('Decoración')).toBeInTheDocument();
+  });
+
+  it('opens the cake recipe dialog with only baking and assembling', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Products api={buildMockApi()} materialsApi={materialsApi} inventoryApi={inventoryApi} />);
+
+    await user.click(await screen.findByRole('button', { name: /Receta de tortas/ }));
+
+    expect(await screen.findByText('Receta de tortas personalizadas')).toBeInTheDocument();
+    expect(materialsApi.getCakeRecipe).toHaveBeenCalled();
+    expect(screen.queryByText('Decoración')).not.toBeInTheDocument();
+  });
+});
+
 describe('Products - Sabores tab', () => {
   it('lists cake and filling flavors separately', async () => {
     const api = buildMockApi();

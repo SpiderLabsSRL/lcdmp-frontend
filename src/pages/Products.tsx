@@ -14,17 +14,23 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { MobileCard, MobileCardHeader, MobileCardRow, useIsMobile } from '@/components/ui/responsive-table';
-import { Plus, Search, Edit2, Trash2, Cake, Package, Filter, X, PlusCircle, Loader2, Gift, RefreshCw } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Cake, Package, Filter, X, PlusCircle, Loader2, Gift, RefreshCw, FlaskConical } from 'lucide-react';
 import { toast } from 'sonner';
 import { Flavor, Product, CreateProductData, EditProductData, AddStockData, CreateFlavorData, EditFlavorData, SweetTableCombo, CreateSweetTableComboData, EditSweetTableComboData, ComboProduct } from '@/types';
 import { categories } from '@/types/consts';
 import { IProductsApi, defaultProductsApi } from '@/api/ProductsApi';
+import { IMaterialsApi, defaultMaterialsApi } from '@/api/MaterialsApi';
+import { IInventoryApi, defaultInventoryApi } from '@/api/InventoryApi';
+import RecipeDialog from '@/components/Dialogs/RecipeDialog';
+import type { RawMaterial } from '@/types';
 
 interface ProductsProps {
   api?: IProductsApi;
+  materialsApi?: IMaterialsApi;
+  inventoryApi?: IInventoryApi;
 }
 
-export default function Products({ api = defaultProductsApi }: ProductsProps) {
+export default function Products({ api = defaultProductsApi, materialsApi = defaultMaterialsApi, inventoryApi = defaultInventoryApi }: ProductsProps) {
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState('products');
   const [searchTerm, setSearchTerm] = useState('');
@@ -36,6 +42,20 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [stockProduct, setStockProduct] = useState<Product | null>(null);
+
+  // Recetas de materia prima: de un producto (por unidad) o de la torta personalizada
+  const [recipeTarget, setRecipeTarget] = useState<Product | 'cake' | null>(null);
+  const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
+
+  const openRecipe = async (target: Product | 'cake') => {
+    setRecipeTarget(target);
+    try {
+      setRawMaterials(await inventoryApi.getRawMaterials());
+    } catch (error) {
+      console.error('Error loading raw materials:', error);
+      toast.error('Error al cargar las materias primas');
+    }
+  };
   const [products, setProducts] = useState<Product[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -449,6 +469,15 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
                 </Dialog>
 
                 <Button
+                  variant="outline"
+                  className="w-full sm:w-auto justify-center"
+                  onClick={() => openRecipe('cake')}
+                >
+                  <FlaskConical className="h-4 w-4 mr-2" />
+                  Receta de tortas
+                </Button>
+
+                <Button
                   className="w-full sm:w-auto justify-center"
                   onClick={handleCreateProduct}
                 >
@@ -589,6 +618,35 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
             </DialogContent>
           </Dialog>
         </div>
+
+        {/* Receta de materia prima */}
+        {recipeTarget === 'cake' ? (
+          <RecipeDialog
+            open
+            onOpenChange={(open) => { if (!open) setRecipeTarget(null); }}
+            title="Receta de tortas personalizadas"
+            description="Cantidad por cada 10 porciones, en la unidad de cada materia prima. La decoración se registra a mano en cada pedido."
+            stages={[{ key: 'baking', label: 'Horneado' }, { key: 'assembling', label: 'Armado' }]}
+            rawMaterials={rawMaterials}
+            load={() => materialsApi.getCakeRecipe()}
+            save={(recipe) => materialsApi.saveCakeRecipe(recipe)}
+          />
+        ) : recipeTarget && (
+          <RecipeDialog
+            open
+            onOpenChange={(open) => { if (!open) setRecipeTarget(null); }}
+            title={`Receta - ${recipeTarget.name}`}
+            description="Cantidad por unidad, en la unidad de cada materia prima. En pedidos de mesa dulce solo se descuentan Horneado y Armado."
+            stages={[
+              { key: 'baking', label: 'Horneado' },
+              { key: 'assembling', label: 'Armado' },
+              { key: 'decorating', label: 'Decoración' },
+            ]}
+            rawMaterials={rawMaterials}
+            load={() => materialsApi.getProductRecipe(recipeTarget.id)}
+            save={(recipe) => materialsApi.saveProductRecipe(recipeTarget.id, recipe)}
+          />
+        )}
 
         {/* Stock Dialog */}
         <Dialog open={stockProduct !== null} onOpenChange={handleCloseStockDialog}>
@@ -762,6 +820,15 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
                               >
                                 <PlusCircle className="h-4 w-4" />
                               </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => openRecipe(product)}
+                                title="Receta"
+                              >
+                                <FlaskConical className="h-4 w-4" />
+                              </Button>
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
@@ -844,6 +911,15 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
                                   title="Agregar stock"
                                 >
                                   <PlusCircle className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => openRecipe(product)}
+                                  title="Receta"
+                                >
+                                  <FlaskConical className="h-4 w-4" />
                                 </Button>
                                 <Button 
                                   variant="ghost" 

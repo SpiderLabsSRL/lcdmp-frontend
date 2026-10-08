@@ -19,6 +19,9 @@ import { Banknote, QrCode } from "lucide-react";
 import { getOrderType } from "@/pages/Orders";
 import { IOrdersApi, defaultOrdersApi } from "@/api/OrdersApi";
 import { getLocalDateString } from "@/utils/DateUtils";
+import MaterialUsageSection from "./MaterialUsageSection";
+import type { IMaterialsApi } from "@/api/MaterialsApi";
+import type { IInventoryApi } from "@/api/InventoryApi";
 
 interface OrderDetailProps {
   order: Order;
@@ -26,6 +29,8 @@ interface OrderDetailProps {
   onCancel?: (orderId: string) => void;
   onMarkAtStore?: (orderId: string) => void;
   ordersApi?: IOrdersApi;
+  materialsApi?: IMaterialsApi;
+  inventoryApi?: IInventoryApi;
 }
 
 const itemStatusLabel = (status?: string) => {
@@ -38,7 +43,7 @@ const itemStatusColor = (status?: string) => {
   return statusConfig[status as keyof typeof statusConfig]?.color || '';
 };
 
-export default function OrderDetail({ order, onDeliver, onCancel, onMarkAtStore, ordersApi = defaultOrdersApi }: OrderDetailProps) {
+export default function OrderDetail({ order, onDeliver, onCancel, onMarkAtStore, ordersApi = defaultOrdersApi, materialsApi, inventoryApi }: OrderDetailProps) {
   const [showDeliverDialog, setShowDeliverDialog] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [showHistory, setShowHistory] = useState(false);
@@ -416,6 +421,13 @@ export default function OrderDetail({ order, onDeliver, onCancel, onMarkAtStore,
             </div>
           )}
         </div>
+
+        <MaterialUsageSection
+          orderId={order.id}
+          canRegister={order.status !== 'delivered' && order.status !== 'cancelled'}
+          materialsApi={materialsApi}
+          inventoryApi={inventoryApi}
+        />
 
         {/* Cancelar pedido */}
         {order.status !== 'delivered' && order.status !== 'cancelled' && onCancel && (
