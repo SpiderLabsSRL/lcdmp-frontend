@@ -101,9 +101,19 @@ export interface Product {
   portionSize: number;
   pricePerPortion: number;
   isActive: boolean;
-  location: 'production' | 'store';
+  // Total entre ubicaciones (storeStock + productionStock) — el stock puede
+  // estar repartido entre tienda y planta al mismo tiempo, no es un único
+  // lugar por producto.
   stock: number;
+  storeStock: number;
+  // Unidades de tienda comprometidas con pedidos de hoy ("usar de stock"). El
+  // disponible para vender es storeStock - reservedStock.
+  reservedStock?: number;
+  productionStock: number;
   minStock: number;
+  // Cantidad a producir cuando el stock llega al mínimo. Si no está definida,
+  // el producto no se repone automáticamente (es opt-in por producto).
+  restockQuantity?: number | null;
 }
 
 // Flavor Types
@@ -118,11 +128,13 @@ export interface CreateProductData {
   name: string;
   description: string;
   category: 'cake' | 'cupcake' | 'dessert' | 'bread' | 'special';
-  location: 'production' | 'store';
   basePrice: number;
   pricePerPortion: number;
+  // Stock inicial — se guarda como stock de TIENDA (lo vendible). La planta
+  // arranca en 0 y solo se le agrega después, vía "Agregar stock".
   stock: number;
   minStock: number;
+  restockQuantity?: number | null;
   isActive: boolean;
 }
 
@@ -133,6 +145,7 @@ export interface EditProductData extends Partial<CreateProductData> {
 export interface AddStockData {
   productId: string;
   quantity: number;
+  locationType: 'production' | 'store';
 }
 
 export interface CreateFlavorData {
@@ -203,6 +216,10 @@ export interface EditSweetTableComboData extends Partial<CreateSweetTableComboDa
 
 // Order Types
 export type OrderType = 'cake' | 'products' | 'sweet_table' | 'mixed';
+// 'restock' se crea internamente (ver maybeCreateRestockOrder en el backend)
+// cuando el stock de un producto llega a su mínimo — nunca a través del
+// formulario público de creación de pedidos, por eso vive aparte de OrderType.
+export type SystemOrderType = OrderType | 'restock';
 
 export type OrderStatus = 
   | 'pending' 
@@ -218,12 +235,16 @@ export type PaymentMethod = 'cash' | 'qr';
 export interface Order {
   id: string;
   orderNumber: string;
-  orderType: OrderType;
+  orderType: SystemOrderType;
   customerName: string;
   customerPhone: string;
   pickupDate: Date;
   pickupTime: string;
   status: OrderStatus;
+  // Dónde está físicamente el pedido AHORA MISMO — no se deriva del status:
+  // 'ready' no implica que ya se trasladó a la tienda, es una acción manual
+  // aparte (ver OrdersApi.markOrderAtStore).
+  currentLocationType?: 'production' | 'store';
   items: OrderItem[];
   customCakes: CustomCake[];
   sweetTableCombos?: OrderCombo[];
@@ -251,6 +272,10 @@ export interface OrderItem {
   price: number;
   notes?: string;
   status?: ProductStatus;
+  // "Usar de stock": la línea nace lista y el stock de tienda se descuenta al entregar.
+  fromStock?: boolean;
+  // Stock de tienda actual del producto (solo lectura, para avisar si no alcanza al retirar).
+  storeStock?: number;
 }
 
 export interface CustomCake {
@@ -332,6 +357,8 @@ export interface OrderFilters {
   endDate?: Date;
   customerName?: string;
   customerPhone?: string;
+  orderType?: SystemOrderType;
+  excludeOrderType?: SystemOrderType;
 }
 
 // Seguimiento de producción por línea (torta/producto/item de combo/extra)

@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MobileCard, MobileCardHeader, useIsMobile } from '@/components/ui/responsive-table';
-import { Plus, Search, Eye, RefreshCw, Filter, Trash2, Edit, Loader2, Wifi, WifiOff } from 'lucide-react';
+import { Plus, Search, Eye, RefreshCw, Filter, Trash2, Edit, Loader2, Wifi, WifiOff, Truck } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { CreateOrderData, Order, OrderStatus, UpdateOrderData,Flavor, Product, OrderFilters, SweetTableCombo } from '@/types';
@@ -17,6 +17,7 @@ import { statusConfig } from '@/types/consts';
 import { IOrdersApi, defaultOrdersApi } from '@/api/OrdersApi';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useOrdersSocket } from '@/hooks/useOrdersSocket';
+import { isDeliveryOrder } from '@/utils/orderUtils';
 import { OrderType, PaymentMethod } from '../types/index';
 import OrderForm from '@/components/Forms/OrderForm';
 import OrderDetail from '@/components/Dialogs/OrderDetail';
@@ -76,6 +77,7 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
 
   const { orders, setOrders, isConnected } = useOrdersSocket({
     statusFilter,
+    excludeOrderType: 'restock',
     initialOrders,
   });
 
@@ -89,8 +91,11 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
     try {
       setLoading(true);
       
-      const filters: OrderFilters = {};
-      
+      // Los pedidos de reposición de stock ('restock') son internos — no
+      // tienen cliente real y se confirman desde la pantalla de Reposición,
+      // no acá.
+      const filters: OrderFilters = { excludeOrderType: 'restock' };
+
       if (selectedStatus !== 'all') {
         filters.status = selectedStatus as OrderStatus;
       }
@@ -211,6 +216,18 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
   const handleDeliverOrder = async (orderId: string, paymentMethod: PaymentMethod) => {
     setSelectedOrder(null);
     await handleUpdateStatus(orderId, 'delivered', paymentMethod)
+  };
+
+  const handleMarkAtStore = async (orderId: string) => {
+    setSelectedOrder(null);
+    try {
+      await ordersApi.markOrderAtStore(orderId);
+      await loadOrders();
+      toast.success('Pedido marcado como trasladado a tienda');
+    } catch (error: any) {
+      console.error('Error marking order at store:', error);
+      toast.error(error.message || 'Error al marcar el pedido como trasladado');
+    }
   };
 
   const handleCancelOrder = async (orderId: string) => {
@@ -396,10 +413,20 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
                     <MobileCardHeader className="px-3 py-2">
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="font-bold text-primary text-sm">#{order.orderNumber}</span>
+                        {isDeliveryOrder(order) && (
+                          <Badge variant="outline" className="border-info text-info px-1.5 py-0.5" title="Pedido con envío a domicilio">
+                            <Truck className="h-3 w-3" />
+                          </Badge>
+                        )}
                         <Badge className={`${config.color} text-xs px-2 py-0.5`}>
                           <Icon className="h-3 w-3 mr-1 inline" />
                           {config.label}
                         </Badge>
+                        {(order.status === 'ready' || order.status === 'delivered') && order.currentLocationType && (
+                          <Badge variant="outline" className="text-xs px-2 py-0.5">
+                            {order.currentLocationType === 'store' ? 'En tienda' : 'En planta'}
+                          </Badge>
+                        )}
                       </div>
                       {(order.status !== 'cancelled' && order.status !== 'delivered') && (
                         <Button
@@ -507,7 +534,16 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
                           className="hover:bg-muted/50 cursor-pointer"
                           onClick={() => handleSelectOrder(order)}
                         >
-                          <TableCell className="font-medium">#{order.orderNumber}</TableCell>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-1.5">
+                              #{order.orderNumber}
+                              {isDeliveryOrder(order) && (
+                                <Badge variant="outline" className="border-info text-info px-1.5 py-0.5" title="Pedido con envío a domicilio">
+                                  <Truck className="h-3 w-3" />
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <div>
                               <p className="font-medium">{order.customerName}</p>
@@ -551,10 +587,17 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
                             </p>
                           </TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
-                            <Badge className={`${config.color} w-auto`}>
-                              <Icon className="h-3 w-3 mr-1 inline" />
-                              {config.label}
-                            </Badge>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <Badge className={`${config.color} w-auto`}>
+                                <Icon className="h-3 w-3 mr-1 inline" />
+                                {config.label}
+                              </Badge>
+                              {(order.status === 'ready' || order.status === 'delivered') && order.currentLocationType && (
+                                <Badge variant="outline" className="w-auto">
+                                  {order.currentLocationType === 'store' ? 'En tienda' : 'En planta'}
+                                </Badge>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
@@ -592,6 +635,7 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
               order={selectedOrder}
               onDeliver={handleDeliverOrder}
               onCancel={handleCancelOrder}
+              onMarkAtStore={handleMarkAtStore}
               ordersApi={ordersApi}
             />}
           </DialogContent>

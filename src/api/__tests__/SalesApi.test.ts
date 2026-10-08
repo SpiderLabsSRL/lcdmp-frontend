@@ -78,6 +78,19 @@ describe('SalesApi (real, axios-backed)', () => {
         items: sale.items,
         total: sale.total,
         paymentMethod: sale.paymentMethod,
+        overrideReservation: false,
+      });
+    });
+
+    it('throws a ReservationConflictError carrying the conflicts when the backend answers RESERVATION_CONFLICT', async () => {
+      const conflicts = [{ productId: 'p1', lines: [] }];
+      mockedApi.post.mockRejectedValue({
+        response: { data: { success: false, code: 'RESERVATION_CONFLICT', message: 'reservado', conflicts } },
+      });
+
+      await expect(salesApi.createSale(sale)).rejects.toMatchObject({
+        name: 'ReservationConflictError',
+        conflicts,
       });
     });
 
@@ -112,7 +125,7 @@ describe('MockSalesApi (in-memory)', () => {
     const products = await mockApi.getProducts();
 
     expect(products.length).toBeGreaterThan(0);
-    expect(products.every(p => p.isActive && p.location === 'store' && p.stock > 0)).toBe(true);
+    expect(products.every(p => p.isActive && p.storeStock > 0)).toBe(true);
   });
 
   it('filters products by search term (case-insensitive)', async () => {

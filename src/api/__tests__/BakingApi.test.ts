@@ -74,15 +74,15 @@ describe('BakingApi (real, axios-backed)', () => {
   describe('getBakedProductsStock', () => {
     it('gets /inventory/baked-products and maps date fields', async () => {
       const raw = [
-        { id: '1', name: 'Base chocolate', lastUpdated: '2026-01-01T00:00:00.000Z', expiresAt: '2026-02-01T00:00:00.000Z', createdAt: '2026-01-01T00:00:00.000Z' },
-        { id: '2', name: 'Base vainilla', lastUpdated: '2026-01-01T00:00:00.000Z', expiresAt: null, createdAt: '2026-01-01T00:00:00.000Z' },
+        { id: '1', name: 'Base chocolate', expiresAt: '2026-02-01T00:00:00.000Z', createdAt: '2026-01-01T00:00:00.000Z' },
+        { id: '2', name: 'Base vainilla', expiresAt: null, createdAt: '2026-01-01T00:00:00.000Z' },
       ];
       mockedApi.get.mockResolvedValue({ data: { success: true, data: raw } });
 
       const result = await bakingApi.getBakedProductsStock();
 
       expect(mockedApi.get).toHaveBeenCalledWith('/inventory/baked-products');
-      expect(result[0].lastUpdated).toEqual(new Date(raw[0].lastUpdated));
+      expect(result[0].createdAt).toEqual(new Date(raw[0].createdAt));
       expect(result[0].expiresAt).toEqual(new Date(raw[0].expiresAt as string));
       expect(result[1].expiresAt).toBeUndefined();
     });

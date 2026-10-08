@@ -4,6 +4,7 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NumberInput } from '@/components/ui/number-input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -13,17 +14,23 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { MobileCard, MobileCardHeader, MobileCardRow, useIsMobile } from '@/components/ui/responsive-table';
-import { Plus, Search, Edit2, Trash2, Cake, Package, Filter, X, PlusCircle, Loader2, Gift, RefreshCw } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Cake, Package, Filter, X, PlusCircle, Loader2, Gift, RefreshCw, FlaskConical } from 'lucide-react';
 import { toast } from 'sonner';
 import { Flavor, Product, CreateProductData, EditProductData, AddStockData, CreateFlavorData, EditFlavorData, SweetTableCombo, CreateSweetTableComboData, EditSweetTableComboData, ComboProduct } from '@/types';
 import { categories } from '@/types/consts';
 import { IProductsApi, defaultProductsApi } from '@/api/ProductsApi';
+import { IMaterialsApi, defaultMaterialsApi } from '@/api/MaterialsApi';
+import { IInventoryApi, defaultInventoryApi } from '@/api/InventoryApi';
+import RecipeDialog from '@/components/Dialogs/RecipeDialog';
+import type { RawMaterial } from '@/types';
 
 interface ProductsProps {
   api?: IProductsApi;
+  materialsApi?: IMaterialsApi;
+  inventoryApi?: IInventoryApi;
 }
 
-export default function Products({ api = defaultProductsApi }: ProductsProps) {
+export default function Products({ api = defaultProductsApi, materialsApi = defaultMaterialsApi, inventoryApi = defaultInventoryApi }: ProductsProps) {
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState('products');
   const [searchTerm, setSearchTerm] = useState('');
@@ -35,6 +42,20 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [stockProduct, setStockProduct] = useState<Product | null>(null);
+
+  // Recetas de materia prima: de un producto (por unidad) o de la torta personalizada
+  const [recipeTarget, setRecipeTarget] = useState<Product | 'cake' | null>(null);
+  const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
+
+  const openRecipe = async (target: Product | 'cake') => {
+    setRecipeTarget(target);
+    try {
+      setRawMaterials(await inventoryApi.getRawMaterials());
+    } catch (error) {
+      console.error('Error loading raw materials:', error);
+      toast.error('Error al cargar las materias primas');
+    }
+  };
   const [products, setProducts] = useState<Product[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -177,11 +198,11 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
           name: savedProduct.name,
           description: savedProduct.description,
           category: savedProduct.category,
-          location: savedProduct.location,
           basePrice: savedProduct.basePrice,
           pricePerPortion: Number(savedProduct.pricePerPortion),
           stock: savedProduct.stock,
           minStock: savedProduct.minStock,
+          restockQuantity: savedProduct.restockQuantity,
           isActive: savedProduct.isActive,
         };
         await api.editProduct(editData);
@@ -192,11 +213,11 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
           name: savedProduct.name,
           description: savedProduct.description,
           category: savedProduct.category,
-          location: savedProduct.location,
           basePrice: savedProduct.basePrice,
           pricePerPortion: savedProduct.pricePerPortion,
           stock: savedProduct.stock,
           minStock: savedProduct.minStock,
+          restockQuantity: savedProduct.restockQuantity,
           isActive: savedProduct.isActive,
         };
         await api.createProduct(createData);
@@ -210,9 +231,9 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
     }
   };
 
-  const handleStockAdded = async (productId: string, quantity: number) => {
+  const handleStockAdded = async (productId: string, quantity: number, locationType: 'production' | 'store') => {
     try {
-      const stockData: AddStockData = { productId, quantity };
+      const stockData: AddStockData = { productId, quantity, locationType };
       await api.addProductStock(stockData);
       await loadProducts(); // Recargar la lista
       handleCloseStockDialog();
@@ -220,6 +241,18 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
     } catch (error) {
       console.error('Error adding stock:', error);
       toast.error('Error al agregar stock');
+    }
+  };
+
+  const handleStockTransferred = async (productId: string, quantity: number) => {
+    try {
+      await api.transferStockToStore(productId, quantity);
+      await loadProducts();
+      handleCloseStockDialog();
+      toast.success(`Se trasladaron ${quantity} unidades a tienda`);
+    } catch (error: any) {
+      console.error('Error transferring stock:', error);
+      toast.error(error.message || 'Error al trasladar stock');
     }
   };
 
@@ -436,6 +469,15 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
                 </Dialog>
 
                 <Button
+                  variant="outline"
+                  className="w-full sm:w-auto justify-center"
+                  onClick={() => openRecipe('cake')}
+                >
+                  <FlaskConical className="h-4 w-4 mr-2" />
+                  Receta de tortas
+                </Button>
+
+                <Button
                   className="w-full sm:w-auto justify-center"
                   onClick={handleCreateProduct}
                 >
@@ -577,6 +619,35 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
           </Dialog>
         </div>
 
+        {/* Receta de materia prima */}
+        {recipeTarget === 'cake' ? (
+          <RecipeDialog
+            open
+            onOpenChange={(open) => { if (!open) setRecipeTarget(null); }}
+            title="Receta de tortas personalizadas"
+            description="Cantidad por cada 10 porciones, en la unidad de cada materia prima. La decoración se registra a mano en cada pedido."
+            stages={[{ key: 'baking', label: 'Horneado' }, { key: 'assembling', label: 'Armado' }]}
+            rawMaterials={rawMaterials}
+            load={() => materialsApi.getCakeRecipe()}
+            save={(recipe) => materialsApi.saveCakeRecipe(recipe)}
+          />
+        ) : recipeTarget && (
+          <RecipeDialog
+            open
+            onOpenChange={(open) => { if (!open) setRecipeTarget(null); }}
+            title={`Receta - ${recipeTarget.name}`}
+            description="Cantidad por unidad, en la unidad de cada materia prima. En pedidos de mesa dulce solo se descuentan Horneado y Armado."
+            stages={[
+              { key: 'baking', label: 'Horneado' },
+              { key: 'assembling', label: 'Armado' },
+              { key: 'decorating', label: 'Decoración' },
+            ]}
+            rawMaterials={rawMaterials}
+            load={() => materialsApi.getProductRecipe(recipeTarget.id)}
+            save={(recipe) => materialsApi.saveProductRecipe(recipeTarget.id, recipe)}
+          />
+        )}
+
         {/* Stock Dialog */}
         <Dialog open={stockProduct !== null} onOpenChange={handleCloseStockDialog}>
           <DialogContent className="w-[95vw] sm:w-full max-w-md rounded-lg">
@@ -590,6 +661,7 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
                 product={stockProduct} 
                 onClose={handleCloseStockDialog}
                 onAddStock={handleStockAdded}
+                onTransfer={handleStockTransferred}
               />
             )}
           </DialogContent>
@@ -682,7 +754,7 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
             {!loading && products.length === 0 && (
               <Card>
                 <CardContent className="p-8 text-center ">
-                  No se encontraron usuarios
+                  No se encontraron productos
                 </CardContent>
               </Card>
             )}
@@ -724,16 +796,14 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
                               <p className="font-medium">Bs. {product.basePrice}</p>
                             </div>
                             <div>
-                              <p className="text-xs ">Stock</p>
-                              <p className={product.stock <= product.minStock ? 'text-destructive font-medium' : ''}>
-                                {product.stock} / {product.minStock}
+                              <p className="text-xs ">Stock (tienda / mínimo)</p>
+                              <p className={product.storeStock <= product.minStock ? 'text-destructive font-medium' : ''}>
+                                {product.storeStock} / {product.minStock}
                               </p>
                             </div>
                             <div>
-                              <p className="text-xs ">Ubicación</p>
-                              <Badge variant={product.location === 'store' ? 'default' : 'secondary'} className="text-xs">
-                                {product.location === 'store' ? 'Tienda' : 'Producción'}
-                              </Badge>
+                              <p className="text-xs ">En planta</p>
+                              <p>{product.productionStock}</p>
                             </div>
                           </div>
   
@@ -749,6 +819,15 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
                                 onClick={() => handleAddStock(product)}
                               >
                                 <PlusCircle className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => openRecipe(product)}
+                                title="Receta"
+                              >
+                                <FlaskConical className="h-4 w-4" />
                               </Button>
                               <Button 
                                 variant="ghost" 
@@ -782,8 +861,8 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
                           <TableHead className="whitespace-nowrap">Producto</TableHead>
                           <TableHead className="whitespace-nowrap">Categoría</TableHead>
                           <TableHead className="whitespace-nowrap">Precio Base</TableHead>
-                          <TableHead className="whitespace-nowrap">Ubicación</TableHead>
-                          <TableHead className="whitespace-nowrap">Stock</TableHead>
+                          <TableHead className="whitespace-nowrap">Tienda / Mínimo</TableHead>
+                          <TableHead className="whitespace-nowrap">En planta</TableHead>
                           <TableHead className="text-right whitespace-nowrap">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -817,16 +896,12 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
                               </TableCell>
                               <TableCell className="font-medium whitespace-nowrap">Bs. {product.basePrice}</TableCell>
                               <TableCell>
-                                <Badge variant={product.location === 'store' ? 'default' : 'secondary'} className="whitespace-nowrap">
-                                  {product.location === 'store' ? 'Tienda' : 'Producción'}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <span className={product.stock <= product.minStock ? 'text-destructive font-medium' : ''}>
-                                  {product.stock}
+                                <span className={product.storeStock <= product.minStock ? 'text-destructive font-medium' : ''}>
+                                  {product.storeStock}
                                 </span>
                                 <span className=""> / {product.minStock}</span>
                               </TableCell>
+                              <TableCell>{product.productionStock}</TableCell>
                               <TableCell className="text-right whitespace-nowrap">
                                 <Button 
                                   variant="ghost" 
@@ -836,6 +911,15 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
                                   title="Agregar stock"
                                 >
                                   <PlusCircle className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => openRecipe(product)}
+                                  title="Receta"
+                                >
+                                  <FlaskConical className="h-4 w-4" />
                                 </Button>
                                 <Button 
                                   variant="ghost" 
@@ -1054,13 +1138,18 @@ export default function Products({ api = defaultProductsApi }: ProductsProps) {
 
 // Los componentes AddStockForm, ProductForm y FlavorForm se mantienen igual
 // (incluir los mismos componentes que estaban en el archivo original)
-function AddStockForm({ product, onClose, onAddStock }: { 
-  product: Product; 
+function AddStockForm({ product, onClose, onAddStock, onTransfer }: {
+  product: Product;
   onClose: () => void;
-  onAddStock: (productId: string, quantity: number) => void;
+  onAddStock: (productId: string, quantity: number, locationType: 'production' | 'store') => void;
+  onTransfer: (productId: string, quantity: number) => void;
 }) {
   const [quantity, setQuantity] = useState<number>(1);
+  const [locationType, setLocationType] = useState<'production' | 'store' | 'transfer'>('store');
   const [submitting, setSubmitting] = useState(false);
+
+  const isTransfer = locationType === 'transfer';
+  const currentStock = locationType === 'store' ? product.storeStock : product.productionStock;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1068,9 +1157,17 @@ function AddStockForm({ product, onClose, onAddStock }: {
       toast.error('La cantidad debe ser mayor a 0');
       return;
     }
+    if (isTransfer && quantity > product.productionStock) {
+      toast.error('No hay suficiente stock en planta');
+      return;
+    }
     setSubmitting(true);
     try {
-      await onAddStock(product.id, quantity);
+      if (isTransfer) {
+        await onTransfer(product.id, quantity);
+        return;
+      }
+      await onAddStock(product.id, quantity, locationType);
       toast.success(`Se agregaron ${quantity} unidades al stock de "${product.name}"`);
       onClose();
     } catch (error) {
@@ -1084,26 +1181,66 @@ function AddStockForm({ product, onClose, onAddStock }: {
   return (
     <form onSubmit={handleSubmit} className="space-y-4 px-1">
       <div className="space-y-1.5 sm:space-y-2">
-        <Label className="text-sm">Stock actual</Label>
-        <p className="text-lg font-semibold">{product.stock} unidades</p>
+        <Label className="text-sm">¿Dónde se agrega?</Label>
+        <div className={`grid gap-2 ${product.productionStock > 0 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          <Button
+            type="button"
+            variant={locationType === 'store' ? 'default' : 'outline'}
+            onClick={() => setLocationType('store')}
+            className="w-full"
+          >
+            Tienda
+          </Button>
+          <Button
+            type="button"
+            variant={locationType === 'production' ? 'default' : 'outline'}
+            onClick={() => setLocationType('production')}
+            className="w-full"
+          >
+            Planta
+          </Button>
+          {product.productionStock > 0 && (
+            <Button
+              type="button"
+              variant={isTransfer ? 'default' : 'outline'}
+              onClick={() => setLocationType('transfer')}
+              className="w-full"
+            >
+              Planta → Tienda
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="space-y-1.5 sm:space-y-2">
-        <Label className="text-sm">Cantidad a agregar *</Label>
-        <Input 
-          type="number" 
+        <Label className="text-sm">Stock actual en {locationType === 'store' ? 'tienda' : 'planta'}</Label>
+        <p className="text-lg font-semibold">{currentStock} unidades</p>
+        {isTransfer && <p className="text-sm text-muted-foreground">Tienda: {product.storeStock} unidades</p>}
+        {locationType === 'store' && !!product.reservedStock && (
+          <p className="text-sm text-muted-foreground">{product.reservedStock} reservadas para pedidos de hoy</p>
+        )}
+      </div>
+
+      <div className="space-y-1.5 sm:space-y-2">
+        <Label className="text-sm">Cantidad a {isTransfer ? 'trasladar' : 'agregar'} *</Label>
+        <NumberInput
           min="1"
           value={quantity}
-          onChange={(e) => setQuantity(parseInt(e.target.value) || 0)}
+          onChange={setQuantity}
+          fallback={1}
           placeholder="Cantidad"
-          required 
+          required
           className="text-sm"
         />
       </div>
 
       <div className="space-y-1.5 sm:space-y-2">
-        <Label className="text-sm">Stock después de agregar</Label>
-        <p className="text-lg font-semibold text-primary">{product.stock + quantity} unidades</p>
+        <Label className="text-sm">{isTransfer ? 'Stock después de trasladar' : 'Stock después de agregar'}</Label>
+        <p className="text-lg font-semibold text-primary">
+          {isTransfer
+            ? `Planta ${currentStock - quantity} · Tienda ${product.storeStock + quantity}`
+            : `${currentStock + quantity} unidades`}
+        </p>
       </div>
 
       <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 pt-2">
@@ -1112,7 +1249,7 @@ function AddStockForm({ product, onClose, onAddStock }: {
         </Button>
         <Button type="submit" className="w-full sm:w-auto order-1 sm:order-2" disabled={submitting}>
           {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          Agregar Stock
+          {isTransfer ? 'Trasladar a Tienda' : 'Agregar Stock'}
         </Button>
       </div>
     </form>
@@ -1131,11 +1268,13 @@ function ProductForm({ onClose, onSave, initialProduct }: {
     name: initialProduct?.name || '',
     description: initialProduct?.description || '',
     category: initialProduct?.category || 'cake',
-    location: initialProduct?.location || 'store',
     basePrice: initialProduct?.basePrice || 0,
     pricePerPortion: initialProduct?.pricePerPortion || 0,
-    stock: initialProduct?.stock || 0,
+    // El stock del formulario es el de TIENDA específicamente — el de planta
+    // no se edita acá, solo vía "Agregar stock" con su propia ubicación.
+    stock: initialProduct?.storeStock ?? 0,
     minStock: initialProduct?.minStock || 1,
+    restockQuantity: initialProduct?.restockQuantity ?? undefined,
     isActive: initialProduct?.isActive ?? true,
   });
 
@@ -1159,6 +1298,18 @@ function ProductForm({ onClose, onSave, initialProduct }: {
       return;
     }
 
+    if (formData.stock < 0) {
+      toast.error('El stock inicial no puede ser negativo');
+      setSubmitting(false);
+      return;
+    }
+
+    if (formData.minStock < 0) {
+      toast.error('El stock mínimo no puede ser negativo');
+      setSubmitting(false);
+      return;
+    }
+
     const product: Product = {
       id: initialProduct?.id || Date.now().toString(),
       name: formData.name,
@@ -1168,9 +1319,11 @@ function ProductForm({ onClose, onSave, initialProduct }: {
       portionSize: 10,
       pricePerPortion: formData.pricePerPortion,
       isActive: formData.isActive,
-      location: formData.location as any,
       stock: formData.stock,
+      storeStock: formData.stock,
+      productionStock: initialProduct?.productionStock ?? 0,
       minStock: formData.minStock,
+      restockQuantity: formData.restockQuantity || null,
     };
     
     await onSave(product);
@@ -1201,84 +1354,90 @@ function ProductForm({ onClose, onSave, initialProduct }: {
         />
       </div>
       
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-        <div className="space-y-1.5 sm:space-y-2">
-          <Label className="text-sm">Categoría *</Label>
-          <Select value={formData.category} onValueChange={(v) => handleChange('category', v)}>
-            <SelectTrigger className="text-sm">
-              <SelectValue placeholder="Seleccionar" />
-            </SelectTrigger>
-            <SelectContent>
-              {categories.map(cat => (
-                <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        
-        <div className="space-y-1.5 sm:space-y-2">
-          <Label className="text-sm">Ubicación</Label>
-          <Select value={formData.location} onValueChange={(v) => handleChange('location', v)}>
-            <SelectTrigger className="text-sm">
-              <SelectValue placeholder="Seleccionar" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="store">Tienda</SelectItem>
-              <SelectItem value="production">Producción</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="space-y-1.5 sm:space-y-2">
+        <Label className="text-sm">Categoría *</Label>
+        <Select value={formData.category} onValueChange={(v) => handleChange('category', v)}>
+          <SelectTrigger className="text-sm">
+            <SelectValue placeholder="Seleccionar" />
+          </SelectTrigger>
+          <SelectContent>
+            {categories.map(cat => (
+              <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
-      
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <div className="space-y-1.5 sm:space-y-2">
           <Label className="text-sm">Precio base (Bs.)</Label>
-          <Input 
-            type="number" 
-            placeholder="0" 
-            value={formData.basePrice || ''}
-            onChange={(e) => handleChange('basePrice', parseFloat(e.target.value) || 0)}
-            className="text-sm" 
+          <NumberInput
+            placeholder="0"
+            value={formData.basePrice}
+            onChange={(v) => handleChange('basePrice', v)}
+            decimal
+            fallback={0}
+            className="text-sm"
           />
         </div>
         <div className="space-y-1.5 sm:space-y-2">
           <Label className="text-sm">Precio por porción (Bs.)</Label>
-          <Input 
-            type="number" 
-            placeholder="0" 
-            value={formData.pricePerPortion || ''}
-            onChange={(e) => handleChange('pricePerPortion', parseFloat(e.target.value) || 0)}
-            className="text-sm" 
+          <NumberInput
+            placeholder="0"
+            value={formData.pricePerPortion}
+            onChange={(v) => handleChange('pricePerPortion', v)}
+            decimal
+            fallback={0}
+            className="text-sm"
           />
         </div>
       </div>
       
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <div className="space-y-1.5 sm:space-y-2">
-          <Label className="text-sm">Stock inicial</Label>
-          <Input 
-            type="number" 
-            placeholder="0" 
-            value={formData.stock || ''}
-            onChange={(e) => handleChange('stock', parseInt(e.target.value) || 0)}
-            className="text-sm" 
+          <Label className="text-sm">{isEditing ? 'Stock en tienda' : 'Stock inicial (tienda)'}</Label>
+          <NumberInput
+            placeholder="0"
+            value={formData.stock}
+            onChange={(v) => handleChange('stock', v)}
+            fallback={0}
+            className="text-sm"
           />
+          {isEditing && (
+            <p className="text-xs ">
+              En planta: {initialProduct?.productionStock ?? 0} unidades (se agrega desde "Agregar stock")
+            </p>
+          )}
         </div>
         <div className="space-y-1.5 sm:space-y-2">
           <Label className="text-sm">Stock mínimo</Label>
-          <Input 
-            type="number" 
-            placeholder="0" 
-            value={formData.minStock || ''}
-            onChange={(e) => handleChange('minStock', parseInt(e.target.value) || 0)}
-            className="text-sm" 
+          <NumberInput
+            placeholder="0"
+            value={formData.minStock}
+            onChange={(v) => handleChange('minStock', v)}
+            fallback={0}
+            className="text-sm"
           />
         </div>
       </div>
-      
+
+      <div className="space-y-1.5 sm:space-y-2">
+        <Label className="text-sm">Cantidad de reposición automática (opcional)</Label>
+        <NumberInput
+          placeholder="Sin reposición automática"
+          value={formData.restockQuantity}
+          onChange={(v) => handleChange('restockQuantity', v)}
+          fallback={0}
+          className="text-sm"
+        />
+        <p className="text-xs ">
+          Cuando el stock llegue al mínimo, se creará automáticamente una tarea en Hornos para producir esta cantidad. Déjalo vacío para no reponer automáticamente.
+        </p>
+      </div>
+
       <div className="flex items-center gap-2">
-        <Switch 
-          id="active" 
+        <Switch
+          id="active"
           checked={formData.isActive}
           onCheckedChange={(v) => handleChange('isActive', v)}
           className="scale-75 sm:scale-100" 
@@ -1533,21 +1692,22 @@ function ComboForm({ onClose, onSave, initialCombo, catalogProducts }: {
                 </SelectContent>
               </Select>
               <div className="flex gap-2">
-                <Input
-                  type="number"
+                <NumberInput
                   min="1"
                   placeholder="Cant."
-                  value={row.quantity || ''}
-                  onChange={(e) => updateRowQuantity(index, parseInt(e.target.value) || 0)}
+                  value={row.quantity}
+                  onChange={(v) => updateRowQuantity(index, v)}
+                  fallback={0}
                   className="text-sm w-full sm:w-20"
                 />
-                <Input
-                  type="number"
+                <NumberInput
                   min="0"
                   step="0.01"
                   placeholder="Bs./u"
-                  value={row.pricePerUnit || ''}
-                  onChange={(e) => updateRowPricePerUnit(index, parseFloat(e.target.value) || 0)}
+                  value={row.pricePerUnit}
+                  onChange={(v) => updateRowPricePerUnit(index, v)}
+                  decimal
+                  fallback={0}
                   className="text-sm w-full sm:w-24"
                 />
                 <Button
@@ -1585,16 +1745,17 @@ function ComboForm({ onClose, onSave, initialCombo, catalogProducts }: {
             </button>
           )}
         </div>
-        <Input
-          type="number"
+        <NumberInput
           min="0"
           step="0.01"
           placeholder="0"
-          value={price || ''}
-          onChange={(e) => {
-            setPrice(parseFloat(e.target.value) || 0);
+          value={price}
+          onChange={(v) => {
+            setPrice(v);
             setPriceManuallyEdited(true);
           }}
+          decimal
+          fallback={0}
           className="text-sm"
         />
       </div>

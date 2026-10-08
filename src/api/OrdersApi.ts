@@ -26,7 +26,9 @@ export interface IOrdersApi {
   updateOrder(id: string, data: UpdateOrderData): Promise<Order>;
   deleteOrder(id: string): Promise<void>;
   updateOrderStatus(id: string, status: OrderStatus, paymentMethod?: PaymentMethod): Promise<Order>;
+  markOrderAtStore(id: string): Promise<Order>;
   advanceItemStage(orderId: string, itemType: WorkItemType, itemId: string, toStage: ProductStatus): Promise<Order>;
+  confirmRestock(orderId: string, itemId: string, actualQuantity: number): Promise<Order>;
   getOrderProductionLog(orderId: string): Promise<ItemStageLogEntry[]>;
   getFlavors(): Promise<Flavor[]>;
   getProducts(searchTerm?: string): Promise<Product[]>;
@@ -55,6 +57,14 @@ export class MockOrdersApi implements IOrdersApi {
 
       if (filters.itemStage) {
         filtered = filtered.filter(o => getWorkItemsAtStage([o], filters.itemStage!).length > 0);
+      }
+
+      if (filters.orderType) {
+        filtered = filtered.filter(o => o.orderType === filters.orderType);
+      }
+
+      if (filters.excludeOrderType) {
+        filtered = filtered.filter(o => o.orderType !== filters.excludeOrderType);
       }
 
       if (filters.startDate && filters.endDate) {
@@ -162,6 +172,20 @@ export class MockOrdersApi implements IOrdersApi {
     return this.orders[index];
   }
 
+  async markOrderAtStore(id: string): Promise<Order> {
+    await this.simulateNetworkDelay();
+
+    const index = this.orders.findIndex(o => o.id === id);
+    if (index === -1) {
+      throw new Error(`Order with id ${id} not found`);
+    }
+
+    this.orders[index] = { ...this.orders[index], currentLocationType: 'store' };
+    console.log('Mock order marked at store:', { id });
+
+    return this.orders[index];
+  }
+
   async advanceItemStage(orderId: string, itemType: WorkItemType, itemId: string, toStage: ProductStatus): Promise<Order> {
     await this.simulateNetworkDelay();
 
@@ -171,6 +195,18 @@ export class MockOrdersApi implements IOrdersApi {
     }
 
     console.log('Mock advanceItemStage:', { orderId, itemType, itemId, toStage });
+    return this.orders[index];
+  }
+
+  async confirmRestock(orderId: string, itemId: string, actualQuantity: number): Promise<Order> {
+    await this.simulateNetworkDelay();
+
+    const index = this.orders.findIndex(o => o.id === orderId);
+    if (index === -1) {
+      throw new Error(`Order with id ${orderId} not found`);
+    }
+
+    console.log('Mock confirmRestock:', { orderId, itemId, actualQuantity });
     return this.orders[index];
   }
 
@@ -271,6 +307,8 @@ export class OrdersApi implements IOrdersApi {
       if (filters) {
         if (filters.status) params.status = filters.status;
         if (filters.itemStage) params.itemStage = filters.itemStage;
+        if (filters.orderType) params.orderType = filters.orderType;
+        if (filters.excludeOrderType) params.excludeOrderType = filters.excludeOrderType;
         if (filters.startDate) params.startDate = filters.startDate.toISOString();
         if (filters.endDate) params.endDate = filters.endDate.toISOString();
         if (filters.customerName) params.customerName = filters.customerName;
@@ -415,6 +453,25 @@ export class OrdersApi implements IOrdersApi {
     }
   }
 
+  async markOrderAtStore(id: string): Promise<Order> {
+    try {
+      const response = await api.patch(`/orders/${id}/mark-at-store`);
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Error al marcar el pedido como trasladado');
+      }
+
+      return {
+        ...response.data.data,
+        pickupDate: new Date(response.data.data.pickupDate),
+        createdAt: new Date(response.data.data.createdAt)
+      };
+    } catch (error: any) {
+      console.error('Error en markOrderAtStore:', error);
+      throw new Error(error.response?.data?.message || error.message || 'Error al marcar el pedido como trasladado');
+    }
+  }
+
   async advanceItemStage(orderId: string, itemType: WorkItemType, itemId: string, toStage: ProductStatus): Promise<Order> {
     try {
       const response = await api.patch(`/orders/${orderId}/items/${itemType}/${itemId}/advance`, { toStage });
@@ -431,6 +488,25 @@ export class OrdersApi implements IOrdersApi {
     } catch (error: any) {
       console.error('Error en advanceItemStage:', error);
       throw new Error(error.response?.data?.message || error.message || 'Error al actualizar la etapa');
+    }
+  }
+
+  async confirmRestock(orderId: string, itemId: string, actualQuantity: number): Promise<Order> {
+    try {
+      const response = await api.patch(`/orders/${orderId}/items/${itemId}/confirm-restock`, { actualQuantity });
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Error al confirmar la reposición');
+      }
+
+      return {
+        ...response.data.data,
+        pickupDate: new Date(response.data.data.pickupDate),
+        createdAt: new Date(response.data.data.createdAt)
+      };
+    } catch (error: any) {
+      console.error('Error en confirmRestock:', error);
+      throw new Error(error.response?.data?.message || error.message || 'Error al confirmar la reposición');
     }
   }
 

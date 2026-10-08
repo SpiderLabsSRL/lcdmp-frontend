@@ -36,8 +36,9 @@ const products: Product[] = [
     portionSize: 1,
     pricePerPortion: 15,
     isActive: true,
-    location: 'store',
     stock: 100,
+    storeStock: 100,
+    productionStock: 0,
     minStock: 5,
   },
   {
@@ -49,8 +50,9 @@ const products: Product[] = [
     portionSize: 1,
     pricePerPortion: 10,
     isActive: true,
-    location: 'store',
     stock: 100,
+    storeStock: 100,
+    productionStock: 0,
     minStock: 5,
   },
   {
@@ -62,8 +64,9 @@ const products: Product[] = [
     portionSize: 1,
     pricePerPortion: 5,
     isActive: true,
-    location: 'store',
     stock: 100,
+    storeStock: 100,
+    productionStock: 0,
     minStock: 5,
   },
 ];
@@ -171,8 +174,7 @@ describe('OrderForm - initial render (create mode)', () => {
     const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement;
     expect(dateInput.value).toBe(getLocalDateString());
 
-    const timeInput = document.querySelector('input[type="time"]') as HTMLInputElement;
-    expect(timeInput.value).toBe('12:00');
+    expect(screen.getByRole('button', { name: '12:00' })).toBeInTheDocument();
 
     expect(within(getTotalsRow('Subtotal:')).getByText('Bs. 0.00')).toBeInTheDocument();
     expect(within(getTotalsRow('Total a pagar:')).getByText('Bs. 0.00')).toBeInTheDocument();
@@ -225,6 +227,46 @@ describe('OrderForm - custom cakes', () => {
     expect(within(getTotalsRow('Subtotal:')).getByText('Bs. 600.00')).toBeInTheDocument();
   });
 
+  // Regression test for a reported bug: clearing a number field and typing a
+  // new digit produced "12" instead of "2" (the field would snap back to its
+  // fallback value mid-edit). Drives the input with realistic keystrokes
+  // (user.clear + user.type) instead of the setNumberValue() workaround used
+  // elsewhere in this file, to prove the actual browser interaction works.
+  it('lets the cake quantity be cleared and retyped with real keystrokes without concatenating digits', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(screen.getByLabelText('Torta personalizada'));
+    const card = screen.getByText('Torta #1').closest('.relative') as HTMLElement;
+    const quantityInput = within(card).getAllByRole('spinbutton')[0] as HTMLInputElement;
+
+    expect(quantityInput).toHaveValue(1);
+
+    await user.clear(quantityInput);
+    expect(quantityInput.value).toBe('');
+
+    await user.type(quantityInput, '2');
+
+    expect(quantityInput).toHaveValue(2);
+  });
+
+  it('lets the cake price be cleared without snapping back to 0 mid-edit, and typing "1" never leaves a leading zero', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(screen.getByLabelText('Torta personalizada'));
+    const card = screen.getByText('Torta #1').closest('.relative') as HTMLElement;
+    const priceInput = within(card).getByPlaceholderText('0') as HTMLInputElement;
+
+    await user.clear(priceInput);
+    expect(priceInput.value).toBe('');
+
+    await user.type(priceInput, '1');
+
+    expect(priceInput).toHaveValue(1);
+    expect(priceInput.value).not.toBe('01');
+  });
+
   it('removes a cake when more than one is present', async () => {
     const user = userEvent.setup();
     renderForm();
@@ -260,6 +302,29 @@ describe('OrderForm - catalog products', () => {
     setNumberValue(quantityInput, '3');
 
     expect(within(getTotalsRow('Subtotal:')).getByText('Bs. 45.00')).toBeInTheDocument();
+  });
+});
+
+describe('OrderForm - usar de stock', () => {
+  it('offers the "Usar de stock" check once a product is chosen and sends fromStock in the payload', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm();
+
+    await user.click(screen.getByLabelText('Productos del catálogo'));
+    const card = screen.getByText('Producto #1').closest('.space-y-3') as HTMLElement;
+    expect(within(card).queryByLabelText(/Usar de stock/)).not.toBeInTheDocument();
+
+    await chooseOption(user, within(card).getByRole('combobox'), /Cupcake Vainilla - Bs\. 15/);
+    expect(within(card).getByText(/disponible en tienda: 100/)).toBeInTheDocument();
+
+    await user.click(within(card).getByLabelText(/Usar de stock/));
+    expect(within(card).getByText(/Queda lista de inmediato/)).toBeInTheDocument();
+
+    await fillRequiredCustomerFields(user);
+    await user.click(screen.getByRole('button', { name: 'Crear Pedido' }));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit.mock.calls[0][0].items[0].fromStock).toBe(true);
   });
 });
 
@@ -537,8 +602,7 @@ describe('OrderForm - editing an existing order', () => {
 
     const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement;
     expect(dateInput.value).toBe('2026-10-10');
-    const timeInput = document.querySelector('input[type="time"]') as HTMLInputElement;
-    expect(timeInput.value).toBe('15:30');
+    expect(screen.getByRole('button', { name: '15:30' })).toBeInTheDocument();
 
     // Cake section pre-filled
     const cakeCard = screen.getByText('Torta #1').closest('.relative') as HTMLElement;

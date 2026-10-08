@@ -158,7 +158,7 @@ describe('Baking', () => {
     expect(screen.getByText(/20 porciones - Vainilla/)).toBeInTheDocument();
     expect(screen.getByText('Mesa dulce: 10 Alfajores')).toBeInTheDocument();
     expect(screen.getByText('Mesa dulce: 8 Brownies')).toBeInTheDocument();
-    expect(screen.getByText('Pan integral')).toBeInTheDocument();
+    expect(screen.getByText('3 Pan integral')).toBeInTheDocument();
 
     // Stats: 4 pending lines, totalPortions only counts custom_cake quantity (2).
     expect(screen.getByText('Líneas pendientes').previousSibling?.textContent).toBe('4');

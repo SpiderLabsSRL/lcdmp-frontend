@@ -76,6 +76,22 @@ describe('OrdersApi (real, axios-backed)', () => {
       });
     });
 
+    it('forwards orderType and excludeOrderType as their own params', async () => {
+      mockedApi.get.mockResolvedValue({ data: { success: true, data: [] } });
+
+      await ordersApi.getOrders({ orderType: 'restock' });
+      expect(mockedApi.get).toHaveBeenLastCalledWith('/orders', {
+        params: { orderType: 'restock' },
+        signal: undefined,
+      });
+
+      await ordersApi.getOrders({ excludeOrderType: 'restock' });
+      expect(mockedApi.get).toHaveBeenLastCalledWith('/orders', {
+        params: { excludeOrderType: 'restock' },
+        signal: undefined,
+      });
+    });
+
     it('maps pickupDate (local, from Y-M-D) and createdAt on each order', async () => {
       const rawOrders = [{ id: '1', pickupDate: '2026-03-05', createdAt: '2026-01-01T10:00:00.000Z' }];
       mockedApi.get.mockResolvedValue({ data: { success: true, data: rawOrders } });
@@ -268,6 +284,31 @@ describe('OrdersApi (real, axios-backed)', () => {
     });
   });
 
+  describe('confirmRestock', () => {
+    it('patches /orders/:orderId/items/:itemId/confirm-restock with actualQuantity and returns the mapped order', async () => {
+      const raw = { id: '1', status: 'delivered', pickupDate: '2026-03-05T00:00:00.000Z', createdAt: '2026-01-01T00:00:00.000Z' };
+      mockedApi.patch.mockResolvedValue({ data: { success: true, data: raw } });
+
+      const result = await ordersApi.confirmRestock('1', 'item-1', 18);
+
+      expect(mockedApi.patch).toHaveBeenCalledWith('/orders/1/items/item-1/confirm-restock', { actualQuantity: 18 });
+      expect(result.pickupDate).toEqual(new Date(raw.pickupDate));
+      expect(result.createdAt).toEqual(new Date(raw.createdAt));
+    });
+
+    it('throws with the backend message when success is false', async () => {
+      mockedApi.patch.mockResolvedValue({ data: { success: false, message: 'La reposición todavía no está lista para confirmar' } });
+
+      await expect(ordersApi.confirmRestock('1', 'item-1', 18)).rejects.toThrow('La reposición todavía no está lista para confirmar');
+    });
+
+    it('throws with a connection error when the request itself fails', async () => {
+      mockedApi.patch.mockRejectedValue(new Error('Network Error'));
+
+      await expect(ordersApi.confirmRestock('1', 'item-1', 18)).rejects.toThrow('Network Error');
+    });
+  });
+
   describe('getOrderProductionLog', () => {
     it('gets /orders/:id/production-log and returns the list', async () => {
       const log = [
@@ -412,6 +453,18 @@ describe('MockOrdersApi (in-memory)', () => {
       // Order '1' is the only mock order with a custom cake in the baking stage.
       expect(orders.map(o => o.id)).toEqual(['1']);
     });
+
+    it('filters by orderType', async () => {
+      const orders = await mockApi.getOrders({ orderType: 'mixed' });
+      expect(orders.length).toBeGreaterThan(0);
+      expect(orders.every(o => o.orderType === 'mixed')).toBe(true);
+    });
+
+    it('filters by excludeOrderType', async () => {
+      const orders = await mockApi.getOrders({ excludeOrderType: 'mixed' });
+      expect(orders.length).toBeGreaterThan(0);
+      expect(orders.every(o => o.orderType !== 'mixed')).toBe(true);
+    });
   });
 
   describe('getOrderById', () => {
@@ -497,6 +550,17 @@ describe('MockOrdersApi (in-memory)', () => {
 
     it('throws when advancing an item for a non-existent order', async () => {
       await expect(mockApi.advanceItemStage('missing', 'custom_cake', '1', 'assembling')).rejects.toThrow('Order with id missing not found');
+    });
+  });
+
+  describe('confirmRestock', () => {
+    it('returns the existing order without throwing', async () => {
+      const result = await mockApi.confirmRestock('1', 'item-1', 18);
+      expect(result.id).toBe('1');
+    });
+
+    it('throws when confirming restock for a non-existent order', async () => {
+      await expect(mockApi.confirmRestock('missing', 'item-1', 18)).rejects.toThrow('Order with id missing not found');
     });
   });
 

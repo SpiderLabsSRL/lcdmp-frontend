@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -59,8 +59,9 @@ const baseProducts: Product[] = [
     portionSize: 10,
     pricePerPortion: 12,
     isActive: true,
-    location: 'store',
     stock: 5,
+    storeStock: 5,
+    productionStock: 0,
     minStock: 2,
   },
   {
@@ -72,8 +73,9 @@ const baseProducts: Product[] = [
     portionSize: 1,
     pricePerPortion: 15,
     isActive: true,
-    location: 'production',
     stock: 1,
+    storeStock: 0,
+    productionStock: 1,
     minStock: 5,
   },
 ];
@@ -106,6 +108,7 @@ function buildMockApi(overrides: Partial<IProductsApi> = {}): IProductsApi {
     editProduct: vi.fn().mockResolvedValue(baseProducts[0]),
     deleteProduct: vi.fn().mockResolvedValue(undefined),
     addProductStock: vi.fn().mockResolvedValue(baseProducts[0]),
+    transferStockToStore: vi.fn().mockResolvedValue(baseProducts[1]),
     getFlavors: vi.fn().mockResolvedValue(baseFlavors),
     createFlavor: vi.fn().mockResolvedValue(baseFlavors[0]),
     editFlavor: vi.fn().mockResolvedValue(baseFlavors[0]),
@@ -186,7 +189,7 @@ describe('Products - Productos tab', () => {
     const api = buildMockApi({ getProducts: vi.fn().mockResolvedValue([]) });
     renderWithProviders(<Products api={api} />);
 
-    await waitFor(() => expect(screen.getByText('No se encontraron usuarios')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('No se encontraron productos')).toBeInTheDocument());
   });
 
   it('renders the populated product table with category, price and stock', async () => {
@@ -222,6 +225,85 @@ describe('Products - Productos tab', () => {
       expect.objectContaining({ name: 'Torta red velvet', basePrice: 200 })
     );
     expect(toast.success).toHaveBeenCalledWith('Producto "Torta red velvet" creado exitosamente');
+  });
+
+  it('blocks submit and shows an error when stock inicial is negative', async () => {
+    const api = buildMockApi();
+    const user = userEvent.setup();
+    renderWithProviders(<Products api={api} />);
+
+    await waitFor(() => expect(screen.getByText('Torta de chocolate')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /Nuevo Producto/i }));
+    await user.type(screen.getByPlaceholderText('Nombre del producto'), 'Torta red velvet');
+    const priceInputs = screen.getAllByPlaceholderText('0');
+    await user.type(priceInputs[0], '200');
+    fireEvent.change(priceInputs[2], { target: { value: '-5' } }); // Stock inicial
+
+    await user.click(screen.getByRole('button', { name: 'Crear Producto' }));
+
+    expect(toast.error).toHaveBeenCalledWith('El stock inicial no puede ser negativo');
+    expect(api.createProduct).not.toHaveBeenCalled();
+  });
+
+  it('blocks submit and shows an error when stock mínimo is negative', async () => {
+    const api = buildMockApi();
+    const user = userEvent.setup();
+    renderWithProviders(<Products api={api} />);
+
+    await waitFor(() => expect(screen.getByText('Torta de chocolate')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /Nuevo Producto/i }));
+    await user.type(screen.getByPlaceholderText('Nombre del producto'), 'Torta red velvet');
+    const priceInputs = screen.getAllByPlaceholderText('0');
+    await user.type(priceInputs[0], '200');
+    fireEvent.change(priceInputs[3], { target: { value: '-1' } }); // Stock mínimo
+
+    await user.click(screen.getByRole('button', { name: 'Crear Producto' }));
+
+    expect(toast.error).toHaveBeenCalledWith('El stock mínimo no puede ser negativo');
+    expect(api.createProduct).not.toHaveBeenCalled();
+  });
+
+  it('creates a product with an automatic restock quantity configured', async () => {
+    const api = buildMockApi();
+    const user = userEvent.setup();
+    renderWithProviders(<Products api={api} />);
+
+    await waitFor(() => expect(screen.getByText('Torta de chocolate')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /Nuevo Producto/i }));
+    await user.type(screen.getByPlaceholderText('Nombre del producto'), 'Empanadas de queso');
+    const priceInputs = screen.getAllByPlaceholderText('0');
+    await user.type(priceInputs[0], '5');
+    await user.type(screen.getByPlaceholderText('Sin reposición automática'), '20');
+
+    await user.click(screen.getByRole('button', { name: 'Crear Producto' }));
+
+    await waitFor(() => expect(api.createProduct).toHaveBeenCalled());
+    expect(api.createProduct).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Empanadas de queso', restockQuantity: 20 })
+    );
+  });
+
+  it('creates a product with no restock quantity (null) when left empty', async () => {
+    const api = buildMockApi();
+    const user = userEvent.setup();
+    renderWithProviders(<Products api={api} />);
+
+    await waitFor(() => expect(screen.getByText('Torta de chocolate')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /Nuevo Producto/i }));
+    await user.type(screen.getByPlaceholderText('Nombre del producto'), 'Brownie');
+    const priceInputs = screen.getAllByPlaceholderText('0');
+    await user.type(priceInputs[0], '5');
+
+    await user.click(screen.getByRole('button', { name: 'Crear Producto' }));
+
+    await waitFor(() => expect(api.createProduct).toHaveBeenCalled());
+    expect(api.createProduct).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Brownie', restockQuantity: null })
+    );
   });
 
   it('edits an existing product via the row edit button', async () => {
@@ -285,7 +367,107 @@ describe('Products - Productos tab', () => {
 
     await user.click(screen.getByRole('button', { name: /Agregar Stock/i }));
 
-    await waitFor(() => expect(api.addProductStock).toHaveBeenCalledWith({ productId: 'p1', quantity: 10 }));
+    await waitFor(() => expect(api.addProductStock).toHaveBeenCalledWith({ productId: 'p1', quantity: 10, locationType: 'store' }));
+  });
+
+  it('adds stock to the production location when selected in the stock dialog', async () => {
+    const api = buildMockApi();
+    const user = userEvent.setup();
+    renderWithProviders(<Products api={api} />);
+
+    await waitFor(() => expect(screen.getByText('Torta de chocolate')).toBeInTheDocument());
+
+    const row = screen.getByText('Torta de chocolate').closest('tr')!;
+    await user.click(within(row).getByTitle('Agregar stock'));
+
+    // p1's storeStock is 5 and productionStock is 0 (default fixture).
+    expect(screen.getByText('5 unidades')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Planta' }));
+    expect(screen.getByText('0 unidades')).toBeInTheDocument();
+
+    const qtyInput = screen.getByPlaceholderText('Cantidad');
+    await user.clear(qtyInput);
+    await user.type(qtyInput, '10');
+
+    await user.click(screen.getByRole('button', { name: /Agregar Stock/i }));
+
+    await waitFor(() => expect(api.addProductStock).toHaveBeenCalledWith({ productId: 'p1', quantity: 10, locationType: 'production' }));
+  });
+
+  it('hides the transfer button when there is no plant stock', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Products api={buildMockApi()} />);
+
+    await waitFor(() => expect(screen.getByText('Torta de chocolate')).toBeInTheDocument());
+    await user.click(within(screen.getByText('Torta de chocolate').closest('tr')!).getByTitle('Agregar stock'));
+
+    // p1 tiene productionStock 0
+    expect(screen.queryByRole('button', { name: 'Planta → Tienda' })).not.toBeInTheDocument();
+  });
+
+  it('transfers plant stock to the store and blocks quantities above plant stock', async () => {
+    const api = buildMockApi();
+    const user = userEvent.setup();
+    renderWithProviders(<Products api={api} />);
+
+    await waitFor(() => expect(screen.getByText('Cupcake vainilla')).toBeInTheDocument());
+
+    const row = screen.getByText('Cupcake vainilla').closest('tr')!;
+    await user.click(within(row).getByTitle('Agregar stock'));
+    await user.click(screen.getByRole('button', { name: 'Planta → Tienda' }));
+
+    // p2: planta 1, tienda 0 — pedir 2 no debe llamar a la API
+    const qtyInput = screen.getByPlaceholderText('Cantidad');
+    await user.clear(qtyInput);
+    await user.type(qtyInput, '2');
+    await user.click(screen.getByRole('button', { name: 'Trasladar a Tienda' }));
+    expect(api.transferStockToStore).not.toHaveBeenCalled();
+
+    await user.clear(qtyInput);
+    await user.type(qtyInput, '1');
+    expect(screen.getByText('Planta 0 · Tienda 1')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Trasladar a Tienda' }));
+
+    await waitFor(() => expect(api.transferStockToStore).toHaveBeenCalledWith('p2', 1));
+  });
+});
+
+describe('Products - recetas de materia prima', () => {
+  const materialsApi = {
+    getProductRecipe: vi.fn().mockResolvedValue({ baking: [], assembling: [], decorating: [] }),
+    saveProductRecipe: vi.fn().mockResolvedValue({}),
+    getCakeRecipe: vi.fn().mockResolvedValue({ baking: [], assembling: [] }),
+    saveCakeRecipe: vi.fn().mockResolvedValue({}),
+  } as any;
+  const inventoryApi = { getRawMaterials: vi.fn().mockResolvedValue([]) } as any;
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it('opens the recipe dialog of a product with its three stages', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Products api={buildMockApi()} materialsApi={materialsApi} inventoryApi={inventoryApi} />);
+
+    await waitFor(() => expect(screen.getByText('Torta de chocolate')).toBeInTheDocument());
+    const row = screen.getByText('Torta de chocolate').closest('tr')!;
+    await user.click(within(row).getByTitle('Receta'));
+
+    expect(await screen.findByText('Receta - Torta de chocolate')).toBeInTheDocument();
+    expect(materialsApi.getProductRecipe).toHaveBeenCalledWith('p1');
+    expect(inventoryApi.getRawMaterials).toHaveBeenCalled();
+    expect(screen.getByText('Horneado')).toBeInTheDocument();
+    expect(screen.getByText('Armado')).toBeInTheDocument();
+    expect(screen.getByText('Decoración')).toBeInTheDocument();
+  });
+
+  it('opens the cake recipe dialog with only baking and assembling', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Products api={buildMockApi()} materialsApi={materialsApi} inventoryApi={inventoryApi} />);
+
+    await user.click(await screen.findByRole('button', { name: /Receta de tortas/ }));
+
+    expect(await screen.findByText('Receta de tortas personalizadas')).toBeInTheDocument();
+    expect(materialsApi.getCakeRecipe).toHaveBeenCalled();
+    expect(screen.queryByText('Decoración')).not.toBeInTheDocument();
   });
 });
 

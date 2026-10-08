@@ -185,7 +185,9 @@ function buildMockApi(overrides: Partial<IOrdersApi> = {}): IOrdersApi {
     updateOrder: vi.fn().mockResolvedValue(orderWithCake),
     deleteOrder: vi.fn().mockResolvedValue(undefined),
     updateOrderStatus: vi.fn().mockResolvedValue(orderWithCake),
+    markOrderAtStore: vi.fn().mockResolvedValue(orderWithCake),
     advanceItemStage: vi.fn().mockResolvedValue(orderWithCake),
+    confirmRestock: vi.fn().mockResolvedValue(orderWithCake),
     getOrderProductionLog: vi.fn().mockResolvedValue([]),
     getFlavors: vi.fn().mockResolvedValue(flavors),
     getProducts: vi.fn().mockResolvedValue(products),
@@ -265,6 +267,75 @@ describe('Orders - loading & list states', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
     expect(screen.getByText('#ORD-001')).toBeInTheDocument();
     expect(screen.getByText('20p Chocolate')).toBeInTheDocument();
+  });
+
+  it('shows a delivery badge next to orders that need shipping (desktop), without hiding the status badge', async () => {
+    // deliveryAddress set, deliveryCost still 0 — either one alone should count as "needs shipping".
+    const shippedOrder: Order = { ...orderWithCake, id: '5', orderNumber: 'ORD-005', deliveryAddress: 'Av. Siempre Viva 123' };
+    const api = buildMockApi({ getOrders: vi.fn().mockResolvedValue([shippedOrder, orderWithCombo]) });
+    renderWithProviders(<Orders ordersApi={api} />);
+
+    await waitFor(() => expect(screen.getByText('Maria Lopez')).toBeInTheDocument());
+
+    const shippedRow = screen.getByText('#ORD-005').closest('tr')!;
+    expect(within(shippedRow).getByTitle('Pedido con envío a domicilio')).toBeInTheDocument();
+    // Status badge is untouched by the delivery indicator.
+    expect(within(shippedRow).getByText('Pendiente')).toBeInTheDocument();
+
+    const nonShippedRow = screen.getByText('Juan Perez').closest('tr')!;
+    expect(within(nonShippedRow).queryByTitle('Pedido con envío a domicilio')).not.toBeInTheDocument();
+    expect(within(nonShippedRow).getByText('Horneando')).toBeInTheDocument();
+  });
+
+  it('shows a delivery badge next to orders that need shipping (mobile)', async () => {
+    mockedUseIsMobile.mockReturnValue(true);
+    const shippedOrder: Order = { ...orderWithCake, id: '5', orderNumber: 'ORD-005', deliveryCost: 15 };
+    const api = buildMockApi({ getOrders: vi.fn().mockResolvedValue([shippedOrder, orderWithCombo]) });
+    renderWithProviders(<Orders ordersApi={api} />);
+
+    await waitFor(() => expect(screen.getByText('Maria Lopez')).toBeInTheDocument());
+
+    expect(screen.getByTitle('Pedido con envío a domicilio')).toBeInTheDocument();
+    expect(screen.getByText('Pendiente')).toBeInTheDocument();
+  });
+
+  it('shows a location badge for ready orders (desktop), but not for orders still in earlier stages', async () => {
+    const readyInProduction: Order = { ...orderWithCake, id: '5', orderNumber: 'ORD-005', customerName: 'Rosa Mendez', status: 'ready', currentLocationType: 'production' };
+    const readyAtStore: Order = { ...orderWithCake, id: '6', orderNumber: 'ORD-006', customerName: 'Lucia Flores', status: 'ready', currentLocationType: 'store' };
+    const api = buildMockApi({ getOrders: vi.fn().mockResolvedValue([readyInProduction, readyAtStore, orderWithCombo]) });
+    renderWithProviders(<Orders ordersApi={api} />);
+
+    await waitFor(() => expect(screen.getByText('Juan Perez')).toBeInTheDocument());
+
+    const inProductionRow = screen.getByText('#ORD-005').closest('tr')!;
+    expect(within(inProductionRow).getByText('En planta')).toBeInTheDocument();
+
+    const atStoreRow = screen.getByText('#ORD-006').closest('tr')!;
+    expect(within(atStoreRow).getByText('En tienda')).toBeInTheDocument();
+
+    // orderWithCombo is 'baking' — too early for a location badge to be useful.
+    const bakingRow = screen.getByText('Juan Perez').closest('tr')!;
+    expect(within(bakingRow).queryByText('En planta')).not.toBeInTheDocument();
+    expect(within(bakingRow).queryByText('En tienda')).not.toBeInTheDocument();
+  });
+
+  it('opens the detail dialog with a "mark at store" button for a ready order still in production, and calls markOrderAtStore', async () => {
+    const readyInProduction: Order = { ...orderWithCake, id: '5', orderNumber: 'ORD-005', status: 'ready', currentLocationType: 'production' };
+    const api = buildMockApi({
+      getOrders: vi.fn().mockResolvedValue([readyInProduction]),
+      getOrderById: vi.fn().mockResolvedValue(readyInProduction),
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<Orders ordersApi={api} />);
+
+    await waitFor(() => expect(screen.getByText('#ORD-005')).toBeInTheDocument());
+    await user.click(screen.getByText('#ORD-005'));
+
+    const button = await screen.findByRole('button', { name: /Marcar como trasladado a tienda/ });
+    await user.click(button);
+
+    expect(api.markOrderAtStore).toHaveBeenCalledWith('5');
+    await waitFor(() => expect(api.getOrders).toHaveBeenCalledTimes(2)); // initial load + reload after marking
   });
 });
 
@@ -384,19 +455,31 @@ describe('Orders - row/card click opens detail dialog', () => {
     expect(screen.queryByText('Pedido #ORD-001')).not.toBeInTheDocument();
   });
 
-  it('desktop: clicking Eliminar does not open the detail dialog and calls deleteOrder', async () => {
+  it('desktop: the row has no delete button; cancelling is only offered from inside the detail dialog', async () => {
     const api = buildMockApi();
-    const user = userEvent.setup();
     renderWithProviders(<Orders ordersApi={api} />);
 
     await waitFor(() => expect(screen.getByText('Maria Lopez')).toBeInTheDocument());
 
     const row = screen.getByText('Maria Lopez').closest('tr')!;
-    await user.click(within(row).getByRole('button', { name: /Eliminar/i }));
+    expect(within(row).queryByRole('button', { name: /Eliminar/i })).not.toBeInTheDocument();
+  });
 
-    await waitFor(() => expect(api.deleteOrder).toHaveBeenCalledWith('1'));
-    expect(screen.queryByText('Pedido #ORD-001')).not.toBeInTheDocument();
-    expect(toast.success).toHaveBeenCalledWith('Pedido eliminado exitosamente');
+  it('desktop: hides the Editar button for a cancelled or delivered order', async () => {
+    const api = buildMockApi({
+      getOrders: vi.fn().mockResolvedValue([
+        { ...orderWithCake, status: 'cancelled' },
+        { ...orderWithCombo, status: 'delivered' },
+      ]),
+    });
+    renderWithProviders(<Orders ordersApi={api} />);
+
+    await waitFor(() => expect(screen.getByText('Maria Lopez')).toBeInTheDocument());
+
+    const cancelledRow = screen.getByText('Maria Lopez').closest('tr')!;
+    const deliveredRow = screen.getByText('Juan Perez').closest('tr')!;
+    expect(within(cancelledRow).queryByRole('button', { name: /Editar/i })).not.toBeInTheDocument();
+    expect(within(deliveredRow).queryByRole('button', { name: /Editar/i })).not.toBeInTheDocument();
   });
 
   it('desktop: the row status is a read-only badge, not an editable select, and clicking it does not open the detail dialog', async () => {

@@ -13,6 +13,7 @@ import {
   ChefHat,
   Palette,
   Hammer,
+  PackagePlus,
   LogOut,
   Menu,
   X
@@ -44,12 +45,13 @@ const navItems: NavItem[] = [
   { icon: Hammer, label: 'Armado', href: '/assembly', roles: ['assembler', 'admin'] },
   { icon: Palette, label: 'Decoración', href: '/decoration', roles: ['designer', 'admin'] },
   { icon: Truck, label: 'Delivery', href: '/delivery', roles: ['delivery', 'admin'] },
+  { icon: PackagePlus, label: 'Reposición', href: '/restock', roles: ['admin', 'baker', 'assembler', 'designer'] },
   { icon: CreditCard, label: 'Caja', href: '/cash-register', roles: ['admin', 'seller'] },
   { icon: Users, label: 'Usuarios', href: '/users', roles: ['admin'] },
   { icon: Settings, label: 'Configuración', href: '/settings', roles: ['admin'] },
 ];
 
-function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarContent({ onNavigate, hideBrand = false }: { onNavigate?: () => void; hideBrand?: boolean }) {
   const { user, logout, hasAnyRole } = useAuth();
   const location = useLocation();
 
@@ -63,18 +65,22 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <>
-      {/* Logo */}
-      <div className="p-6">
-        <h1 className="font-display text-2xl font-bold text-sidebar-primary">
-          La Casa de Mi Padre
-        </h1>
-        <p className="text-sm text-sidebar-foreground/60 mt-1">Repostería Artesanal</p>
-      </div>
+      {/* Logo (oculto en mobile para dar más espacio a la navegación) */}
+      {!hideBrand && (
+        <>
+          <div className="p-6">
+            <h1 className="font-display text-2xl font-bold text-sidebar-primary">
+              La Casa de Mi Padre
+            </h1>
+            <p className="text-sm text-sidebar-foreground/60 mt-1">Repostería Artesanal</p>
+          </div>
 
-      <Separator className="bg-sidebar-border" />
+          <Separator className="bg-sidebar-border" />
+        </>
+      )}
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 overflow-y-auto scrollbar-thin">
+      <nav className={cn("flex-1 p-4 overflow-y-auto scrollbar-thin min-h-0", hideBrand && "pt-10")}>
         <ul className="space-y-1">
           {filteredNavItems.map((item) => {
             const isActive = location.pathname === item.href;
@@ -146,16 +152,17 @@ export function AppSidebar() {
     return (
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Abrir menú"
             className="fixed top-4 left-4 z-50 bg-background shadow-md"
           >
             <Menu className="h-5 w-5" />
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="p-0 w-64 bg-sidebar text-sidebar-foreground">
-          <SidebarContent onNavigate={() => setOpen(false)} />
+        <SheetContent side="left" className="flex flex-col p-0 w-64 bg-sidebar text-sidebar-foreground">
+          <SidebarContent onNavigate={() => setOpen(false)} hideBrand />
         </SheetContent>
       </Sheet>
     );

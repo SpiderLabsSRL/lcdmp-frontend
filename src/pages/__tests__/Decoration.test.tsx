@@ -164,7 +164,7 @@ describe('Decoration', () => {
     expect(screen.getByText(/🎨 Flores rosas/)).toBeInTheDocument();
     expect(screen.getByText('Mesa dulce: 15 Macarons')).toBeInTheDocument();
     expect(screen.getByText('Mesa dulce: 6 Cupcakes decorados')).toBeInTheDocument();
-    expect(screen.getByText('Torta express')).toBeInTheDocument();
+    expect(screen.getByText('1 Torta express')).toBeInTheDocument();
 
     expect(screen.getByText('Pendientes de decorar')).toBeInTheDocument();
     expect(screen.getByText('4')).toBeInTheDocument();

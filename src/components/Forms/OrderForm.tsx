@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NumberInput } from '@/components/ui/number-input';
+import { TimePicker } from '@/components/ui/time-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Banknote, Plus, QrCode, X } from 'lucide-react';
 import { format } from 'date-fns';
@@ -124,7 +126,7 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
 
   const cakeFlavors = flavors.filter((f: any) => f.type === 'cake' && f.isActive);
   const fillingFlavors = flavors.filter((f: any) => f.type === 'filling' && f.isActive);
-  const catalogProducts = products.filter((p: any) => p.isActive && p.location === 'store');
+  const catalogProducts = products.filter((p: any) => p.isActive);
 
   const addCake = () => {
     const newCake: Partial<CustomCake> = {
@@ -392,12 +394,9 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
         </div>
         <div className="space-y-1.5 sm:space-y-2">
           <Label className="text-sm">Hora de entrega *</Label>
-          <Input 
-            type="time" 
-            required 
-            className="text-sm"
-            value={formData.pickupTime || ''}
-            onChange={(e) => updateFormField('pickupTime', e.target.value)}
+          <TimePicker
+            value={formData.pickupTime || '12:00'}
+            onChange={(v) => updateFormField('pickupTime', v)}
           />
         </div>
       </div>
@@ -530,11 +529,11 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-sm">Cantidad</Label>
-                  <Input 
-                    type="number" 
+                  <NumberInput
                     min="1"
-                    value={cake.quantity || 1}
-                    onChange={(e) => updateCake(index, 'quantity', parseInt(e.target.value))}
+                    value={cake.quantity}
+                    onChange={(v) => updateCake(index, 'quantity', v)}
+                    fallback={1}
                     className="text-sm"
                   />
                 </div>
@@ -675,13 +674,14 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
 
               <div className="space-y-1.5">
                 <Label className="text-sm">Precio (Bs.) *</Label>
-                <Input 
-                  type="number"
-                  placeholder="0" 
+                <NumberInput
+                  placeholder="0"
                   required
                   className="text-sm"
-                  value={cake.price || ''}
-                  onChange={(e) => updateCake(index, 'price', parseFloat(e.target.value))}
+                  value={cake.price}
+                  onChange={(v) => updateCake(index, 'price', v)}
+                  decimal
+                  fallback={0}
                 />
               </div>
             </div>
@@ -739,21 +739,44 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-sm">Cantidad *</Label>
-                  <Input 
-                    type="number" 
+                  <NumberInput
                     min="1"
                     required
                     value={item.quantity}
-                    onChange={(e) => updateProduct(index, 'quantity', parseInt(e.target.value))}
+                    onChange={(v) => updateProduct(index, 'quantity', v)}
+                    fallback={1}
                     className="text-sm"
                   />
                 </div>
               </div>
-              
+              {item.productId && (() => {
+                const catalogProduct = catalogProducts.find((cp: any) => cp.id === item.productId);
+                const available = (catalogProduct?.storeStock ?? 0) - (catalogProduct?.reservedStock ?? 0);
+                return (
+                  <div className="space-y-1">
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-primary"
+                        checked={!!item.fromStock}
+                        onChange={(e) => updateProduct(index, 'fromStock', e.target.checked)}
+                      />
+                      <span>Usar de stock</span>
+                      <span className="text-muted-foreground">(disponible en tienda: {Math.max(available, 0)})</span>
+                    </label>
+                    {item.fromStock && (
+                      <p className="text-xs text-muted-foreground">
+                        Queda lista de inmediato. El stock se descuenta al entregar y se reserva el día de retiro.
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+
               <div className="space-y-1.5">
                 <Label className="text-sm">Notas (opcional)</Label>
-                <Input 
-                  placeholder="Ej: Sin gluten, decoración especial..." 
+                <Input
+                  placeholder="Ej: Sin gluten, decoración especial..."
                   className="text-sm"
                   value={item.notes || ''}
                   onChange={(e) => updateProduct(index, 'notes', e.target.value)}
@@ -845,12 +868,12 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
                         </div>
                         <div className="space-y-1">
                           <Label className="text-xs">Cantidad</Label>
-                          <Input
-                            type="number"
+                          <NumberInput
                             min="0"
                             className="text-sm"
                             value={p.quantity}
-                            onChange={(e) => updateComboProduct(comboIndex, productIndex, 'quantity', parseInt(e.target.value) || 0)}
+                            onChange={(v) => updateComboProduct(comboIndex, productIndex, 'quantity', v)}
+                            fallback={0}
                           />
                         </div>
                         <Button
@@ -930,12 +953,12 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Cantidad</Label>
-                    <Input
-                      type="number"
+                    <NumberInput
                       min="1"
                       className="text-sm"
                       value={extra.quantity}
-                      onChange={(e) => updateExtra(index, 'quantity', parseInt(e.target.value) || 0)}
+                      onChange={(v) => updateExtra(index, 'quantity', v)}
+                      fallback={1}
                     />
                   </div>
                   <div className="space-y-1">
@@ -978,12 +1001,13 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label className="text-sm">Costo de envío</Label>
-            <Input 
-              type="number" 
-              placeholder="0" 
+            <NumberInput
+              placeholder="0"
               className="text-sm"
-              value={formData.deliveryCost || 0}
-              onChange={(e) => updateFormField('deliveryCost', parseFloat(e.target.value))}
+              value={formData.deliveryCost}
+              onChange={(v) => updateFormField('deliveryCost', v)}
+              decimal
+              fallback={0}
             />
           </div>
           {/*
@@ -1005,23 +1029,25 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="space-y-1.5">
             <Label className="text-sm">Adelanto *</Label>
-            <Input 
-              type="number" 
-              placeholder="0" 
+            <NumberInput
+              placeholder="0"
               required
               className="text-sm"
-              value={formData.deposit || 0}
-              onChange={(e) => updateFormField('deposit', parseFloat(e.target.value))}
+              value={formData.deposit}
+              onChange={(v) => updateFormField('deposit', v)}
+              decimal
+              fallback={0}
             />
           </div>
           <div className="space-y-1.5">
             <Label className="text-sm">Descuento</Label>
-            <Input 
-              type="number" 
-              placeholder="0" 
+            <NumberInput
+              placeholder="0"
               className="text-sm"
-              value={formData.discount || 0}
-              onChange={(e) => updateFormField('discount', parseFloat(e.target.value))}
+              value={formData.discount}
+              onChange={(v) => updateFormField('discount', v)}
+              decimal
+              fallback={0}
             />
           </div>
         </div>

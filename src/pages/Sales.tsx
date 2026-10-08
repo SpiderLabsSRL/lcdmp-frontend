@@ -8,7 +8,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Search, ShoppingCart, QrCode, Banknote, X, Minus, Plus as PlusIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { CartItem, Product } from '@/types';
-import { ISalesApi, defaultSalesApi, SaleData } from '@/api/SalesApi';
+import { ISalesApi, defaultSalesApi, SaleData, ReservationConflict, ReservationConflictError } from '@/api/SalesApi';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface SalesProps {
   api?: ISalesApi;
@@ -23,6 +33,7 @@ export default function Sales({ api = defaultSalesApi }: SalesProps) {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [conflicts, setConflicts] = useState<ReservationConflict[] | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -93,7 +104,7 @@ export default function Sales({ api = defaultSalesApi }: SalesProps) {
 
   const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
-  const completeSale = async () => {
+  const completeSale = async (overrideReservation = false) => {
     const saleData: SaleData = {
       items: cart.map(item => ({
         productId: item.productId,
@@ -103,11 +114,15 @@ export default function Sales({ api = defaultSalesApi }: SalesProps) {
       total,
       paymentMethod,
       timestamp: new Date(),
+      overrideReservation,
     };
 
     try {
       await api.createSale(saleData);
       toast.success(`Venta completada por Bs. ${total} (${paymentMethod === 'cash' ? 'Efectivo' : 'QR'})`);
+      if (overrideReservation) {
+        toast.info('Las líneas de pedido afectadas pasaron a producción');
+      }
       setCart([]);
       setIsDialogOpen(false);
       setIsCartOpen(false);
@@ -115,6 +130,11 @@ export default function Sales({ api = defaultSalesApi }: SalesProps) {
       const updatedProducts = await api.getProducts(debouncedSearchTerm);
       setProducts(updatedProducts);
     } catch (error) {
+      if (error instanceof ReservationConflictError) {
+        setIsDialogOpen(false);
+        setConflicts(error.conflicts);
+        return;
+      }
       toast.error(error.toString());
       console.error(error);
     }
@@ -188,7 +208,7 @@ export default function Sales({ api = defaultSalesApi }: SalesProps) {
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 mt-1 sm:mt-2">
                         <span className="font-bold text-primary text-sm sm:text-base">Bs. {product.basePrice}</span>
                         <Badge variant="secondary" className="text-xs w-fit">
-                          {product.stock} u.
+                          {product.stock} u.{product.reservedStock ? ` (${product.reservedStock} reserv.)` : ''}
                         </Badge>
                       </div>
                     </CardContent>
@@ -358,7 +378,7 @@ export default function Sales({ api = defaultSalesApi }: SalesProps) {
                             </div>
                           )}
 
-                          <Button className="w-full" size="default" onClick={completeSale}>
+                          <Button className="w-full" size="default" onClick={() => completeSale()}>
                             Confirmar Venta
                           </Button>
                         </div>
@@ -378,6 +398,34 @@ export default function Sales({ api = defaultSalesApi }: SalesProps) {
             </Card>
           </div>
         </div>
+
+        <AlertDialog open={!!conflicts} onOpenChange={(open) => { if (!open) setConflicts(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Stock reservado para pedidos de hoy</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta venta usa unidades reservadas. Si continúas, estas líneas pasarán a producción
+                y habrá que reponer el stock para volver a marcarlas como "usar de stock":
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <ul className="text-sm space-y-1">
+              {(conflicts || []).flatMap(c =>
+                c.lines.map(line => (
+                  <li key={line.id}>
+                    <span className="font-medium">{products.find(p => p.id === c.productId)?.name}</span>
+                    {' — '}{line.orderNumber}, {line.quantity} u., retira {line.pickupTime || 'sin hora'}
+                  </li>
+                ))
+              )}
+            </ul>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={() => { setConflicts(null); completeSale(true); }}>
+                Vender y mandar a producción
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {isCartOpen && (
           <div 

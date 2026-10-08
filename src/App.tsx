@@ -16,6 +16,7 @@ import Baking from "./pages/Baking";
 import Assembly from "./pages/Assembly";
 import Decoration from "./pages/Decoration";
 import Delivery from "./pages/Delivery";
+import Restock from "./pages/Restock";
 import CashRegister from "./pages/CashRegister";
 import Users from "./pages/Users";
 import Settings from "./pages/Settings";
@@ -43,6 +44,7 @@ const App = () => (
             <Route path="/assembly" element={<ProtectedRoute requiredRoles={['admin', 'assembler']}><Assembly /></ProtectedRoute>} />
             <Route path="/decoration" element={<ProtectedRoute requiredRoles={['admin', 'designer']}><Decoration /></ProtectedRoute>} />
             <Route path="/delivery" element={<ProtectedRoute requiredRoles={['admin', 'delivery']}><Delivery /></ProtectedRoute>} />
+            <Route path="/restock" element={<ProtectedRoute requiredRoles={['admin', 'baker', 'assembler', 'designer']}><Restock /></ProtectedRoute>} />
             <Route path="/cash-register" element={<ProtectedRoute requiredRoles={['admin']}><CashRegister /></ProtectedRoute>} />
             <Route path="/users" element={<ProtectedRoute requiredRoles={['admin']}><Users /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute requiredRoles={['admin']}><Settings /></ProtectedRoute>} />

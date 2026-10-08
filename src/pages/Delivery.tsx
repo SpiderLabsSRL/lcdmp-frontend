@@ -7,14 +7,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { MobileCard, useIsMobile } from '@/components/ui/responsive-table';
-import { Truck, Clock, MapPin, Phone, CheckCircle, Package, Navigation, Loader2, Wifi, WifiOff } from 'lucide-react';
+import { Truck, Clock, MapPin, Phone, CheckCircle, Package, Navigation, Loader2, Wifi, WifiOff, Banknote, QrCode } from 'lucide-react';
 import { format, differenceInHours } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { IDeliveryApi, defaultDeliveryApi } from '@/api/DeliveryApi';
 import { useOrdersSocket } from '@/hooks/useOrdersSocket';
-import type { Order } from '@/types';
+import type { Order, PaymentMethod } from '@/types';
 import { hoursUntilPickupDateTime } from '@/utils/DateUtils';
+import { isDeliveryOrder } from '@/utils/orderUtils';
 
 interface DeliveryProps {
   deliveryApi?: IDeliveryApi;
@@ -25,22 +26,31 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
   const [deliveryNotes, setDeliveryNotes] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [initialOrders, setInitialOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Socket en tiempo real — filtra solo pedidos con status 'ready'
   const { orders: allReadyOrders, isConnected } = useOrdersSocket({
     statusFilter: ['ready'],
+    excludeOrderType: 'restock',
     initialOrders,
   });
 
+  // Un pedido 'ready' recién puede aparecer acá si ya se puede entregar:
+  // - Recogida en tienda: tiene que estar YA trasladado a la tienda, no basta
+  //   con estar 'ready' (puede seguir esperando en planta).
+  // - Envío a domicilio: se puede despachar directo desde planta, el
+  //   repartidor lo recoge ahí sin pasar por la tienda.
+  const visibleOrders = allReadyOrders.filter(o => isDeliveryOrder(o) || o.currentLocationType === 'store');
+
   // Separar entre entregas a domicilio y recogidas en tienda
-  const deliveryOrders = allReadyOrders
-    .filter(o => o.deliveryAddress)
+  const deliveryOrders = visibleOrders
+    .filter(isDeliveryOrder)
     .sort((a, b) => differenceInHours(a.pickupDate, new Date()) - differenceInHours(b.pickupDate, new Date()));
 
-  const pickupOrders = allReadyOrders
-    .filter(o => !o.deliveryAddress)
+  const pickupOrders = visibleOrders
+    .filter(o => !isDeliveryOrder(o))
     .sort((a, b) => differenceInHours(a.pickupDate, new Date()) - differenceInHours(b.pickupDate, new Date()));
 
   useEffect(() => {
@@ -70,12 +80,13 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
   const completeDelivery = async () => {
     if (!selectedOrder) return;
     try {
-      await deliveryApi.completeDelivery(selectedOrder.id);
+      await deliveryApi.completeDelivery(selectedOrder.id, paymentMethod);
       // El socket actualizará la lista automáticamente via order:status_changed
       toast.success('Entrega completada exitosamente');
       setIsCompleteDialogOpen(false);
       setSelectedOrder(null);
       setDeliveryNotes('');
+      setPaymentMethod('cash');
     } catch (error) {
       toast.error('Error al completar la entrega');
     }
@@ -151,7 +162,7 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
               </div>
               <div className="min-w-0">
                 <p className="text-lg sm:text-2xl font-bold">
-                  {allReadyOrders.filter(o => differenceInHours(o.pickupDate, new Date()) < 2).length}
+                  {visibleOrders.filter(o => differenceInHours(o.pickupDate, new Date()) < 2).length}
                 </p>
                 <p className="text-xs sm:text-sm  truncate">Urgentes (&lt;2h)</p>
               </div>
@@ -228,10 +239,12 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
                               )}
                             </div>
                             <div  className="text-xs bg-muted/50 p-2 rounded">
-                              <div className="flex items-start gap-2 text-xs ">
-                                <MapPin className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
-                                <span className="line-clamp-2">{order.deliveryAddress}</span>
-                              </div>
+                              {order.deliveryAddress && (
+                                <div className="flex items-start gap-2 text-xs ">
+                                  <MapPin className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                                  <span className="line-clamp-2">{order.deliveryAddress}</span>
+                                </div>
+                              )}
                               <div className="flex items-start gap-2 text-xs">
                                 <a href={`tel:${order.customerPhone}`} className="text-primary flex items-center gap-1">
                                   <Phone className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
@@ -318,10 +331,12 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
                           {order.notes && (
                             <p className="text-sm whitespace-pre-wrap">📝 {order.notes}</p>
                           )}
-                          <div className='flex items-start gap-1 mt-2 text-sm '>
-                            <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                            <span className="break-words">{order.deliveryAddress}</span>
-                          </div>
+                          {order.deliveryAddress && (
+                            <div className='flex items-start gap-1 mt-2 text-sm '>
+                              <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                              <span className="break-words">{order.deliveryAddress}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -344,15 +359,17 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
                       </div>
 
                       <div className="flex flex-col gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => openMaps(order.deliveryAddress!)}
-                        >
-                          <Navigation className="h-4 w-4 mr-1" />
-                          Mapa
-                        </Button>
-                        <Button 
+                        {order.deliveryAddress && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openMaps(order.deliveryAddress!)}
+                          >
+                            <Navigation className="h-4 w-4 mr-1" />
+                            Mapa
+                          </Button>
+                        )}
+                        <Button
                           size="sm"
                           onClick={() => { setSelectedOrder(order); setIsCompleteDialogOpen(true); }}
                         >
@@ -585,6 +602,30 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
                     </p>
                   </div>
                 )}
+
+                <div className="space-y-2">
+                  <Label className="text-sm">Método de pago del saldo</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant={paymentMethod === 'cash' ? 'default' : 'outline'}
+                      onClick={() => setPaymentMethod('cash')}
+                      className="w-full"
+                    >
+                      <Banknote className="h-4 w-4 mr-2" />
+                      Efectivo
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={paymentMethod === 'qr' ? 'default' : 'outline'}
+                      onClick={() => setPaymentMethod('qr')}
+                      className="w-full"
+                    >
+                      <QrCode className="h-4 w-4 mr-2" />
+                      QR
+                    </Button>
+                  </div>
+                </div>
 
                 <div className="space-y-2">
                   <Label className="text-sm">Notas de entrega (opcional)</Label>

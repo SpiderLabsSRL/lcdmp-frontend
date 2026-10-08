@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
 import Sales from '../Sales';
 import type { Product } from '@/types';
-import type { ISalesApi } from '@/api/SalesApi';
+import { ReservationConflictError, type ISalesApi } from '@/api/SalesApi';
 
 const renderWithProviders = (ui: React.ReactElement) =>
   render(
@@ -23,8 +23,9 @@ const cupcake: Product = {
   portionSize: 1,
   pricePerPortion: 15,
   isActive: true,
-  location: 'store',
   stock: 10,
+  storeStock: 10,
+  productionStock: 0,
   minStock: 2,
 };
 
@@ -37,8 +38,9 @@ const cookie: Product = {
   portionSize: 1,
   pricePerPortion: 5,
   isActive: true,
-  location: 'store',
   stock: 20,
+  storeStock: 20,
+  productionStock: 0,
   minStock: 5,
 };
 
@@ -107,6 +109,34 @@ describe('Sales', () => {
 
     await waitFor(() => expect(screen.getByText('Subtotal: Bs. 30')).toBeInTheDocument());
     expect(screen.getByText('Bs. 30')).toBeInTheDocument(); // cart total
+  });
+
+  it('asks for confirmation when the sale would take reserved stock and retries with overrideReservation', async () => {
+    const conflict = {
+      productId: 'p1',
+      lines: [{ id: 'oi-1', orderId: 'o1', quantity: 1, orderNumber: 'ORD-2026-0042', pickupDate: '2026-10-02', pickupTime: '18:00' }],
+    };
+    const createSale = vi.fn()
+      .mockRejectedValueOnce(new ReservationConflictError('reservado', [conflict]))
+      .mockResolvedValueOnce(undefined);
+    const mockApi = buildMockApi({ getProducts: vi.fn().mockResolvedValue([cupcake]), createSale });
+    const user = userEvent.setup();
+    renderWithProviders(<Sales api={mockApi} />);
+
+    await screen.findByText('Cupcake de vainilla');
+    await user.click(screen.getByText('Cupcake de vainilla'));
+    await user.click(screen.getByRole('button', { name: 'Cobrar' }));
+    await user.click(await screen.findByRole('button', { name: 'Confirmar Venta' }));
+
+    expect(await screen.findByText('Stock reservado para pedidos de hoy')).toBeInTheDocument();
+    expect(screen.getByText(/ORD-2026-0042/)).toBeInTheDocument();
+    expect(createSale).toHaveBeenCalledTimes(1);
+    expect(createSale.mock.calls[0][0].overrideReservation).toBe(false);
+
+    await user.click(screen.getByRole('button', { name: 'Vender y mandar a producción' }));
+
+    await waitFor(() => expect(createSale).toHaveBeenCalledTimes(2));
+    expect(createSale.mock.calls[1][0].overrideReservation).toBe(true);
   });
 
   it('completes a sale with the cart contents and clears the cart afterward', async () => {

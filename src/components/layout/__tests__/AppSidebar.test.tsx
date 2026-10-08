@@ -13,8 +13,11 @@ vi.mock('@/api/api', () => ({
   },
 }));
 
+vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: vi.fn(() => false) }));
+
 import { AuthProvider } from '@/contexts/AuthContext';
 import { AppSidebar } from '../AppSidebar';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 function setLoggedInUser(roles: string[]) {
   localStorage.setItem(
@@ -38,6 +41,7 @@ describe('AppSidebar', () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
+    vi.mocked(useIsMobile).mockReturnValue(false);
   });
 
   it('shows every nav item for an admin user', async () => {
@@ -91,5 +95,50 @@ describe('AppSidebar', () => {
 
     await waitFor(() => expect(localStorage.getItem('bakery_user')).toBeNull());
     expect(sessionStorage.getItem('token')).toBeNull();
+  });
+
+  it('shows the brand title on desktop', async () => {
+    setLoggedInUser(['admin']);
+    renderSidebar();
+
+    await waitFor(() => expect(screen.getByText('Test User')).toBeInTheDocument());
+    expect(screen.getByText('La Casa de Mi Padre')).toBeInTheDocument();
+    expect(screen.getByText('Repostería Artesanal')).toBeInTheDocument();
+  });
+});
+
+describe('AppSidebar - mobile menu', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+    vi.mocked(useIsMobile).mockReturnValue(true);
+  });
+
+  it('hides the brand title to save vertical space, and lets the nav scroll independently so the last items and "Cerrar Sesión" stay reachable', async () => {
+    setLoggedInUser(['admin']);
+    renderSidebar();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: 'Abrir menú' }));
+    await waitFor(() => expect(screen.getByText('Test User')).toBeInTheDocument());
+
+    // "Elimina las letras" — no brand title/subtitle on mobile.
+    expect(screen.queryByText('La Casa de Mi Padre')).not.toBeInTheDocument();
+    expect(screen.queryByText('Repostería Artesanal')).not.toBeInTheDocument();
+
+    // The sheet is a bounded flex column so only <nav> scrolls, keeping the
+    // header/footer (and "Cerrar Sesión") always on screen regardless of
+    // how many nav items are visible for the user's roles.
+    const sheetContent = screen.getByRole('link', { name: 'Inicio' }).closest('[role="dialog"]') as HTMLElement;
+    expect(sheetContent.className).toContain('flex');
+    expect(sheetContent.className).toContain('flex-col');
+
+    const nav = screen.getByRole('navigation');
+    expect(nav.className).toContain('flex-1');
+    expect(nav.className).toContain('overflow-y-auto');
+    expect(nav.className).toContain('min-h-0');
+
+    expect(screen.getByText('Cerrar Sesión')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Configuración' })).toBeInTheDocument();
   });
 });
