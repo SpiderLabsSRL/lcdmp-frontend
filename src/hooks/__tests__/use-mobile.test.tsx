@@ -78,6 +78,21 @@ describe('useIsMobile', () => {
     expect(result.current).toBe(true);
   });
 
+  it('is already correct on the very first render (no desktop flash on narrow screens)', () => {
+    mockMatchMedia();
+    setInnerWidth(700);
+    const rendered: boolean[] = [];
+
+    renderHook(() => {
+      const value = useIsMobile();
+      rendered.push(value);
+      return value;
+    });
+
+    expect(rendered[0]).toBe(true);
+    expect(rendered.every(Boolean)).toBe(true);
+  });
+
   it('updates when the media query change event fires after a resize', () => {
     const { triggerChange } = mockMatchMedia();
     setInnerWidth(1024);
