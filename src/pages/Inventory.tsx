@@ -337,7 +337,7 @@ function InventoryHeader({
   onAddBaked: () => void;
 }) {
   return (
-    <div className="px-4 sm:px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className="px-4 sm:px-6 flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3">
       <div>
         <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground">
           Inventario
@@ -347,7 +347,7 @@ function InventoryHeader({
         </p>
       </div>
       
-      <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 w-full sm:w-auto">
         <Button 
           variant="outline" 
           size="icon"

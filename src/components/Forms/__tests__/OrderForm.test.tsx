@@ -285,6 +285,58 @@ describe('OrderForm - custom cakes', () => {
   });
 });
 
+describe('OrderForm - porciones de torta', () => {
+  const openCake = async (user: ReturnType<typeof userEvent.setup>) => {
+    renderForm();
+    await user.click(screen.getByLabelText('Torta personalizada'));
+    const card = screen.getByText('Torta #1').closest('.relative') as HTMLElement;
+    return { card, portions: within(card).getAllByRole('combobox')[0] };
+  };
+
+  it('offers only the common sizes plus "Otra cantidad..."', async () => {
+    const user = userEvent.setup();
+    const { portions } = await openCake(user);
+
+    await user.click(portions);
+
+    const options = screen.getAllByRole('option').map(o => o.textContent);
+    expect(options).toEqual([
+      '10 porciones', '15 porciones', '20 porciones', '30 porciones', '40 porciones', '50 porciones', 'Otra cantidad...',
+    ]);
+  });
+
+  it('selects a preset', async () => {
+    const user = userEvent.setup();
+    const { portions } = await openCake(user);
+
+    await chooseOption(user, portions, '40 porciones');
+
+    expect(portions).toHaveTextContent('40 porciones');
+  });
+
+  it('lets the user type any other number of portions with "Otra cantidad"', async () => {
+    const user = userEvent.setup();
+    const { card, portions } = await openCake(user);
+
+    await chooseOption(user, portions, 'Otra cantidad...');
+    const custom = within(card).getByLabelText('Porciones personalizadas');
+    setNumberValue(custom, '250');
+
+    expect(custom).toHaveValue(250);
+    expect(portions).toHaveTextContent('Otra cantidad...');
+  });
+
+  it('hides the custom input again when a preset is chosen', async () => {
+    const user = userEvent.setup();
+    const { card, portions } = await openCake(user);
+
+    await chooseOption(user, portions, 'Otra cantidad...');
+    await chooseOption(user, portions, '20 porciones');
+
+    expect(within(card).queryByLabelText('Porciones personalizadas')).not.toBeInTheDocument();
+  });
+});
+
 describe('OrderForm - catalog products', () => {
   it('adds a catalog item, selects a product and updates the quantity/subtotal', async () => {
     const user = userEvent.setup();
@@ -549,7 +601,7 @@ describe('OrderForm - editing an existing order', () => {
     orderType: 'mixed',
     customerName: 'Juana Perez',
     customerPhone: '70011122',
-    pickupDate: new Date(2026, 9, 10),
+    pickupDate: new Date(2099, 9, 10),
     pickupTime: '15:30',
     status: 'pending',
     items: [{ productId: 'p2', product: products[1], quantity: 2, price: 10 }],
@@ -601,7 +653,7 @@ describe('OrderForm - editing an existing order', () => {
     expect(screen.getByPlaceholderText('Número de teléfono')).toHaveValue('70011122');
 
     const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement;
-    expect(dateInput.value).toBe('2026-10-10');
+    expect(dateInput.value).toBe('2099-10-10');
     expect(screen.getByRole('button', { name: '15:30' })).toBeInTheDocument();
 
     // Cake section pre-filled

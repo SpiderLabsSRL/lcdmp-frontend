@@ -408,7 +408,7 @@ export default function Products({ api = defaultProductsApi, materialsApi = defa
   return (
     <MainLayout>
       <div className="space-y-4 sm:space-y-6 animate-fade-in">
-        <div className="px-4 sm:px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="px-4 sm:px-6 flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground">
               Productos
@@ -418,7 +418,7 @@ export default function Products({ api = defaultProductsApi, materialsApi = defa
             </p>
           </div>
           
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 w-full sm:w-auto">
             {activeTab === 'flavors' && (
               <Dialog open={isFlavorDialogOpen} onOpenChange={(open) => {
                 if (!open) setEditingFlavor(null);

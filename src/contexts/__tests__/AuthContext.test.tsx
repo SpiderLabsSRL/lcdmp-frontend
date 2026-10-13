@@ -55,6 +55,18 @@ describe('AuthContext', () => {
     expect(result.current.user).toEqual(savedUser);
   });
 
+  it('restores a user with only a refresh token: the access token renews itself on the first request', async () => {
+    const savedUser: User = { id: '1', username: 'gary', name: 'Gary Mamani', roles: ['admin'] };
+    localStorage.setItem('bakery_user', JSON.stringify(savedUser));
+    sessionStorage.setItem('refreshToken', 'refresh-1');
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.user).toEqual(savedUser);
+  });
+
   it('clears storage and stays logged-out if bakery_user is invalid JSON', async () => {
     localStorage.setItem('bakery_user', '{not-valid-json');
     sessionStorage.setItem('token', 'saved-token');
@@ -115,6 +127,29 @@ describe('AuthContext', () => {
     expect(result.current.isLoading).toBe(false);
   });
 
+  it('login() also stores the refresh token', async () => {
+    mockedApi.post.mockResolvedValue({
+      data: {
+        success: true,
+        data: {
+          user: { id: '1', username: 'gary', name: 'Gary Mamani', roles: [{ name: 'admin' }] },
+          token: 't-123',
+          refreshToken: 'r-456',
+        },
+      },
+    });
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.login('gary', 'password');
+    });
+
+    expect(sessionStorage.getItem('token')).toBe('t-123');
+    expect(sessionStorage.getItem('refreshToken')).toBe('r-456');
+  });
+
   it('login() failure path (success: false) returns false and does not throw', async () => {
     mockedApi.post.mockResolvedValue({ data: { success: false, message: 'Credenciales inválidas' } });
 
@@ -163,6 +198,62 @@ describe('AuthContext', () => {
     expect(result.current.user).toBeNull();
     expect(localStorage.getItem('bakery_user')).toBeNull();
     expect(sessionStorage.getItem('token')).toBeNull();
+  });
+
+  it('logout() revokes the refresh token on the server (without an access token) and clears it locally', async () => {
+    const savedUser: User = { id: '1', username: 'gary', name: 'Gary Mamani', roles: ['admin'] };
+    localStorage.setItem('bakery_user', JSON.stringify(savedUser));
+    sessionStorage.setItem('token', 'saved-token');
+    sessionStorage.setItem('refreshToken', 'refresh-1');
+    mockedApi.post.mockResolvedValue({ data: { success: true } });
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    act(() => {
+      result.current.logout();
+    });
+
+    expect(mockedApi.post).toHaveBeenCalledWith(
+      '/auth/logout',
+      { refreshToken: 'refresh-1' },
+      { headers: { requiresAuth: false } }
+    );
+    expect(result.current.user).toBeNull();
+    expect(sessionStorage.getItem('token')).toBeNull();
+    expect(sessionStorage.getItem('refreshToken')).toBeNull();
+    expect(localStorage.getItem('bakery_user')).toBeNull();
+  });
+
+  it('logout() still closes the local session when revoking on the server fails', async () => {
+    localStorage.setItem('bakery_user', JSON.stringify({ id: '1', username: 'gary', name: 'G', roles: ['admin'] }));
+    sessionStorage.setItem('refreshToken', 'refresh-1');
+    mockedApi.post.mockRejectedValue(new Error('Network Error'));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    act(() => {
+      result.current.logout();
+    });
+
+    expect(result.current.user).toBeNull();
+    expect(sessionStorage.getItem('refreshToken')).toBeNull();
+  });
+
+  it('logout() does not call the server when there is no refresh token', async () => {
+    localStorage.setItem('bakery_user', JSON.stringify({ id: '1', username: 'gary', name: 'G', roles: ['admin'] }));
+    sessionStorage.setItem('token', 'saved-token');
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    act(() => {
+      result.current.logout();
+    });
+
+    expect(mockedApi.post).not.toHaveBeenCalled();
   });
 
   describe('hasRole / hasAnyRole', () => {

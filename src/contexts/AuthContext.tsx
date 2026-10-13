@@ -21,14 +21,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const initAuth = async () => {
       const savedUser = localStorage.getItem('bakery_user');
       const token = sessionStorage.getItem('token');
+      const refreshToken = sessionStorage.getItem('refreshToken');
 
-      if (savedUser && token) {
+      // Con el refresh token basta: el access token (15 min) se renueva solo en la primera petición.
+      if (savedUser && (token || refreshToken)) {
         try {
           const parsedUser = JSON.parse(savedUser) as User;
           setUser(parsedUser);
         } catch {
           localStorage.removeItem('bakery_user');
           sessionStorage.removeItem('token');
+          sessionStorage.removeItem('refreshToken');
         }
       }
       setIsLoading(false);
@@ -48,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(response.data.message || 'Credenciales inválidas');
       }
 
-      const { user: backendUser, token } = response.data.data;
+      const { user: backendUser, token, refreshToken } = response.data.data;
 
       const roles: UserRole[] = backendUser.roles.map((r: { name: string }) => r.name);
 
@@ -62,6 +65,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(frontendUser);
       localStorage.setItem('bakery_user', JSON.stringify(frontendUser));
       sessionStorage.setItem('token', token);
+      if (refreshToken) {
+        sessionStorage.setItem('refreshToken', refreshToken);
+      }
 
       setIsLoading(false);
       return true;
@@ -73,9 +79,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    // Revoca el refresh token en el servidor (best effort: si falla, igual se cierra la sesión local)
+    const refreshToken = sessionStorage.getItem('refreshToken');
+    if (refreshToken) {
+      api
+        .post('/auth/logout', { refreshToken }, { headers: { requiresAuth: false } })
+        .catch((error) => console.warn('No se pudo revocar el refresh token:', error));
+    }
+
     setUser(null);
     localStorage.removeItem('bakery_user');
     sessionStorage.removeItem('token');
+    sessionStorage.removeItem('refreshToken');
   };
 
   const hasRole = (role: UserRole): boolean => {

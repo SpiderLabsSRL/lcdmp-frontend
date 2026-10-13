@@ -23,6 +23,9 @@ export interface OrderFormProps {
   isEditing?: boolean;
 }
 
+const PORTION_OPTIONS = [10, 15, 20, 30, 40, 50];
+const CUSTOM_PORTIONS = 'custom';
+
 export default function OrderForm({ initialData, onSubmit, onClose, products, flavors, sweetTableCombos = [], isEditing = false }: OrderFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<CreateOrderData | UpdateOrderData>(() => {
@@ -127,6 +130,8 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
   const cakeFlavors = flavors.filter((f: any) => f.type === 'cake' && f.isActive);
   const fillingFlavors = flavors.filter((f: any) => f.type === 'filling' && f.isActive);
   const catalogProducts = products.filter((p: any) => p.isActive);
+
+  const [customPortionCakes, setCustomPortionCakes] = useState<Record<string, boolean>>({});
 
   const addCake = () => {
     const newCake: Partial<CustomCake> = {
@@ -539,19 +544,45 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label className="text-sm">Porciones por torta</Label>
-                  <Select 
-                    value={cake.portions?.toString()}
-                    onValueChange={(v) => updateCake(index, 'portions', parseInt(v))}
-                  >
-                    <SelectTrigger className="text-sm">
-                      <SelectValue placeholder="Seleccionar" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[10, 15, 20, 25, 30, 40, 50].map(p => (
-                        <SelectItem key={p} value={p.toString()}>{p} porciones</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {(() => {
+                    const isCustom = !!customPortionCakes[cake.id!] || (!!cake.portions && !PORTION_OPTIONS.includes(cake.portions));
+                    return (
+                      <>
+                        <Select
+                          value={isCustom ? CUSTOM_PORTIONS : cake.portions?.toString()}
+                          onValueChange={(v) => {
+                            if (v === CUSTOM_PORTIONS) {
+                              setCustomPortionCakes(prev => ({ ...prev, [cake.id!]: true }));
+                              return;
+                            }
+                            setCustomPortionCakes(prev => ({ ...prev, [cake.id!]: false }));
+                            updateCake(index, 'portions', parseInt(v));
+                          }}
+                        >
+                          <SelectTrigger className="text-sm">
+                            <SelectValue placeholder="Seleccionar" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PORTION_OPTIONS.map(p => (
+                              <SelectItem key={p} value={p.toString()}>{p} {p === 1 ? 'porción' : 'porciones'}</SelectItem>
+                            ))}
+                            <SelectItem value={CUSTOM_PORTIONS}>Otra cantidad...</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {isCustom && (
+                          <NumberInput
+                            min="1"
+                            value={cake.portions}
+                            onChange={(v) => updateCake(index, 'portions', v)}
+                            fallback={1}
+                            placeholder="Número de porciones"
+                            aria-label="Porciones personalizadas"
+                            className="text-sm mt-2"
+                          />
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
 
