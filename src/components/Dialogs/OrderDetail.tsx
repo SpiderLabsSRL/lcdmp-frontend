@@ -19,6 +19,7 @@ import { Banknote, QrCode } from "lucide-react";
 import { getOrderType } from "@/pages/Orders";
 import { IOrdersApi, defaultOrdersApi } from "@/api/OrdersApi";
 import { getLocalDateString } from "@/utils/DateUtils";
+import { isCustomizedItem, customizationExtra, itemLineTotal } from "@/utils/orderItems";
 import MaterialUsageSection from "./MaterialUsageSection";
 import { ReferenceImages } from "@/components/Images/ReferenceImages";
 import type { IMaterialsApi } from "@/api/MaterialsApi";
@@ -218,8 +219,17 @@ export default function OrderDetail({ order, onDeliver, onCancel, onMarkAtStore,
                   {item.notes && (
                     <p className="text-sm text-foreground mt-1">{item.notes}</p>
                   )}
+                  {isCustomizedItem(item) && (
+                    <div className="mt-1 space-y-1">
+                      <p className="text-sm text-foreground">
+                        <span className="font-medium">Personalizado:</span> {item.customizationNotes}
+                        <span className="text-muted-foreground"> (+Bs. {customizationExtra(item)} c/u)</span>
+                      </p>
+                      <ReferenceImages images={item.referenceImages} />
+                    </div>
+                  )}
                 </div>
-                <p className="font-semibold text-foreground">Bs. {item.price * item.quantity}</p>
+                <p className="font-semibold text-foreground">Bs. {itemLineTotal(item)}</p>
               </div>
             </div>
           ))}

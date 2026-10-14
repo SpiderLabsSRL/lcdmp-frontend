@@ -289,6 +289,38 @@ describe('Baking', () => {
       expect(screen.getByText('Notas: "Bien tostado"')).toBeInTheDocument();
     });
 
+    it('a customized catalog line shows its personalization on the card and in the details dialog, with images', async () => {
+      const order = makeOrder({
+        items: [{
+          id: 'item-c', productId: 'p3', product: {} as any, productName: 'Tres leches', quantity: 2, price: 80, status: 'baking',
+          customizationNotes: 'Papel comestible con foto de Leo', customizationPrice: 30,
+          referenceImages: ['https://signed.example/Pedidos/p.jpg'],
+        }],
+      });
+      const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([order]) });
+      const user = userEvent.setup();
+      renderWithProviders(<Baking bakingApi={mockApi} />);
+
+      expect(await screen.findByText(/🎨 Papel comestible con foto de Leo/)).toBeInTheDocument();
+
+      await user.click(screen.getByText('#ORD-100'));
+
+      expect(await screen.findByText('Personalización:')).toBeInTheDocument();
+      expect(within(screen.getByRole('dialog')).getByText('Papel comestible con foto de Leo')).toBeInTheDocument();
+      expect(screen.getByAltText('Referencia 1')).toHaveAttribute('src', 'https://signed.example/Pedidos/p.jpg');
+    });
+
+    it('a plain catalog line has no personalization preview', async () => {
+      const order = makeOrder({
+        items: [{ id: 'item-p', productId: 'p3', product: {} as any, productName: 'Pan integral', quantity: 3, price: 15, status: 'baking' }],
+      });
+      const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([order]) });
+      renderWithProviders(<Baking bakingApi={mockApi} />);
+
+      await screen.findByText('#ORD-100');
+      expect(screen.queryByText(/🎨/)).not.toBeInTheDocument();
+    });
+
     it('tapping "Completar" opens the complete dialog, not the details one', async () => {
       const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([detailedOrder]) });
       const user = userEvent.setup();

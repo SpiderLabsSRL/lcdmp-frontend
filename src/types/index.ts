@@ -276,6 +276,12 @@ export interface OrderItem {
   fromStock?: boolean;
   // Stock de tienda actual del producto (solo lectura, para avisar si no alcanza al retirar).
   storeStock?: number;
+  // Personalización (p.ej. papel comestible): descripción de lo que se personaliza, recargo POR
+  // UNIDAD sobre el precio de catálogo e imágenes de referencia. Sin descripción la línea es normal.
+  // El total de la línea es (price + customizationPrice) * quantity.
+  customizationNotes?: string | null;
+  customizationPrice?: number;
+  referenceImages?: string[];
 }
 
 export interface CustomCake {
@@ -376,6 +382,8 @@ export interface WorkItem {
   detail?: string;
   quantity: number;
   notes?: string;
+  // Personalización de una línea de catálogo (descripción + imágenes), si la tiene
+  customization?: { notes: string; images: string[] };
 }
 
 export interface ItemStageLogEntry {

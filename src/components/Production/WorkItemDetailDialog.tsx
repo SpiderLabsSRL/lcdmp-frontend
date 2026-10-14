@@ -12,9 +12,10 @@ export const getCakeForItem = (item: WorkItem): CustomCake | undefined => {
 
 // Línea corta para la tarjeta de una línea de producción: el diseño pedido (recortado)
 export function DesignPreview({ item }: { item: WorkItem }) {
-  const cake = getCakeForItem(item);
-  if (!cake?.design) return null;
-  return <p className=" mt-0.5">🎨 {cake.design.substring(0, 100)}{cake.design.length > 100 ? '...' : ''}</p>;
+  // Diseño de una torta, o descripción de la personalización de un producto de catálogo
+  const text = getCakeForItem(item)?.design || item.customization?.notes;
+  if (!text) return null;
+  return <p className=" mt-0.5">🎨 {text.substring(0, 100)}{text.length > 100 ? '...' : ''}</p>;
 }
 
 interface WorkItemDetailDialogProps {
@@ -82,6 +83,20 @@ export function WorkItemDetailDialog({ item, open, onOpenChange }: WorkItemDetai
                   </>
                 );
               })()}
+              {item.customization && (
+                <>
+                  <div className="p-2 sm:p-3 bg-background rounded border">
+                    <p className="text-sm font-semibold text-foreground">Personalización:</p>
+                    <p className="text-sm mt-1 whitespace-pre-wrap text-foreground">{item.customization.notes}</p>
+                  </div>
+                  {item.customization.images.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-sm font-semibold mb-1 text-foreground">Imágenes de referencia:</p>
+                      <ReferenceImages images={item.customization.images} />
+                    </div>
+                  )}
+                </>
+              )}
               {item.notes && (
                 <p className="text-sm text-foreground">Notas: "{item.notes}"</p>
               )}

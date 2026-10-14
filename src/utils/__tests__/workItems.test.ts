@@ -127,6 +127,26 @@ describe('getWorkItemsAtStage', () => {
     });
   });
 
+  it('carries the personalization (trimmed description + images) of a customized order_item', () => {
+    const item = makeItem({
+      id: 'i1', status: 'decorating',
+      customizationNotes: '  Papel comestible  ', customizationPrice: 30, referenceImages: ['https://signed/a.jpg'],
+    });
+
+    const [result] = getWorkItemsAtStage([makeOrder({ items: [item] })], 'decorating');
+
+    expect(result.customization).toEqual({ notes: 'Papel comestible', images: ['https://signed/a.jpg'] });
+  });
+
+  it('a plain or blank-described order_item has no customization', () => {
+    const plain = makeItem({ id: 'i1', status: 'baking' });
+    const blank = makeItem({ id: 'i2', status: 'baking', customizationNotes: '   ', customizationPrice: 30 });
+
+    const result = getWorkItemsAtStage([makeOrder({ items: [plain, blank] })], 'baking');
+
+    expect(result.map(r => r.customization)).toEqual([undefined, undefined]);
+  });
+
   it('skips an order_item without an id even if its status matches', () => {
     const item = makeItem({ id: undefined, status: 'baking' });
     const order = makeOrder({ items: [item] });

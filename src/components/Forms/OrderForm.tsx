@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { getLocalDateString } from '@/utils/DateUtils';
 import ReferenceImagesInput from '@/components/Images/ReferenceImagesInput';
 import { cakeShapes } from '@/types/consts';
+import { isCustomizedItem, itemLineTotal } from '@/utils/orderItems';
 import type { IUploadsApi } from '@/api/UploadsApi';
 import { es } from 'date-fns/locale';
 
@@ -90,7 +91,7 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
     });
     
     (formData.items || []).forEach(item => {
-      subtotal += (item.price || 0) * item.quantity;
+      subtotal += itemLineTotal(item);
     });
 
     (formData.sweetTableCombos || []).forEach(combo => {
@@ -171,6 +172,16 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
       ...formData,
       items: [...(formData.items || []), { productId: '', quantity: 1, product: {} as any, price: 0 }]
     });
+  };
+
+  // Activar "Personalizado" abre los campos (descripción vacía = todavía sin describir); apagarlo
+  // los borra, y el backend también borra las imágenes que tenía.
+  const toggleCustomization = (index: number, enabled: boolean) => {
+    const updated = [...(formData.items || [])];
+    updated[index] = enabled
+      ? { ...updated[index], customizationNotes: '', customizationPrice: 0, referenceImages: [] }
+      : { ...updated[index], customizationNotes: undefined, customizationPrice: undefined, referenceImages: undefined };
+    setFormData({ ...formData, items: updated });
   };
 
   const removeProduct = (index: number) => {
@@ -309,6 +320,14 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
       return;
     }
 
+    const undescribed = (formData.items || []).find(
+      i => i.customizationNotes !== undefined && i.customizationNotes !== null && !isCustomizedItem(i)
+    );
+    if (undescribed) {
+      toast.error(`Describe la personalización de "${undescribed.product?.name || 'el producto'}" o desmarca "Personalizado"`);
+      return;
+    }
+
     if (!selectedOptions.hasCake && !selectedOptions.hasProducts && !selectedOptions.hasSweetTable) {
       toast.error('Debe seleccionar al menos un tipo de producto');
       return;
@@ -341,6 +360,12 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
     
     const submitData = {
       ...formData,
+      // Solo las líneas personalizadas llevan campos de personalización (descripción sin espacios sobrantes)
+      items: (formData.items || []).map(item =>
+        isCustomizedItem(item)
+          ? { ...item, customizationNotes: item.customizationNotes!.trim(), customizationPrice: item.customizationPrice || 0, referenceImages: item.referenceImages || [] }
+          : { ...item, customizationNotes: undefined, customizationPrice: undefined, referenceImages: undefined }
+      ),
       total,
       orderType: typesSelected > 1 ? 'mixed' :
                   selectedOptions.hasCake ? 'cake' :
@@ -808,12 +833,76 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
                     </label>
                     {item.fromStock && (
                       <p className="text-xs text-muted-foreground">
-                        Queda lista de inmediato. El stock se descuenta al entregar y se reserva el día de retiro.
+                        {item.customizationNotes !== undefined && item.customizationNotes !== null
+                          ? 'Pasa directo a Decoración para aplicar la personalización. '
+                          : 'Queda lista de inmediato. '}
+                        El stock se descuenta al entregar y se reserva el día de retiro.
                       </p>
                     )}
                   </div>
                 );
               })()}
+
+              {item.productId && (
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-primary"
+                      checked={item.customizationNotes !== undefined && item.customizationNotes !== null}
+                      onChange={(e) => toggleCustomization(index, e.target.checked)}
+                    />
+                    <span>Personalizado</span>
+                    <span className="text-muted-foreground">(ej. papel comestible, topper)</span>
+                  </label>
+
+                  {item.customizationNotes !== undefined && item.customizationNotes !== null && (
+                    <div className="border rounded-md p-3 space-y-3 bg-muted/30">
+                      <div className="space-y-1.5">
+                        <Label className="text-sm">Qué se personaliza *</Label>
+                        <Textarea
+                          placeholder="Ej: Papel comestible con la foto de Leo"
+                          className="text-sm"
+                          rows={2}
+                          value={item.customizationNotes}
+                          onChange={(e) => updateProduct(index, 'customizationNotes', e.target.value)}
+                        />
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-sm">Recargo por unidad (Bs.)</Label>
+                          <NumberInput
+                            placeholder="0"
+                            decimal
+                            min="0"
+                            fallback={0}
+                            className="text-sm"
+                            value={item.customizationPrice}
+                            onChange={(v) => updateProduct(index, 'customizationPrice', v)}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-sm">Total de la línea</Label>
+                          <p className="text-sm font-medium py-2">
+                            Bs. {itemLineTotal(item).toFixed(2)}
+                            <span className="text-muted-foreground font-normal">
+                              {' '}(Bs. {Number(item.price || 0).toFixed(2)} + Bs. {Number(item.customizationPrice || 0).toFixed(2)}) × {item.quantity}
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-sm">Imágenes de referencia (opcional)</Label>
+                        <ReferenceImagesInput
+                          value={item.referenceImages || []}
+                          onChange={(images) => updateProduct(index, 'referenceImages', images)}
+                          uploadsApi={uploadsApi}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="space-y-1.5">
                 <Label className="text-sm">Notas (opcional)</Label>

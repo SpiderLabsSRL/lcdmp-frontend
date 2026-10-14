@@ -1,5 +1,6 @@
 import type { Order, WorkItem, ProductStatus } from '@/types';
 import { getCakeShapeLabel } from '@/types/consts';
+import { isCustomizedItem } from '@/utils/orderItems';
 
 // Aplana las 4 fuentes de líneas de producción de un pedido (tortas
 // personalizadas, productos de catálogo, productos dentro de una mesa dulce,
@@ -34,6 +35,9 @@ export function getWorkItemsAtStage(orders: Order[], stage: ProductStatus): Work
         title: `${item.quantity} ${item.productName || item.product?.name || 'Producto'}`,
         quantity: item.quantity,
         notes: item.notes,
+        customization: isCustomizedItem(item)
+          ? { notes: item.customizationNotes!.trim(), images: item.referenceImages || [] }
+          : undefined,
       });
     }
 
