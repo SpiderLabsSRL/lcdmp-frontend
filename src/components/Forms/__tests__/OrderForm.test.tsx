@@ -337,6 +337,33 @@ describe('OrderForm - porciones de torta', () => {
   });
 });
 
+describe('OrderForm - forma de torta', () => {
+  it('offers "Long cake" among the shapes and submits it as the long-cake value', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm();
+
+    await fillRequiredCustomerFields(user);
+    await user.click(screen.getByLabelText('Torta personalizada'));
+    const card = screen.getByText('Torta #1').closest('.relative') as HTMLElement;
+    const comboboxes = within(card).getAllByRole('combobox');
+
+    // orden: porciones, forma, sabor de torta, relleno, ...
+    await user.click(comboboxes[1]);
+    const options = screen.getAllByRole('option').map(o => o.textContent);
+    expect(options).toEqual(['Redonda', 'Cuadrada', 'Rectangular', 'Long cake', 'Corazón', 'Dos pisos', 'Tres pisos']);
+    await user.click(screen.getByRole('option', { name: 'Long cake' }));
+    expect(comboboxes[1]).toHaveTextContent('Long cake');
+
+    await chooseOption(user, comboboxes[2], 'Chocolate');
+    await chooseOption(user, comboboxes[3], 'Dulce de Leche');
+    setNumberValue(within(card).getAllByRole('spinbutton')[1], '100');
+    await user.click(screen.getByRole('button', { name: 'Crear Pedido' }));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit.mock.calls[0][0].customCakes[0].shape).toBe('long-cake');
+  });
+});
+
 describe('OrderForm - catalog products', () => {
   it('adds a catalog item, selects a product and updates the quantity/subtotal', async () => {
     const user = userEvent.setup();

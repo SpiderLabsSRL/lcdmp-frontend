@@ -1,4 +1,5 @@
 import type { Order, WorkItem, ProductStatus } from '@/types';
+import { getCakeShapeLabel } from '@/types/consts';
 
 // Aplana las 4 fuentes de líneas de producción de un pedido (tortas
 // personalizadas, productos de catálogo, productos dentro de una mesa dulce,
@@ -18,7 +19,7 @@ export function getWorkItemsAtStage(orders: Order[], stage: ProductStatus): Work
         order,
         status: cake.status,
         title: `${cake.portions} porciones - ${cake.cakeFlavor}${cake.secondCakeFlavor ? `/${cake.secondCakeFlavor}` : ''}`,
-        detail: cake.shape,
+        detail: getCakeShapeLabel(cake.shape) || undefined,
         quantity: cake.quantity || 1,
       });
     }

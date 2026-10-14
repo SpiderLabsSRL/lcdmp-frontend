@@ -2,7 +2,7 @@ import { Order, ItemStageLogEntry } from "@/types";
 import { format, differenceInMinutes } from 'date-fns';
 import { Truck, XCircle, ChevronDown, ChevronUp, History, Store } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { statusConfig } from '@/types/consts';
+import { statusConfig, getCakeShapeLabel } from '@/types/consts';
 import { es } from "date-fns/locale";
 import { Button } from "../ui/button";
 import { PaymentMethod } from '../../types/index';
@@ -175,7 +175,7 @@ export default function OrderDetail({ order, onDeliver, onCancel, onMarkAtStore,
                 <p className="font-bold text-primary">Bs. {cake.price * cake.quantity}</p>
               </div>
               {cake.shape && (
-                <p className="text-sm text-foreground">Forma: {cake.shape}</p>
+                <p className="text-sm text-foreground">Forma: {getCakeShapeLabel(cake.shape)}</p>
               )}
               {cake.design && (
                 <p className="text-sm text-foreground mt-1">Diseño: {cake.design}</p>

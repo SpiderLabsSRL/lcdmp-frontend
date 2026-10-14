@@ -10,6 +10,8 @@ import { IBakingApi, defaultBakingApi } from '@/api/BakingApi';
 import { useOrdersSocket } from '@/hooks/useOrdersSocket';
 import { getWorkItemsAtStage } from '@/utils/workItems';
 import { WorkItemCard } from '@/components/Production/WorkItemCard';
+import { Badge } from '@/components/ui/badge';
+import { getCakeShapeLabel } from '@/types/consts';
 import type { Order, BakedProduct, WorkItem } from '@/types';
 
 interface BakingProps {
@@ -75,6 +77,35 @@ export default function Baking({ bakingApi = defaultBakingApi }: BakingProps) {
     } catch (error) {
       toast.error('Error al completar el horneado');
     }
+  };
+
+  // Lo que el hornero necesita para armar la tanda de una torta: qué forma, cuántas y de qué sabor.
+  const renderDetail = (item: WorkItem) => {
+    if (item.itemType !== 'custom_cake') return null;
+    const cake = item.order.customCakes.find(c => c.id === item.itemId);
+    if (!cake) return null;
+
+    const flavors = [cake.cakeFlavor, cake.secondCakeFlavor].filter(Boolean).join(' / ');
+
+    return (
+      <div className="mt-1 space-y-0.5 text-sm">
+        <p className="flex items-center gap-2 flex-wrap">
+          <span className="font-medium">Forma:</span>
+          {cake.shape ? (
+            <Badge variant="secondary">{getCakeShapeLabel(cake.shape)}</Badge>
+          ) : (
+            <span className="text-muted-foreground">sin especificar</span>
+          )}
+          <span className="font-medium ml-2">Cantidad:</span>
+          <span>{cake.quantity || 1}</span>
+        </p>
+        {flavors && (
+          <p>
+            <span className="font-medium">Sabores:</span> {flavors}
+          </p>
+        )}
+      </div>
+    );
   };
 
   const isLowStock = (product: BakedProduct): boolean => {
@@ -192,6 +223,7 @@ export default function Baking({ bakingApi = defaultBakingApi }: BakingProps) {
                       item={item}
                       urgentHours={12}
                       soonHours={24}
+                      detail={renderDetail(item)}
                       onComplete={handleOpenCompleteDialog}
                     />
                   ))}

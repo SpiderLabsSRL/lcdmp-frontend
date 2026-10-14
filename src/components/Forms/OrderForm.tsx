@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { getLocalDateString } from '@/utils/DateUtils';
 import ReferenceImagesInput from '@/components/Images/ReferenceImagesInput';
+import { cakeShapes } from '@/types/consts';
 import type { IUploadsApi } from '@/api/UploadsApi';
 import { es } from 'date-fns/locale';
 
@@ -601,12 +602,9 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
                       <SelectValue placeholder="Seleccionar" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="redonda">Redonda</SelectItem>
-                      <SelectItem value="cuadrada">Cuadrada</SelectItem>
-                      <SelectItem value="rectangular">Rectangular</SelectItem>
-                      <SelectItem value="corazon">Corazón</SelectItem>
-                      <SelectItem value="dos-pisos">Dos pisos</SelectItem>
-                      <SelectItem value="tres-pisos">Tres pisos</SelectItem>
+                      {cakeShapes.map(shape => (
+                        <SelectItem key={shape.value} value={shape.value}>{shape.label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

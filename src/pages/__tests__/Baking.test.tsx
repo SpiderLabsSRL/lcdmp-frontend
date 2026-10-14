@@ -165,6 +165,72 @@ describe('Baking', () => {
     expect(screen.getByText('Porciones a hornear').previousSibling?.textContent).toBe('2');
   });
 
+  it('shows, for a custom cake, its shape, how many to bake and its cake flavors', async () => {
+    const order = makeOrder({
+      customCakes: [{
+        id: 'cake-lc',
+        portions: 30,
+        shape: 'long-cake',
+        cakeFlavor: 'Chocolate',
+        secondCakeFlavor: 'Vainilla',
+        fillingFlavor: 'Fresa',
+        secondFillingFlavor: '',
+        referenceImages: [],
+        price: 300,
+        quantity: 3,
+        status: 'baking',
+      }],
+    });
+    const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([order]) });
+    renderWithProviders(<Baking bakingApi={mockApi} />);
+
+    await screen.findByText('#ORD-100');
+
+    // el slug guardado se muestra como etiqueta legible
+    expect(screen.getByText('Long cake')).toBeInTheDocument();
+    expect(screen.getByText('Cantidad:').nextSibling).toHaveTextContent('3');
+    expect(screen.getByText('Sabores:').parentElement).toHaveTextContent('Sabores: Chocolate / Vainilla');
+    // el relleno es cosa de Armado, no de Hornos
+    expect(screen.queryByText(/Fresa/)).not.toBeInTheDocument();
+  });
+
+  it('says the shape is not specified when the cake has none, and defaults the quantity to 1', async () => {
+    const order = makeOrder({
+      customCakes: [{
+        id: 'cake-ns',
+        portions: 15,
+        cakeFlavor: 'Chocolate',
+        secondCakeFlavor: '',
+        fillingFlavor: 'Manjar',
+        secondFillingFlavor: '',
+        referenceImages: [],
+        price: 100,
+        quantity: 0,
+        status: 'baking',
+      }],
+    });
+    const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([order]) });
+    renderWithProviders(<Baking bakingApi={mockApi} />);
+
+    await screen.findByText('#ORD-100');
+
+    expect(screen.getByText('sin especificar')).toBeInTheDocument();
+    expect(screen.getByText('Cantidad:').nextSibling).toHaveTextContent('1');
+  });
+
+  it('does not add cake detail to non-cake lines (combo products, extras, catalog items)', async () => {
+    const order = makeOrder({
+      items: [{ id: 'item-1', productId: 'p3', product: {} as any, productName: 'Pan integral', quantity: 3, price: 15, status: 'baking' }],
+    });
+    const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([order]) });
+    renderWithProviders(<Baking bakingApi={mockApi} />);
+
+    await screen.findByText('#ORD-100');
+
+    expect(screen.queryByText('Forma:')).not.toBeInTheDocument();
+    expect(screen.queryByText('Sabores:')).not.toBeInTheDocument();
+  });
+
   it('flags items with a pickup less than 12h away as urgent', async () => {
     const soon = new Date();
     const urgentOrder = makeOrder({
