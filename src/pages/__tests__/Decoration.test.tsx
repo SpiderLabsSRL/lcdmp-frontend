@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { addHours, format } from 'date-fns';
@@ -211,6 +211,18 @@ describe('Decoration', () => {
     expect(await screen.findByText('Detalles del Pedido #ORD-201')).toBeInTheDocument();
     expect(screen.getByText('Tema de unicornios')).toBeInTheDocument();
     expect(screen.getByText('Dedicatoria: "Feliz cumple Sofia"')).toBeInTheDocument();
+  });
+
+  it('shows the cake shape in the detail dialog', async () => {
+    const mockApi = buildMockApi({ getDecorationOrders: vi.fn().mockResolvedValue([fullOrder]) });
+    const user = userEvent.setup();
+    renderWithProviders(<Decoration decorationApi={mockApi} />);
+
+    await screen.findAllByText('#ORD-200');
+    await user.click(screen.getAllByText('Ana Rojas')[0]);
+
+    await screen.findByText('Detalles del Pedido #ORD-200');
+    expect(within(screen.getByRole('dialog')).getByText('Cuadrada')).toBeInTheDocument();
   });
 
   it('shows the order-level notes in the detail dialog', async () => {

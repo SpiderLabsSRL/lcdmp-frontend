@@ -278,7 +278,7 @@ describe('OrderForm - custom cakes', () => {
     expect(screen.getByText('Torta #2')).toBeInTheDocument();
 
     const secondCard = screen.getByText('Torta #2').closest('.relative') as HTMLElement;
-    await user.click(within(secondCard).getByRole('button'));
+    await user.click(within(secondCard).getByRole('button', { name: 'Quitar torta' }));
 
     expect(screen.queryByText('Torta #2')).not.toBeInTheDocument();
     expect(screen.getByText('Torta #1')).toBeInTheDocument();
@@ -337,6 +337,33 @@ describe('OrderForm - porciones de torta', () => {
   });
 });
 
+describe('OrderForm - forma de torta', () => {
+  it('offers "Long cake" among the shapes and submits it as the long-cake value', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm();
+
+    await fillRequiredCustomerFields(user);
+    await user.click(screen.getByLabelText('Torta personalizada'));
+    const card = screen.getByText('Torta #1').closest('.relative') as HTMLElement;
+    const comboboxes = within(card).getAllByRole('combobox');
+
+    // orden: porciones, forma, sabor de torta, relleno, ...
+    await user.click(comboboxes[1]);
+    const options = screen.getAllByRole('option').map(o => o.textContent);
+    expect(options).toEqual(['Redonda', 'Cuadrada', 'Rectangular', 'Long cake', 'Corazón', 'Dos pisos', 'Tres pisos']);
+    await user.click(screen.getByRole('option', { name: 'Long cake' }));
+    expect(comboboxes[1]).toHaveTextContent('Long cake');
+
+    await chooseOption(user, comboboxes[2], 'Chocolate');
+    await chooseOption(user, comboboxes[3], 'Dulce de Leche');
+    setNumberValue(within(card).getAllByRole('spinbutton')[1], '100');
+    await user.click(screen.getByRole('button', { name: 'Crear Pedido' }));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit.mock.calls[0][0].customCakes[0].shape).toBe('long-cake');
+  });
+});
+
 describe('OrderForm - catalog products', () => {
   it('adds a catalog item, selects a product and updates the quantity/subtotal', async () => {
     const user = userEvent.setup();
@@ -377,6 +404,122 @@ describe('OrderForm - usar de stock', () => {
 
     expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(onSubmit.mock.calls[0][0].items[0].fromStock).toBe(true);
+  });
+});
+
+describe('OrderForm - producto de catálogo personalizado', () => {
+  const addCatalogLine = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(screen.getByLabelText('Productos del catálogo'));
+    const card = screen.getByText('Producto #1').closest('.space-y-3') as HTMLElement;
+    await chooseOption(user, within(card).getByRole('combobox'), /Cupcake Vainilla - Bs\. 15/);
+    return card;
+  };
+
+  it('offers "Personalizado" only after a product is chosen, and it starts closed', async () => {
+    const user = userEvent.setup();
+    renderForm();
+    await user.click(screen.getByLabelText('Productos del catálogo'));
+    const card = screen.getByText('Producto #1').closest('.space-y-3') as HTMLElement;
+
+    expect(within(card).queryByLabelText(/Personalizado/)).not.toBeInTheDocument();
+
+    await chooseOption(user, within(card).getByRole('combobox'), /Cupcake Vainilla - Bs\. 15/);
+
+    expect(within(card).getByLabelText(/Personalizado/)).not.toBeChecked();
+    expect(within(card).queryByText('Qué se personaliza *')).not.toBeInTheDocument();
+  });
+
+  it('adds the per-unit surcharge to the line and to the subtotal: (15 + 5) x 3 = 60', async () => {
+    const user = userEvent.setup();
+    renderForm();
+    const card = await addCatalogLine(user);
+    setNumberValue(within(card).getByRole('spinbutton'), '3');
+
+    await user.click(within(card).getByLabelText(/Personalizado/));
+    await user.type(within(card).getByPlaceholderText(/Papel comestible/), 'Papel comestible con foto');
+    setNumberValue(within(card).getAllByRole('spinbutton')[1], '5');
+
+    expect(within(card).getByText(/Bs\. 60\.00/)).toBeInTheDocument();
+    expect(within(getTotalsRow('Subtotal:')).getByText('Bs. 60.00')).toBeInTheDocument();
+  });
+
+  it('sends the customization in the payload, with the description trimmed', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm();
+    const card = await addCatalogLine(user);
+
+    await user.click(within(card).getByLabelText(/Personalizado/));
+    await user.type(within(card).getByPlaceholderText(/Papel comestible/), '  Foto de Leo  ');
+    setNumberValue(within(card).getAllByRole('spinbutton')[1], '25');
+    await fillRequiredCustomerFields(user);
+    await user.click(screen.getByRole('button', { name: 'Crear Pedido' }));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit.mock.calls[0][0].items[0]).toMatchObject({
+      productId: 'p1', price: 15, customizationNotes: 'Foto de Leo', customizationPrice: 25, referenceImages: [],
+    });
+    expect(onSubmit.mock.calls[0][0].total).toBe(40);
+  });
+
+  it('blocks the submit with a message when "Personalizado" is on but nothing is described', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm();
+    const card = await addCatalogLine(user);
+
+    await user.click(within(card).getByLabelText(/Personalizado/));
+    await fillRequiredCustomerFields(user);
+    await user.click(screen.getByRole('button', { name: 'Crear Pedido' }));
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(mockedToastError).toHaveBeenCalledWith(expect.stringContaining('Describe la personalización'));
+  });
+
+  it('turning "Personalizado" off drops the surcharge and the fields from the payload', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm();
+    const card = await addCatalogLine(user);
+
+    await user.click(within(card).getByLabelText(/Personalizado/));
+    await user.type(within(card).getByPlaceholderText(/Papel comestible/), 'Foto');
+    setNumberValue(within(card).getAllByRole('spinbutton')[1], '25');
+    await user.click(within(card).getByLabelText(/Personalizado/)); // apagar
+    await fillRequiredCustomerFields(user);
+    await user.click(screen.getByRole('button', { name: 'Crear Pedido' }));
+
+    const item = onSubmit.mock.calls[0][0].items[0];
+    expect(item.customizationNotes).toBeUndefined();
+    expect(item.customizationPrice).toBeUndefined();
+    expect(onSubmit.mock.calls[0][0].total).toBe(15);
+  });
+
+  it('tells the user a customized stock line goes to Decoración instead of being ready', async () => {
+    const user = userEvent.setup();
+    renderForm();
+    const card = await addCatalogLine(user);
+
+    await user.click(within(card).getByLabelText(/Usar de stock/));
+    expect(within(card).getByText(/Queda lista de inmediato/)).toBeInTheDocument();
+
+    await user.click(within(card).getByLabelText(/Personalizado/));
+    expect(within(card).getByText(/Pasa directo a Decoración/)).toBeInTheDocument();
+  });
+
+  it('pre-fills the personalization when editing an order', async () => {
+    const order: Order = {
+      id: 'o1', orderNumber: 'ORD-1', orderType: 'products', customerName: 'Juana', customerPhone: '70011122',
+      pickupDate: new Date(2099, 9, 10), pickupTime: '15:30', status: 'pending',
+      items: [{
+        productId: 'p1', product: products[0], quantity: 2, price: 15,
+        customizationNotes: 'Papel comestible', customizationPrice: 10, referenceImages: ['https://signed/a.jpg'],
+      }],
+      customCakes: [], sweetTableCombos: [], sweetTableExtras: [],
+      deliveryCost: 0, deposit: 0, total: 50, createdAt: new Date(2026, 8, 1), createdBy: 'u1',
+    } as unknown as Order;
+    renderForm({ initialData: order, isEditing: true });
+
+    expect(screen.getByDisplayValue('Papel comestible')).toBeInTheDocument();
+    expect(screen.getByAltText('Referencia 1')).toHaveAttribute('src', 'https://signed/a.jpg');
+    expect(within(getTotalsRow('Subtotal:')).getByText('Bs. 50.00')).toBeInTheDocument();
   });
 });
 

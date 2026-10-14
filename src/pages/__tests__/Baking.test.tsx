@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { addHours, format } from 'date-fns';
@@ -163,6 +163,175 @@ describe('Baking', () => {
     // Stats: 4 pending lines, totalPortions only counts custom_cake quantity (2).
     expect(screen.getByText('Líneas pendientes').previousSibling?.textContent).toBe('4');
     expect(screen.getByText('Porciones a hornear').previousSibling?.textContent).toBe('2');
+  });
+
+  it('shows, for a custom cake, its shape, how many to bake and its cake flavors', async () => {
+    const order = makeOrder({
+      customCakes: [{
+        id: 'cake-lc',
+        portions: 30,
+        shape: 'long-cake',
+        cakeFlavor: 'Chocolate',
+        secondCakeFlavor: 'Vainilla',
+        fillingFlavor: 'Fresa',
+        secondFillingFlavor: '',
+        referenceImages: [],
+        price: 300,
+        quantity: 3,
+        status: 'baking',
+      }],
+    });
+    const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([order]) });
+    renderWithProviders(<Baking bakingApi={mockApi} />);
+
+    await screen.findByText('#ORD-100');
+
+    // el slug guardado se muestra como etiqueta legible
+    expect(screen.getByText('Long cake')).toBeInTheDocument();
+    expect(screen.getByText('Cantidad:').nextSibling).toHaveTextContent('3');
+    expect(screen.getByText('Sabores:').parentElement).toHaveTextContent('Sabores: Chocolate / Vainilla');
+    // el relleno es cosa de Armado, no de Hornos
+    expect(screen.queryByText(/Fresa/)).not.toBeInTheDocument();
+  });
+
+  it('says the shape is not specified when the cake has none, and defaults the quantity to 1', async () => {
+    const order = makeOrder({
+      customCakes: [{
+        id: 'cake-ns',
+        portions: 15,
+        cakeFlavor: 'Chocolate',
+        secondCakeFlavor: '',
+        fillingFlavor: 'Manjar',
+        secondFillingFlavor: '',
+        referenceImages: [],
+        price: 100,
+        quantity: 0,
+        status: 'baking',
+      }],
+    });
+    const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([order]) });
+    renderWithProviders(<Baking bakingApi={mockApi} />);
+
+    await screen.findByText('#ORD-100');
+
+    expect(screen.getByText('sin especificar')).toBeInTheDocument();
+    expect(screen.getByText('Cantidad:').nextSibling).toHaveTextContent('1');
+  });
+
+  it('does not add cake detail to non-cake lines (combo products, extras, catalog items)', async () => {
+    const order = makeOrder({
+      items: [{ id: 'item-1', productId: 'p3', product: {} as any, productName: 'Pan integral', quantity: 3, price: 15, status: 'baking' }],
+    });
+    const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([order]) });
+    renderWithProviders(<Baking bakingApi={mockApi} />);
+
+    await screen.findByText('#ORD-100');
+
+    expect(screen.queryByText('Forma:')).not.toBeInTheDocument();
+    expect(screen.queryByText('Sabores:')).not.toBeInTheDocument();
+  });
+
+  describe('cake details (design, notes, images) like in Decoración', () => {
+    const detailedOrder = makeOrder({
+      notes: 'Sin nueces por favor',
+      customCakes: [{
+        id: 'cake-d',
+        portions: 25,
+        shape: 'long-cake',
+        cakeFlavor: 'Chocolate',
+        secondCakeFlavor: '',
+        fillingFlavor: 'Manjar',
+        secondFillingFlavor: '',
+        design: 'Tema safari con jirafa',
+        dedication: 'Feliz cumple Leo',
+        referenceImages: ['https://signed.example/Pedidos/a.jpg'],
+        price: 250,
+        quantity: 1,
+        status: 'baking',
+      }],
+    });
+
+    it('shows a one-line design preview on the card', async () => {
+      const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([detailedOrder]) });
+      renderWithProviders(<Baking bakingApi={mockApi} />);
+
+      expect(await screen.findByText(/🎨 Tema safari con jirafa/)).toBeInTheDocument();
+    });
+
+    it('opens the details dialog when the card is tapped: design, dedication, images and order notes', async () => {
+      const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([detailedOrder]) });
+      const user = userEvent.setup();
+      renderWithProviders(<Baking bakingApi={mockApi} />);
+
+      await user.click(await screen.findByText('#ORD-100'));
+
+      expect(await screen.findByText('Detalles del Pedido #ORD-100')).toBeInTheDocument();
+      // la forma también está en el diálogo (además de en la tarjeta)
+      expect(within(screen.getByRole('dialog')).getByText('Long cake')).toBeInTheDocument();
+      expect(screen.getByText('Diseño requerido:')).toBeInTheDocument();
+      expect(screen.getByText('Dedicatoria: "Feliz cumple Leo"')).toBeInTheDocument();
+      expect(screen.getByAltText('Referencia 1')).toHaveAttribute('src', 'https://signed.example/Pedidos/a.jpg');
+      expect(screen.getByText('Sin nueces por favor')).toBeInTheDocument();
+      expect(mockApi.completeItem).not.toHaveBeenCalled();
+    });
+
+    it('shows the item notes of a catalog line in its details dialog', async () => {
+      const order = makeOrder({
+        items: [{ id: 'item-1', productId: 'p3', product: {} as any, productName: 'Pan integral', quantity: 3, price: 15, notes: 'Bien tostado', status: 'baking' }],
+      });
+      const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([order]) });
+      const user = userEvent.setup();
+      renderWithProviders(<Baking bakingApi={mockApi} />);
+
+      await user.click(await screen.findByText('#ORD-100'));
+
+      expect(await screen.findByText('Detalles del Pedido #ORD-100')).toBeInTheDocument();
+      expect(screen.getByText('Notas: "Bien tostado"')).toBeInTheDocument();
+    });
+
+    it('a customized catalog line shows its personalization on the card and in the details dialog, with images', async () => {
+      const order = makeOrder({
+        items: [{
+          id: 'item-c', productId: 'p3', product: {} as any, productName: 'Tres leches', quantity: 2, price: 80, status: 'baking',
+          customizationNotes: 'Papel comestible con foto de Leo', customizationPrice: 30,
+          referenceImages: ['https://signed.example/Pedidos/p.jpg'],
+        }],
+      });
+      const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([order]) });
+      const user = userEvent.setup();
+      renderWithProviders(<Baking bakingApi={mockApi} />);
+
+      expect(await screen.findByText(/🎨 Papel comestible con foto de Leo/)).toBeInTheDocument();
+
+      await user.click(screen.getByText('#ORD-100'));
+
+      expect(await screen.findByText('Personalización:')).toBeInTheDocument();
+      expect(within(screen.getByRole('dialog')).getByText('Papel comestible con foto de Leo')).toBeInTheDocument();
+      expect(screen.getByAltText('Referencia 1')).toHaveAttribute('src', 'https://signed.example/Pedidos/p.jpg');
+    });
+
+    it('a plain catalog line has no personalization preview', async () => {
+      const order = makeOrder({
+        items: [{ id: 'item-p', productId: 'p3', product: {} as any, productName: 'Pan integral', quantity: 3, price: 15, status: 'baking' }],
+      });
+      const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([order]) });
+      renderWithProviders(<Baking bakingApi={mockApi} />);
+
+      await screen.findByText('#ORD-100');
+      expect(screen.queryByText(/🎨/)).not.toBeInTheDocument();
+    });
+
+    it('tapping "Completar" opens the complete dialog, not the details one', async () => {
+      const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([detailedOrder]) });
+      const user = userEvent.setup();
+      renderWithProviders(<Baking bakingApi={mockApi} />);
+
+      await screen.findByText('#ORD-100');
+      await user.click(screen.getByRole('button', { name: /Completar/i }));
+
+      expect(await screen.findByText('Completar Horneado')).toBeInTheDocument();
+      expect(screen.queryByText('Detalles del Pedido #ORD-100')).not.toBeInTheDocument();
+    });
   });
 
   it('flags items with a pickup less than 12h away as urgent', async () => {

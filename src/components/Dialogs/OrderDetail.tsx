@@ -2,7 +2,7 @@ import { Order, ItemStageLogEntry } from "@/types";
 import { format, differenceInMinutes } from 'date-fns';
 import { Truck, XCircle, ChevronDown, ChevronUp, History, Store } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { statusConfig } from '@/types/consts';
+import { statusConfig, getCakeShapeLabel } from '@/types/consts';
 import { es } from "date-fns/locale";
 import { Button } from "../ui/button";
 import { PaymentMethod } from '../../types/index';
@@ -19,7 +19,9 @@ import { Banknote, QrCode } from "lucide-react";
 import { getOrderType } from "@/pages/Orders";
 import { IOrdersApi, defaultOrdersApi } from "@/api/OrdersApi";
 import { getLocalDateString } from "@/utils/DateUtils";
+import { isCustomizedItem, customizationExtra, itemLineTotal } from "@/utils/orderItems";
 import MaterialUsageSection from "./MaterialUsageSection";
+import { ReferenceImages } from "@/components/Images/ReferenceImages";
 import type { IMaterialsApi } from "@/api/MaterialsApi";
 import type { IInventoryApi } from "@/api/InventoryApi";
 
@@ -174,7 +176,7 @@ export default function OrderDetail({ order, onDeliver, onCancel, onMarkAtStore,
                 <p className="font-bold text-primary">Bs. {cake.price * cake.quantity}</p>
               </div>
               {cake.shape && (
-                <p className="text-sm text-foreground">Forma: {cake.shape}</p>
+                <p className="text-sm text-foreground">Forma: {getCakeShapeLabel(cake.shape)}</p>
               )}
               {cake.design && (
                 <p className="text-sm text-foreground mt-1">Diseño: {cake.design}</p>
@@ -183,9 +185,9 @@ export default function OrderDetail({ order, onDeliver, onCancel, onMarkAtStore,
                 <p className="text-sm italic text-foreground">"{cake.dedication}"</p>
               )}
               {cake.referenceImages && cake.referenceImages.length > 0 && (
-                <p className="text-sm text-foreground mt-1">
-                  {cake.referenceImages.length} imágenes de referencia
-                </p>
+                <div className="mt-2">
+                  <ReferenceImages images={cake.referenceImages} />
+                </div>
               )}
             </div>
           ))}
@@ -217,8 +219,17 @@ export default function OrderDetail({ order, onDeliver, onCancel, onMarkAtStore,
                   {item.notes && (
                     <p className="text-sm text-foreground mt-1">{item.notes}</p>
                   )}
+                  {isCustomizedItem(item) && (
+                    <div className="mt-1 space-y-1">
+                      <p className="text-sm text-foreground">
+                        <span className="font-medium">Personalizado:</span> {item.customizationNotes}
+                        <span className="text-muted-foreground"> (+Bs. {customizationExtra(item)} c/u)</span>
+                      </p>
+                      <ReferenceImages images={item.referenceImages} />
+                    </div>
+                  )}
                 </div>
-                <p className="font-semibold text-foreground">Bs. {item.price * item.quantity}</p>
+                <p className="font-semibold text-foreground">Bs. {itemLineTotal(item)}</p>
               </div>
             </div>
           ))}

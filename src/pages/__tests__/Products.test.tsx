@@ -227,6 +227,101 @@ describe('Products - Productos tab', () => {
     expect(toast.success).toHaveBeenCalledWith('Producto "Torta red velvet" creado exitosamente');
   });
 
+  describe('product image', () => {
+    const makeUploads = (overrides: Record<string, unknown> = {}) => ({
+      uploadOrderImage: vi.fn(),
+      uploadProductImage: vi.fn().mockResolvedValue('https://img.example.com/Productos/p1/a.jpg'),
+      removeProductImage: vi.fn().mockResolvedValue(undefined),
+      ...overrides,
+    }) as any;
+    const photo = () => new File([new Uint8Array([0xff, 0xd8, 0xff])], 'torta.jpg', { type: 'image/jpeg' });
+
+    beforeEach(() => {
+      vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:x'), revokeObjectURL: vi.fn() }));
+    });
+
+    const fillNewProduct = async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click(screen.getByRole('button', { name: /Nuevo Producto/i }));
+      await user.type(screen.getByPlaceholderText('Nombre del producto'), 'Torta red velvet');
+      await user.type(screen.getAllByPlaceholderText('0')[0], '200');
+    };
+
+    it('uploads the chosen image AFTER creating the product, using the id the server returned', async () => {
+      const api = buildMockApi();
+      const uploadsApi = makeUploads();
+      const user = userEvent.setup();
+      renderWithProviders(<Products api={api} uploadsApi={uploadsApi} />);
+      await waitFor(() => expect(screen.getByText('Torta de chocolate')).toBeInTheDocument());
+
+      await fillNewProduct(user);
+      const file = photo();
+      fireEvent.change(screen.getByLabelText('Seleccionar imagen del producto'), { target: { files: [file] } });
+      await user.click(screen.getByRole('button', { name: 'Crear Producto' }));
+
+      await waitFor(() => expect(uploadsApi.uploadProductImage).toHaveBeenCalledWith('p1', file));
+      expect(api.createProduct).toHaveBeenCalled();
+    });
+
+    it('does not touch images when the product is saved without choosing one', async () => {
+      const api = buildMockApi();
+      const uploadsApi = makeUploads();
+      const user = userEvent.setup();
+      renderWithProviders(<Products api={api} uploadsApi={uploadsApi} />);
+      await waitFor(() => expect(screen.getByText('Torta de chocolate')).toBeInTheDocument());
+
+      await fillNewProduct(user);
+      await user.click(screen.getByRole('button', { name: 'Crear Producto' }));
+
+      await waitFor(() => expect(api.createProduct).toHaveBeenCalled());
+      expect(uploadsApi.uploadProductImage).not.toHaveBeenCalled();
+      expect(uploadsApi.removeProductImage).not.toHaveBeenCalled();
+    });
+
+    it('keeps the product (and warns) when the image upload fails', async () => {
+      const api = buildMockApi();
+      const uploadsApi = makeUploads({ uploadProductImage: vi.fn().mockRejectedValue(new Error('La imagen supera los 10 MB')) });
+      const user = userEvent.setup();
+      renderWithProviders(<Products api={api} uploadsApi={uploadsApi} />);
+      await waitFor(() => expect(screen.getByText('Torta de chocolate')).toBeInTheDocument());
+
+      await fillNewProduct(user);
+      fireEvent.change(screen.getByLabelText('Seleccionar imagen del producto'), { target: { files: [photo()] } });
+      await user.click(screen.getByRole('button', { name: 'Crear Producto' }));
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+        'El producto se guardó, pero la imagen no: La imagen supera los 10 MB'
+      ));
+      expect(toast.success).toHaveBeenCalledWith('Producto "Torta red velvet" creado exitosamente');
+    });
+
+    it('removes the image of an existing product when "Quitar" was chosen', async () => {
+      const withImage = [{ ...baseProducts[0], image: 'https://img.example.com/Productos/p1/a.jpg' }, baseProducts[1]];
+      const api = buildMockApi({ getProducts: vi.fn().mockResolvedValue(withImage) });
+      const uploadsApi = makeUploads();
+      const user = userEvent.setup();
+      renderWithProviders(<Products api={api} uploadsApi={uploadsApi} />);
+      await waitFor(() => expect(screen.getByText('Torta de chocolate')).toBeInTheDocument());
+
+      const row = screen.getByText('Torta de chocolate').closest('tr')!;
+      await user.click(within(row).getByTitle('Editar'));
+      await user.click(await screen.findByRole('button', { name: /Quitar/ }));
+      await user.click(screen.getByRole('button', { name: /Actualizar|Guardar/ }));
+
+      await waitFor(() => expect(uploadsApi.removeProductImage).toHaveBeenCalledWith('p1'));
+      expect(api.editProduct).toHaveBeenCalled();
+    });
+
+    it('shows the product thumbnail in the list when it has an image', async () => {
+      const withImage = [{ ...baseProducts[0], image: 'https://img.example.com/Productos/p1/a.jpg' }, baseProducts[1]];
+      const api = buildMockApi({ getProducts: vi.fn().mockResolvedValue(withImage) });
+      renderWithProviders(<Products api={api} uploadsApi={makeUploads()} />);
+      await waitFor(() => expect(screen.getByText('Torta de chocolate')).toBeInTheDocument());
+
+      expect(screen.getByAltText('Torta de chocolate')).toHaveAttribute('src', 'https://img.example.com/Productos/p1/a.jpg');
+      expect(screen.queryByAltText('Cupcake vainilla')).not.toBeInTheDocument();
+    });
+  });
+
   it('blocks submit and shows an error when stock inicial is negative', async () => {
     const api = buildMockApi();
     const user = userEvent.setup();

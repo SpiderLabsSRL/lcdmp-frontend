@@ -76,3 +76,20 @@ export const inventoryCategories: Category[] = [
   { id: 'decoration', name: 'Decoración', type: 'raw_material' },
   { id: 'other', name: 'Otros', type: 'raw_material' }
 ];
+
+// Formas de torta personalizada. El valor es lo que se guarda en custom_cakes.shape (texto
+// libre en la base, sin CHECK): agregar una forma nueva es solo agregarla acá.
+export const cakeShapes = [
+  { value: 'redonda', label: 'Redonda' },
+  { value: 'cuadrada', label: 'Cuadrada' },
+  { value: 'rectangular', label: 'Rectangular' },
+  { value: 'long-cake', label: 'Long cake' },
+  { value: 'corazon', label: 'Corazón' },
+  { value: 'dos-pisos', label: 'Dos pisos' },
+  { value: 'tres-pisos', label: 'Tres pisos' },
+] as const;
+
+// Etiqueta legible de una forma guardada. Si el valor no está en la lista (datos antiguos
+// o escritos a mano) se muestra tal cual.
+export const getCakeShapeLabel = (shape?: string | null): string =>
+  cakeShapes.find(s => s.value === shape)?.label ?? shape ?? '';

@@ -128,6 +128,35 @@ describe('OrderDetail', () => {
     expect(screen.getByText('Sin stock en tienda')).toBeInTheDocument();
   });
 
+  it('shows a customized catalog line with its description, surcharge, images and the real line total', () => {
+    const order: Order = {
+      ...baseOrder,
+      items: [{
+        id: 'oi-1', productId: 'p1', product: { name: 'Tres leches' } as any, quantity: 2, price: 80,
+        customizationNotes: 'Papel comestible con foto', customizationPrice: 30,
+        referenceImages: ['https://signed.example/Pedidos/a.jpg'],
+      }],
+    };
+    render(<OrderDetail order={order} ordersApi={makeOrdersApi()} />);
+
+    expect(screen.getByText('Papel comestible con foto')).toBeInTheDocument();
+    expect(screen.getByText('(+Bs. 30 c/u)')).toBeInTheDocument();
+    expect(screen.getByAltText('Referencia 1')).toHaveAttribute('src', 'https://signed.example/Pedidos/a.jpg');
+    // (80 + 30) x 2 y no 80 x 2
+    expect(screen.getByText('Bs. 220')).toBeInTheDocument();
+  });
+
+  it('a plain catalog line keeps price x quantity and shows no personalization', () => {
+    const order: Order = {
+      ...baseOrder,
+      items: [{ id: 'oi-1', productId: 'p1', product: { name: 'Tres leches' } as any, quantity: 2, price: 80, customizationNotes: null, customizationPrice: 0 }],
+    };
+    render(<OrderDetail order={order} ordersApi={makeOrdersApi()} />);
+
+    expect(screen.getByText('Bs. 160')).toBeInTheDocument();
+    expect(screen.queryByText('Personalizado:')).not.toBeInTheDocument();
+  });
+
   it('renders the status badge and creator username', () => {
     render(<OrderDetail order={baseOrder} />);
 
@@ -180,7 +209,8 @@ describe('OrderDetail', () => {
       expect(screen.getByText('Forma: Redonda')).toBeInTheDocument();
       expect(screen.getByText('Diseño: Flores rosadas')).toBeInTheDocument();
       expect(screen.getByText('"Feliz cumpleaños"')).toBeInTheDocument();
-      expect(screen.getByText('2 imágenes de referencia')).toBeInTheDocument();
+      expect(screen.getByAltText('Referencia 1')).toBeInTheDocument();
+      expect(screen.getByAltText('Referencia 2')).toBeInTheDocument();
       // price shown is unit price * quantity = 150 * 2 = 300
       expect(screen.getByText('Bs. 300')).toBeInTheDocument();
     });

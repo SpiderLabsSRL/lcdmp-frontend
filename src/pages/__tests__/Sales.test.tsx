@@ -139,6 +139,18 @@ describe('Sales', () => {
     expect(createSale.mock.calls[1][0].overrideReservation).toBe(true);
   });
 
+  it('shows the product image on the card when it has one, and the cart icon otherwise', async () => {
+    const withImage = { ...cupcake, image: 'https://img.example.com/Productos/p1/a.jpg' };
+    const mockApi = buildMockApi({ getProducts: vi.fn().mockResolvedValue([withImage, cookie]) });
+    renderWithProviders(<Sales api={mockApi} />);
+
+    await screen.findByText('Cupcake de vainilla');
+
+    const image = screen.getByAltText('Cupcake de vainilla');
+    expect(image).toHaveAttribute('src', 'https://img.example.com/Productos/p1/a.jpg');
+    expect(screen.queryByAltText('Galleta de chocolate')).not.toBeInTheDocument();
+  });
+
   it('completes a sale with the cart contents and clears the cart afterward', async () => {
     const mockApi = buildMockApi({ getProducts: vi.fn().mockResolvedValue([cupcake, cookie]) });
     const user = userEvent.setup();

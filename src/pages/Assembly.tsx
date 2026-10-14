@@ -10,6 +10,7 @@ import { IAssemblyApi, defaultAssemblyApi } from '@/api/AssemblyApi';
 import { useOrdersSocket } from '@/hooks/useOrdersSocket';
 import { getWorkItemsAtStage } from '@/utils/workItems';
 import { WorkItemCard } from '@/components/Production/WorkItemCard';
+import { WorkItemDetailDialog, DesignPreview } from '@/components/Production/WorkItemDetailDialog';
 import type { Order, WorkItem } from '@/types';
 
 interface AssemblyProps {
@@ -19,6 +20,7 @@ interface AssemblyProps {
 export default function Assembly({ assemblyApi = defaultAssemblyApi }: AssemblyProps) {
   const [selectedItem, setSelectedItem] = useState<WorkItem | null>(null);
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [initialOrders, setInitialOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -52,6 +54,11 @@ export default function Assembly({ assemblyApi = defaultAssemblyApi }: AssemblyP
     }
   };
 
+  const handleViewItem = (item: WorkItem) => {
+    setSelectedItem(item);
+    setIsDetailDialogOpen(true);
+  };
+
   const handleOpenCompleteDialog = (item: WorkItem) => {
     setSelectedItem(item);
     setIsCompleteDialogOpen(true);
@@ -72,13 +79,17 @@ export default function Assembly({ assemblyApi = defaultAssemblyApi }: AssemblyP
   };
 
   const renderDetail = (item: WorkItem) => {
+    if (item.itemType === 'order_item') return <DesignPreview item={item} />;
     if (item.itemType !== 'custom_cake') return null;
     const cake = item.order.customCakes.find(c => c.id === item.itemId);
     if (!cake) return null;
     return (
-      <p className=" mt-0.5">
-        Relleno: {cake.fillingFlavor} {cake.secondFillingFlavor ? `/ ${cake.secondFillingFlavor}` : ''}
-      </p>
+      <>
+        <p className=" mt-0.5">
+          Relleno: {cake.fillingFlavor} {cake.secondFillingFlavor ? `/ ${cake.secondFillingFlavor}` : ''}
+        </p>
+        <DesignPreview item={item} />
+      </>
     );
   };
 
@@ -153,6 +164,7 @@ export default function Assembly({ assemblyApi = defaultAssemblyApi }: AssemblyP
                       soonHours={24}
                       detail={renderDetail(item)}
                       onComplete={handleOpenCompleteDialog}
+                      onClick={handleViewItem}
                     />
                   ))}
                 </div>
@@ -164,6 +176,8 @@ export default function Assembly({ assemblyApi = defaultAssemblyApi }: AssemblyP
             </div>
           )}
         </Card>
+
+        <WorkItemDetailDialog item={selectedItem} open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen} />
 
         {/* Complete Assembly Dialog */}
         <Dialog open={isCompleteDialogOpen} onOpenChange={setIsCompleteDialogOpen}>
