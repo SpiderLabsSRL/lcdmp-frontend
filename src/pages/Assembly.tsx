@@ -10,7 +10,7 @@ import { IAssemblyApi, defaultAssemblyApi } from '@/api/AssemblyApi';
 import { useOrdersSocket } from '@/hooks/useOrdersSocket';
 import { getWorkItemsAtStage } from '@/utils/workItems';
 import { WorkItemCard } from '@/components/Production/WorkItemCard';
-import { ReferenceImages } from '@/components/Images/ReferenceImages';
+import { WorkItemDetailDialog, DesignPreview } from '@/components/Production/WorkItemDetailDialog';
 import type { Order, WorkItem } from '@/types';
 
 interface AssemblyProps {
@@ -20,6 +20,7 @@ interface AssemblyProps {
 export default function Assembly({ assemblyApi = defaultAssemblyApi }: AssemblyProps) {
   const [selectedItem, setSelectedItem] = useState<WorkItem | null>(null);
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [initialOrders, setInitialOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -53,6 +54,11 @@ export default function Assembly({ assemblyApi = defaultAssemblyApi }: AssemblyP
     }
   };
 
+  const handleViewItem = (item: WorkItem) => {
+    setSelectedItem(item);
+    setIsDetailDialogOpen(true);
+  };
+
   const handleOpenCompleteDialog = (item: WorkItem) => {
     setSelectedItem(item);
     setIsCompleteDialogOpen(true);
@@ -77,9 +83,12 @@ export default function Assembly({ assemblyApi = defaultAssemblyApi }: AssemblyP
     const cake = item.order.customCakes.find(c => c.id === item.itemId);
     if (!cake) return null;
     return (
-      <p className=" mt-0.5">
-        Relleno: {cake.fillingFlavor} {cake.secondFillingFlavor ? `/ ${cake.secondFillingFlavor}` : ''}
-      </p>
+      <>
+        <p className=" mt-0.5">
+          Relleno: {cake.fillingFlavor} {cake.secondFillingFlavor ? `/ ${cake.secondFillingFlavor}` : ''}
+        </p>
+        <DesignPreview item={item} />
+      </>
     );
   };
 
@@ -154,6 +163,7 @@ export default function Assembly({ assemblyApi = defaultAssemblyApi }: AssemblyP
                       soonHours={24}
                       detail={renderDetail(item)}
                       onComplete={handleOpenCompleteDialog}
+                      onClick={handleViewItem}
                     />
                   ))}
                 </div>
@@ -165,6 +175,8 @@ export default function Assembly({ assemblyApi = defaultAssemblyApi }: AssemblyP
             </div>
           )}
         </Card>
+
+        <WorkItemDetailDialog item={selectedItem} open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen} />
 
         {/* Complete Assembly Dialog */}
         <Dialog open={isCompleteDialogOpen} onOpenChange={setIsCompleteDialogOpen}>
@@ -179,29 +191,6 @@ export default function Assembly({ assemblyApi = defaultAssemblyApi }: AssemblyP
                   <p className="text-xs sm:text-sm ">{selectedItem.order.customerName}</p>
                   <p className="text-sm mt-2">{selectedItem.title}</p>
                 </div>
-
-                {(() => {
-                  const cake = selectedItem.itemType === 'custom_cake'
-                    ? selectedItem.order.customCakes.find(c => c.id === selectedItem.itemId)
-                    : undefined;
-                  if (!cake || (!cake.design && !cake.referenceImages?.length)) return null;
-                  return (
-                    <div className="p-3 sm:p-4 bg-muted/50 rounded-lg space-y-2">
-                      {cake.design && (
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">Diseño:</p>
-                          <p className="text-sm mt-1 whitespace-pre-wrap text-foreground">{cake.design}</p>
-                        </div>
-                      )}
-                      {cake.referenceImages && cake.referenceImages.length > 0 && (
-                        <div>
-                          <p className="text-sm font-semibold mb-1 text-foreground">Imágenes de referencia:</p>
-                          <ReferenceImages images={cake.referenceImages} />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
 
                 <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 pt-2">
                   <Button

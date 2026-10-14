@@ -6,15 +6,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Palette, AlertTriangle, CheckCircle, Loader2, Wifi, WifiOff } from 'lucide-react';
-import { format, differenceInHours } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { differenceInHours } from 'date-fns';
 import { toast } from 'sonner';
 import { IDecorationApi, defaultDecorationApi } from '@/api/DecorationApi';
 import { useOrdersSocket } from '@/hooks/useOrdersSocket';
 import { getWorkItemsAtStage } from '@/utils/workItems';
 import { WorkItemCard } from '@/components/Production/WorkItemCard';
-import { ReferenceImages } from '@/components/Images/ReferenceImages';
-import type { Order, WorkItem, CustomCake } from '@/types';
+import { WorkItemDetailDialog, DesignPreview } from '@/components/Production/WorkItemDetailDialog';
+import type { Order, WorkItem } from '@/types';
 
 interface DecorationProps {
   decorationApi?: IDecorationApi;
@@ -85,16 +84,7 @@ export default function Decoration({ decorationApi = defaultDecorationApi }: Dec
     setIsCompleteDialogOpen(true);
   };
 
-  const getCakeForItem = (item: WorkItem): CustomCake | undefined => {
-    if (item.itemType !== 'custom_cake') return undefined;
-    return item.order.customCakes.find(c => c.id === item.itemId);
-  };
-
-  const renderDetail = (item: WorkItem) => {
-    const cake = getCakeForItem(item);
-    if (!cake?.design) return null;
-    return <p className=" mt-0.5">🎨 {cake.design.substring(0, 100)}{cake.design.length > 100 ? '...' : ''}</p>;
-  };
+  const renderDetail = (item: WorkItem) => <DesignPreview item={item} />;
 
   return (
     <MainLayout>
@@ -180,71 +170,7 @@ export default function Decoration({ decorationApi = defaultDecorationApi }: Dec
           )}
         </Card>
 
-        {/* Detail Dialog - Mobile optimized */}
-        <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-          <DialogContent className="w-[95vw] sm:w-full max-w-lg rounded-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-lg sm:text-xl">Detalles del Pedido #{selectedItem?.order.orderNumber}</DialogTitle>
-            </DialogHeader>
-            {selectedItem && (
-              <div className="space-y-4 px-1">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                  <div>
-                    <p className="text-sm text-foreground">Cliente</p>
-                    <p className="font-semibold text-base text-foreground">{selectedItem.order.customerName}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-foreground">Fecha de entrega</p>
-                    <p className="font-semibold text-base text-foreground">
-                      {format(new Date(selectedItem.order.pickupDate), 'dd MMMM yyyy', { locale: es })}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-foreground">Hora</p>
-                    <p className="font-semibold text-base text-foreground">{selectedItem.order.pickupTime}</p>
-                  </div>
-                </div>
-
-                <div className="p-3 sm:p-4 bg-muted/50 rounded-lg space-y-2">
-                  <h4 className="font-semibold text-base text-foreground">{selectedItem.title}</h4>
-                  {(() => {
-                    const cake = getCakeForItem(selectedItem);
-                    if (!cake) return null;
-                    return (
-                      <>
-                        {cake.design && (
-                          <div className="p-2 sm:p-3 bg-background rounded border">
-                            <p className="text-sm font-semibold text-foreground">Diseño requerido:</p>
-                            <p className="text-sm mt-1 whitespace-pre-wrap text-foreground">{cake.design}</p>
-                          </div>
-                        )}
-                        {cake.dedication && (
-                          <p className="text-sm text-foreground">Dedicatoria: "{cake.dedication}"</p>
-                        )}
-                        {cake.referenceImages && cake.referenceImages.length > 0 && (
-                          <div className="mt-2">
-                            <p className="text-sm font-semibold mb-1 text-foreground">Imágenes de referencia:</p>
-                            <ReferenceImages images={cake.referenceImages} />
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
-                  {selectedItem.notes && (
-                    <p className="text-sm text-foreground">Notas: "{selectedItem.notes}"</p>
-                  )}
-                </div>
-
-                {selectedItem.order.notes && (
-                  <div className="p-3 sm:p-4 bg-muted/50 rounded-lg space-y-1">
-                    <p className="text-sm font-semibold text-foreground">📝 Notas del pedido:</p>
-                    <p className="text-sm text-foreground whitespace-pre-wrap">{selectedItem.order.notes}</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
+        <WorkItemDetailDialog item={selectedItem} open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen} />
 
         {/* Complete Dialog - Mobile optimized */}
         <Dialog open={isCompleteDialogOpen} onOpenChange={setIsCompleteDialogOpen}>

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { addHours, format } from 'date-fns';
@@ -214,38 +214,66 @@ describe('Assembly', () => {
     expect(screen.queryByText('Completar Armado')).not.toBeInTheDocument();
   });
 
-  it('shows the cake design and its reference images in the dialog', async () => {
-    const orderWithImages = {
+  describe('cake details (design, notes, images) like in Decoración', () => {
+    const detailedOrder = {
       ...singleCakeOrder,
+      notes: 'Entregar con vela',
       customCakes: [{
         ...singleCakeOrder.customCakes[0],
+        shape: 'dos-pisos',
         design: 'Flores de azúcar rosadas',
+        dedication: 'Feliz cumple Ana',
         referenceImages: ['https://signed.example/Pedidos/a.jpg', 'https://signed.example/Pedidos/b.jpg'],
       }],
     };
-    const mockApi = buildMockApi({ getAssemblyOrders: vi.fn().mockResolvedValue([orderWithImages]) });
-    const user = userEvent.setup();
-    renderWithProviders(<Assembly assemblyApi={mockApi} />);
 
-    await screen.findByText('#ORD-002');
-    await user.click(screen.getByRole('button', { name: /Completar/i }));
+    it('shows a one-line design preview on the card', async () => {
+      const mockApi = buildMockApi({ getAssemblyOrders: vi.fn().mockResolvedValue([detailedOrder]) });
+      renderWithProviders(<Assembly assemblyApi={mockApi} />);
 
-    expect(await screen.findByText('Flores de azúcar rosadas')).toBeInTheDocument();
-    expect(screen.getByAltText('Referencia 1')).toHaveAttribute('src', 'https://signed.example/Pedidos/a.jpg');
-    expect(screen.getByAltText('Referencia 2')).toBeInTheDocument();
-  });
+      expect(await screen.findByText(/🎨 Flores de azúcar rosadas/)).toBeInTheDocument();
+    });
 
-  it('shows no design block when the cake has neither design nor images', async () => {
-    const mockApi = buildMockApi({ getAssemblyOrders: vi.fn().mockResolvedValue([singleCakeOrder]) });
-    const user = userEvent.setup();
-    renderWithProviders(<Assembly assemblyApi={mockApi} />);
+    it('opens the details dialog when the card is tapped: design, dedication, images and order notes', async () => {
+      const mockApi = buildMockApi({ getAssemblyOrders: vi.fn().mockResolvedValue([detailedOrder]) });
+      const user = userEvent.setup();
+      renderWithProviders(<Assembly assemblyApi={mockApi} />);
 
-    await screen.findByText('#ORD-002');
-    await user.click(screen.getByRole('button', { name: /Completar/i }));
+      await user.click(await screen.findByText('#ORD-002'));
 
-    await screen.findByText('Completar Armado');
-    expect(screen.queryByText('Imágenes de referencia:')).not.toBeInTheDocument();
-    expect(screen.queryByText('Diseño:')).not.toBeInTheDocument();
+      expect(await screen.findByText('Detalles del Pedido #ORD-002')).toBeInTheDocument();
+      expect(within(screen.getByRole('dialog')).getByText('Dos pisos')).toBeInTheDocument();
+      expect(screen.getByText('Diseño requerido:')).toBeInTheDocument();
+      expect(screen.getByText('Dedicatoria: "Feliz cumple Ana"')).toBeInTheDocument();
+      expect(screen.getByAltText('Referencia 1')).toHaveAttribute('src', 'https://signed.example/Pedidos/a.jpg');
+      expect(screen.getByAltText('Referencia 2')).toBeInTheDocument();
+      expect(screen.getByText('Entregar con vela')).toBeInTheDocument();
+      expect(mockApi.completeItem).not.toHaveBeenCalled();
+    });
+
+    it('tapping "Completar" does not open the details dialog', async () => {
+      const mockApi = buildMockApi({ getAssemblyOrders: vi.fn().mockResolvedValue([detailedOrder]) });
+      const user = userEvent.setup();
+      renderWithProviders(<Assembly assemblyApi={mockApi} />);
+
+      await screen.findByText('#ORD-002');
+      await user.click(screen.getByRole('button', { name: /Completar/i }));
+
+      expect(await screen.findByText('Completar Armado')).toBeInTheDocument();
+      expect(screen.queryByText('Detalles del Pedido #ORD-002')).not.toBeInTheDocument();
+    });
+
+    it('shows no design preview or design block when the cake has none', async () => {
+      const mockApi = buildMockApi({ getAssemblyOrders: vi.fn().mockResolvedValue([singleCakeOrder]) });
+      const user = userEvent.setup();
+      renderWithProviders(<Assembly assemblyApi={mockApi} />);
+
+      await user.click(await screen.findByText('#ORD-002'));
+
+      await screen.findByText('Detalles del Pedido #ORD-002');
+      expect(screen.queryByText(/🎨/)).not.toBeInTheDocument();
+      expect(screen.queryByText('Diseño requerido:')).not.toBeInTheDocument();
+    });
   });
 
   it('closes the dialog without completing when Cancelar is clicked', async () => {

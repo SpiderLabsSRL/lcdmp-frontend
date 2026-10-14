@@ -10,6 +10,7 @@ import { IBakingApi, defaultBakingApi } from '@/api/BakingApi';
 import { useOrdersSocket } from '@/hooks/useOrdersSocket';
 import { getWorkItemsAtStage } from '@/utils/workItems';
 import { WorkItemCard } from '@/components/Production/WorkItemCard';
+import { WorkItemDetailDialog, DesignPreview } from '@/components/Production/WorkItemDetailDialog';
 import { Badge } from '@/components/ui/badge';
 import { getCakeShapeLabel } from '@/types/consts';
 import type { Order, BakedProduct, WorkItem } from '@/types';
@@ -21,6 +22,7 @@ interface BakingProps {
 export default function Baking({ bakingApi = defaultBakingApi }: BakingProps) {
   const [selectedItem, setSelectedItem] = useState<WorkItem | null>(null);
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [initialOrders, setInitialOrders] = useState<Order[]>([]);
   const [bakedProducts, setBakedProducts] = useState<BakedProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -58,6 +60,11 @@ export default function Baking({ bakingApi = defaultBakingApi }: BakingProps) {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleViewItem = (item: WorkItem) => {
+    setSelectedItem(item);
+    setIsDetailDialogOpen(true);
   };
 
   const handleOpenCompleteDialog = (item: WorkItem) => {
@@ -104,6 +111,7 @@ export default function Baking({ bakingApi = defaultBakingApi }: BakingProps) {
             <span className="font-medium">Sabores:</span> {flavors}
           </p>
         )}
+        <DesignPreview item={item} />
       </div>
     );
   };
@@ -225,6 +233,7 @@ export default function Baking({ bakingApi = defaultBakingApi }: BakingProps) {
                       soonHours={24}
                       detail={renderDetail(item)}
                       onComplete={handleOpenCompleteDialog}
+                      onClick={handleViewItem}
                     />
                   ))}
                 </div>
@@ -236,6 +245,8 @@ export default function Baking({ bakingApi = defaultBakingApi }: BakingProps) {
             </div>
           )}
         </Card>
+
+        <WorkItemDetailDialog item={selectedItem} open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen} />
 
         {/* Complete Baking Dialog */}
         <Dialog open={isCompleteDialogOpen} onOpenChange={setIsCompleteDialogOpen}>
