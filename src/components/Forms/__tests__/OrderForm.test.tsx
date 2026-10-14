@@ -278,7 +278,7 @@ describe('OrderForm - custom cakes', () => {
     expect(screen.getByText('Torta #2')).toBeInTheDocument();
 
     const secondCard = screen.getByText('Torta #2').closest('.relative') as HTMLElement;
-    await user.click(within(secondCard).getByRole('button'));
+    await user.click(within(secondCard).getByRole('button', { name: 'Quitar torta' }));
 
     expect(screen.queryByText('Torta #2')).not.toBeInTheDocument();
     expect(screen.getByText('Torta #1')).toBeInTheDocument();

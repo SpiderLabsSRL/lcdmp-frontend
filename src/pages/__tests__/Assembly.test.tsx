@@ -214,6 +214,40 @@ describe('Assembly', () => {
     expect(screen.queryByText('Completar Armado')).not.toBeInTheDocument();
   });
 
+  it('shows the cake design and its reference images in the dialog', async () => {
+    const orderWithImages = {
+      ...singleCakeOrder,
+      customCakes: [{
+        ...singleCakeOrder.customCakes[0],
+        design: 'Flores de azúcar rosadas',
+        referenceImages: ['https://signed.example/Pedidos/a.jpg', 'https://signed.example/Pedidos/b.jpg'],
+      }],
+    };
+    const mockApi = buildMockApi({ getAssemblyOrders: vi.fn().mockResolvedValue([orderWithImages]) });
+    const user = userEvent.setup();
+    renderWithProviders(<Assembly assemblyApi={mockApi} />);
+
+    await screen.findByText('#ORD-002');
+    await user.click(screen.getByRole('button', { name: /Completar/i }));
+
+    expect(await screen.findByText('Flores de azúcar rosadas')).toBeInTheDocument();
+    expect(screen.getByAltText('Referencia 1')).toHaveAttribute('src', 'https://signed.example/Pedidos/a.jpg');
+    expect(screen.getByAltText('Referencia 2')).toBeInTheDocument();
+  });
+
+  it('shows no design block when the cake has neither design nor images', async () => {
+    const mockApi = buildMockApi({ getAssemblyOrders: vi.fn().mockResolvedValue([singleCakeOrder]) });
+    const user = userEvent.setup();
+    renderWithProviders(<Assembly assemblyApi={mockApi} />);
+
+    await screen.findByText('#ORD-002');
+    await user.click(screen.getByRole('button', { name: /Completar/i }));
+
+    await screen.findByText('Completar Armado');
+    expect(screen.queryByText('Imágenes de referencia:')).not.toBeInTheDocument();
+    expect(screen.queryByText('Diseño:')).not.toBeInTheDocument();
+  });
+
   it('closes the dialog without completing when Cancelar is clicked', async () => {
     const mockApi = buildMockApi({ getAssemblyOrders: vi.fn().mockResolvedValue([singleCakeOrder]) });
     const user = userEvent.setup();

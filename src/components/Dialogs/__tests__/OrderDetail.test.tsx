@@ -180,7 +180,8 @@ describe('OrderDetail', () => {
       expect(screen.getByText('Forma: Redonda')).toBeInTheDocument();
       expect(screen.getByText('Diseño: Flores rosadas')).toBeInTheDocument();
       expect(screen.getByText('"Feliz cumpleaños"')).toBeInTheDocument();
-      expect(screen.getByText('2 imágenes de referencia')).toBeInTheDocument();
+      expect(screen.getByAltText('Referencia 1')).toBeInTheDocument();
+      expect(screen.getByAltText('Referencia 2')).toBeInTheDocument();
       // price shown is unit price * quantity = 150 * 2 = 300
       expect(screen.getByText('Bs. 300')).toBeInTheDocument();
     });

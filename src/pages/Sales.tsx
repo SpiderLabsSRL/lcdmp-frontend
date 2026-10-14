@@ -201,8 +201,12 @@ export default function Sales({ api = defaultSalesApi }: SalesProps) {
                     onClick={() => addToCart(product)}
                   >
                     <CardContent className="p-3 sm:p-4">
-                      <div className="aspect-square bg-muted rounded-lg mb-2 sm:mb-3 flex items-center justify-center">
-                        <ShoppingCart className="h-6 w-6 sm:h-8 sm:w-8 " />
+                      <div className="aspect-square bg-muted rounded-lg mb-2 sm:mb-3 flex items-center justify-center overflow-hidden">
+                        {product.image ? (
+                          <img src={product.image} alt={product.name} loading="lazy" className="h-full w-full object-cover" />
+                        ) : (
+                          <ShoppingCart className="h-6 w-6 sm:h-8 sm:w-8 " />
+                        )}
                       </div>
                       <span className="font-medium text-sm sm:text-sm truncate">{product.name}</span>
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 mt-1 sm:mt-2">

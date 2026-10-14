@@ -11,6 +11,8 @@ import { toast } from 'sonner';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { getLocalDateString } from '@/utils/DateUtils';
+import ReferenceImagesInput from '@/components/Images/ReferenceImagesInput';
+import type { IUploadsApi } from '@/api/UploadsApi';
 import { es } from 'date-fns/locale';
 
 export interface OrderFormProps {
@@ -21,12 +23,13 @@ export interface OrderFormProps {
   flavors: any[];
   sweetTableCombos?: SweetTableCombo[];
   isEditing?: boolean;
+  uploadsApi?: IUploadsApi;
 }
 
 const PORTION_OPTIONS = [10, 15, 20, 30, 40, 50];
 const CUSTOM_PORTIONS = 'custom';
 
-export default function OrderForm({ initialData, onSubmit, onClose, products, flavors, sweetTableCombos = [], isEditing = false }: OrderFormProps) {
+export default function OrderForm({ initialData, onSubmit, onClose, products, flavors, sweetTableCombos = [], isEditing = false, uploadsApi }: OrderFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<CreateOrderData | UpdateOrderData>(() => {
     if (initialData) {
@@ -525,6 +528,7 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
                     size="sm"
                     onClick={() => removeCake(index)}
                     className="text-destructive"
+                    aria-label="Quitar torta"
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -700,6 +704,15 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
                   className="text-sm"
                   value={cake.dedication || ''}
                   onChange={(e) => updateCake(index, 'dedication', e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-sm">Imágenes de referencia (opcional)</Label>
+                <ReferenceImagesInput
+                  value={cake.referenceImages || []}
+                  onChange={(images) => updateCake(index, 'referenceImages', images)}
+                  uploadsApi={uploadsApi}
                 />
               </div>
 

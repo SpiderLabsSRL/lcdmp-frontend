@@ -22,15 +22,19 @@ import { IProductsApi, defaultProductsApi } from '@/api/ProductsApi';
 import { IMaterialsApi, defaultMaterialsApi } from '@/api/MaterialsApi';
 import { IInventoryApi, defaultInventoryApi } from '@/api/InventoryApi';
 import RecipeDialog from '@/components/Dialogs/RecipeDialog';
+import ProductImageField, { ProductImageChange } from '@/components/Images/ProductImageField';
+import { IUploadsApi, defaultUploadsApi } from '@/api/UploadsApi';
+import { prepareImage } from '@/utils/image';
 import type { RawMaterial } from '@/types';
 
 interface ProductsProps {
   api?: IProductsApi;
   materialsApi?: IMaterialsApi;
   inventoryApi?: IInventoryApi;
+  uploadsApi?: IUploadsApi;
 }
 
-export default function Products({ api = defaultProductsApi, materialsApi = defaultMaterialsApi, inventoryApi = defaultInventoryApi }: ProductsProps) {
+export default function Products({ api = defaultProductsApi, materialsApi = defaultMaterialsApi, inventoryApi = defaultInventoryApi, uploadsApi = defaultUploadsApi }: ProductsProps) {
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState('products');
   const [searchTerm, setSearchTerm] = useState('');
@@ -189,7 +193,23 @@ export default function Products({ api = defaultProductsApi, materialsApi = defa
     setStockProduct(null);
   };
 
-  const handleProductSaved = async (savedProduct: Product) => {
+  // La imagen se sube DESPUÉS de guardar el producto (necesita su id). Si falla, el producto
+  // ya quedó guardado: se avisa y se puede reintentar editándolo.
+  const applyImageChange = async (productId: string, change?: ProductImageChange) => {
+    if (!change) return;
+    try {
+      if (change.file) {
+        await uploadsApi.uploadProductImage(productId, await prepareImage(change.file));
+      } else if (change.remove) {
+        await uploadsApi.removeProductImage(productId);
+      }
+    } catch (error: any) {
+      console.error('Error saving product image:', error);
+      toast.error(`El producto se guardó, pero la imagen no: ${error.message}`);
+    }
+  };
+
+  const handleProductSaved = async (savedProduct: Product, imageChange?: ProductImageChange) => {
     try {
       if (editingProduct) {
         // Editar producto existente
@@ -206,6 +226,7 @@ export default function Products({ api = defaultProductsApi, materialsApi = defa
           isActive: savedProduct.isActive,
         };
         await api.editProduct(editData);
+        await applyImageChange(savedProduct.id, imageChange);
         toast.success(`Producto "${savedProduct.name}" actualizado exitosamente`);
       } else {
         // Crear nuevo producto
@@ -220,7 +241,8 @@ export default function Products({ api = defaultProductsApi, materialsApi = defa
           restockQuantity: savedProduct.restockQuantity,
           isActive: savedProduct.isActive,
         };
-        await api.createProduct(createData);
+        const created = await api.createProduct(createData);
+        await applyImageChange(created.id, imageChange);
         toast.success(`Producto "${savedProduct.name}" creado exitosamente`);
       }
       await loadProducts(); // Recargar la lista
@@ -773,8 +795,12 @@ export default function Products({ api = defaultProductsApi, materialsApi = defa
                       <MobileCard key={product.id} className="active:scale-[0.98] transition-transform">
                         <MobileCardHeader className="px-3 py-2">
                           <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 bg-muted rounded-lg flex items-center justify-center shrink-0">
-                              <Cake className="h-5 w-5 " />
+                            <div className="h-10 w-10 bg-muted rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
+                              {product.image ? (
+                                <img src={product.image} alt={product.name} loading="lazy" className="h-full w-full object-cover" />
+                              ) : (
+                                <Cake className="h-5 w-5 " />
+                              )}
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="font-medium text-sm truncate">{product.name}</p>
@@ -878,8 +904,12 @@ export default function Products({ api = defaultProductsApi, materialsApi = defa
                             <TableRow key={product.id}>
                               <TableCell>
                                 <div className="flex items-center gap-3 min-w-[200px]">
-                                  <div className="h-10 w-10 bg-muted rounded-lg flex items-center justify-center shrink-0">
-                                    <Cake className="h-5 w-5 " />
+                                  <div className="h-10 w-10 bg-muted rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
+                                    {product.image ? (
+                                      <img src={product.image} alt={product.name} loading="lazy" className="h-full w-full object-cover" />
+                                    ) : (
+                                      <Cake className="h-5 w-5 " />
+                                    )}
                                   </div>
                                   <div className="min-w-0">
                                     <p className="font-medium truncate">{product.name}</p>
@@ -1258,11 +1288,12 @@ function AddStockForm({ product, onClose, onAddStock, onTransfer }: {
 
 function ProductForm({ onClose, onSave, initialProduct }: { 
   onClose: () => void; 
-  onSave: (product: Product) => void;
+  onSave: (product: Product, imageChange: ProductImageChange) => void;
   initialProduct?: Product | null;
 }) {
   const isEditing = !!initialProduct;
   const [submitting, setSubmitting] = useState(false);
+  const [imageChange, setImageChange] = useState<ProductImageChange>({ file: null, remove: false });
   
   const [formData, setFormData] = useState({
     name: initialProduct?.name || '',
@@ -1326,7 +1357,7 @@ function ProductForm({ onClose, onSave, initialProduct }: {
       restockQuantity: formData.restockQuantity || null,
     };
     
-    await onSave(product);
+    await onSave(product, imageChange);
     setSubmitting(false);
   };
 
@@ -1393,6 +1424,8 @@ function ProductForm({ onClose, onSave, initialProduct }: {
         </div>
       </div>
       
+      <ProductImageField currentImage={initialProduct?.image} value={imageChange} onChange={setImageChange} />
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <div className="space-y-1.5 sm:space-y-2">
           <Label className="text-sm">{isEditing ? 'Stock en tienda' : 'Stock inicial (tienda)'}</Label>

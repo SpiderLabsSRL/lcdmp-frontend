@@ -13,6 +13,7 @@ import { IDecorationApi, defaultDecorationApi } from '@/api/DecorationApi';
 import { useOrdersSocket } from '@/hooks/useOrdersSocket';
 import { getWorkItemsAtStage } from '@/utils/workItems';
 import { WorkItemCard } from '@/components/Production/WorkItemCard';
+import { ReferenceImages } from '@/components/Images/ReferenceImages';
 import type { Order, WorkItem, CustomCake } from '@/types';
 
 interface DecorationProps {
@@ -223,11 +224,7 @@ export default function Decoration({ decorationApi = defaultDecorationApi }: Dec
                         {cake.referenceImages && cake.referenceImages.length > 0 && (
                           <div className="mt-2">
                             <p className="text-sm font-semibold mb-1 text-foreground">Imágenes de referencia:</p>
-                            <div className="flex gap-2 flex-wrap">
-                              {cake.referenceImages.map((img, idx) => (
-                                <img key={idx} src={img} alt={`Referencia ${idx + 1}`} className="w-16 h-16 object-cover rounded" />
-                              ))}
-                            </div>
+                            <ReferenceImages images={cake.referenceImages} />
                           </div>
                         )}
                       </>

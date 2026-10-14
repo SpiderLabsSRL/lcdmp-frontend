@@ -10,6 +10,7 @@ import { IAssemblyApi, defaultAssemblyApi } from '@/api/AssemblyApi';
 import { useOrdersSocket } from '@/hooks/useOrdersSocket';
 import { getWorkItemsAtStage } from '@/utils/workItems';
 import { WorkItemCard } from '@/components/Production/WorkItemCard';
+import { ReferenceImages } from '@/components/Images/ReferenceImages';
 import type { Order, WorkItem } from '@/types';
 
 interface AssemblyProps {
@@ -178,6 +179,29 @@ export default function Assembly({ assemblyApi = defaultAssemblyApi }: AssemblyP
                   <p className="text-xs sm:text-sm ">{selectedItem.order.customerName}</p>
                   <p className="text-sm mt-2">{selectedItem.title}</p>
                 </div>
+
+                {(() => {
+                  const cake = selectedItem.itemType === 'custom_cake'
+                    ? selectedItem.order.customCakes.find(c => c.id === selectedItem.itemId)
+                    : undefined;
+                  if (!cake || (!cake.design && !cake.referenceImages?.length)) return null;
+                  return (
+                    <div className="p-3 sm:p-4 bg-muted/50 rounded-lg space-y-2">
+                      {cake.design && (
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">Diseño:</p>
+                          <p className="text-sm mt-1 whitespace-pre-wrap text-foreground">{cake.design}</p>
+                        </div>
+                      )}
+                      {cake.referenceImages && cake.referenceImages.length > 0 && (
+                        <div>
+                          <p className="text-sm font-semibold mb-1 text-foreground">Imágenes de referencia:</p>
+                          <ReferenceImages images={cake.referenceImages} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 pt-2">
                   <Button

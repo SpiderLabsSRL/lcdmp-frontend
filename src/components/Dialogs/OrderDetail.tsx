@@ -20,6 +20,7 @@ import { getOrderType } from "@/pages/Orders";
 import { IOrdersApi, defaultOrdersApi } from "@/api/OrdersApi";
 import { getLocalDateString } from "@/utils/DateUtils";
 import MaterialUsageSection from "./MaterialUsageSection";
+import { ReferenceImages } from "@/components/Images/ReferenceImages";
 import type { IMaterialsApi } from "@/api/MaterialsApi";
 import type { IInventoryApi } from "@/api/InventoryApi";
 
@@ -183,9 +184,9 @@ export default function OrderDetail({ order, onDeliver, onCancel, onMarkAtStore,
                 <p className="text-sm italic text-foreground">"{cake.dedication}"</p>
               )}
               {cake.referenceImages && cake.referenceImages.length > 0 && (
-                <p className="text-sm text-foreground mt-1">
-                  {cake.referenceImages.length} imágenes de referencia
-                </p>
+                <div className="mt-2">
+                  <ReferenceImages images={cake.referenceImages} />
+                </div>
               )}
             </div>
           ))}
