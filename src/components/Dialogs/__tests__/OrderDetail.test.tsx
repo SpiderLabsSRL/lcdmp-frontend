@@ -157,6 +157,27 @@ describe('OrderDetail', () => {
     expect(screen.queryByText('Personalizado:')).not.toBeInTheDocument();
   });
 
+  it('shows the reference images of a sweet table and of an additional dessert', () => {
+    const order: Order = {
+      ...baseOrder,
+      sweetTableCombos: [{
+        id: 'oc-1', name: 'Mesa Dulce 50', totalQuantity: 10, price: 400, products: [],
+        referenceImages: ['https://signed.example/Pedidos/mesa.jpg'],
+      }],
+      sweetTableExtras: [{
+        id: 'e-1', productId: 'p2', product: { name: 'Galleta' } as any, quantity: 3, price: 5,
+        referenceImages: ['https://signed.example/Pedidos/postre.jpg'],
+      }],
+    };
+    render(<OrderDetail order={order} ordersApi={makeOrdersApi()} />);
+
+    const images = screen.getAllByAltText(/Referencia/);
+    expect(images.map(i => i.getAttribute('src'))).toEqual([
+      'https://signed.example/Pedidos/mesa.jpg',
+      'https://signed.example/Pedidos/postre.jpg',
+    ]);
+  });
+
   it('renders the status badge and creator username', () => {
     render(<OrderDetail order={baseOrder} />);
 

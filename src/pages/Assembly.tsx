@@ -79,8 +79,7 @@ export default function Assembly({ assemblyApi = defaultAssemblyApi }: AssemblyP
   };
 
   const renderDetail = (item: WorkItem) => {
-    if (item.itemType === 'order_item') return <DesignPreview item={item} />;
-    if (item.itemType !== 'custom_cake') return null;
+    if (item.itemType !== 'custom_cake') return <DesignPreview item={item} />;
     const cake = item.order.customCakes.find(c => c.id === item.itemId);
     if (!cake) return null;
     return (

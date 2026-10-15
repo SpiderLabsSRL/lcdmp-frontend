@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
-import { render, screen, within, fireEvent } from '@testing-library/react';
+import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('sonner', () => ({
@@ -628,10 +628,81 @@ describe('OrderForm - sweet table extras', () => {
     expect(within(extraRow).getByText('Bs. 20.00')).toBeInTheDocument();
     expect(screen.getByText(/Total adicionales: Bs\. 20\.00/)).toBeInTheDocument();
 
-    const removeButton = within(extraRow).getByRole('button');
-    await user.click(removeButton);
+    await user.click(within(extraRow).getByRole('button', { name: 'Quitar postre' }));
 
     expect(screen.getByText('Sin postres adicionales. Estos se agregan por separado de las mesas dulces.')).toBeInTheDocument();
+  });
+});
+
+describe('OrderForm - imágenes de mesa dulce', () => {
+  const photo = () => new File([new Uint8Array([0xff, 0xd8, 0xff])], 'mesa.jpg', { type: 'image/jpeg' });
+  const makeUploads = (urls: string[]) => ({
+    uploadOrderImage: vi.fn().mockImplementation(async () => ({ key: 'Pedidos/x.jpg', url: urls.shift() })),
+    uploadProductImage: vi.fn(),
+    removeProductImage: vi.fn(),
+  }) as any;
+
+  it('lets you attach images to a predefined sweet table and sends them with the combo', async () => {
+    const user = userEvent.setup();
+    const uploadsApi = makeUploads(['https://signed/mesa.jpg']);
+    const { onSubmit } = renderForm({ uploadsApi });
+
+    await user.click(screen.getByLabelText('Mesa dulce'));
+    await chooseOption(user, getPresetComboSelect(), /Mesa Dulce 50/);
+
+    const combo = screen.getByText('Mesa Dulce 50').closest('.border') as HTMLElement;
+    fireEvent.change(within(combo).getByLabelText('Seleccionar imágenes de referencia'), { target: { files: [photo()] } });
+
+    await waitFor(() => expect(within(combo).getByAltText('Referencia 1')).toHaveAttribute('src', 'https://signed/mesa.jpg'));
+
+    await fillRequiredCustomerFields(user);
+    // la mesa predefinida ya viene con la composición válida
+    await user.click(screen.getByRole('button', { name: 'Crear Pedido' }));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit.mock.calls[0][0].sweetTableCombos[0].referenceImages).toEqual(['https://signed/mesa.jpg']);
+    expect(uploadsApi.uploadOrderImage).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets you attach images to an additional dessert independently of the sweet tables', async () => {
+    const user = userEvent.setup();
+    const uploadsApi = makeUploads(['https://signed/postre.jpg']);
+    const { onSubmit } = renderForm({ uploadsApi });
+
+    await user.click(screen.getByLabelText('Mesa dulce'));
+    await user.click(screen.getByRole('button', { name: /Agregar postre/i }));
+    const extraSelect = within(getMesaDulceSection()).getAllByRole('combobox')[1];
+    await chooseOption(user, extraSelect, /Galleta - Bs\. 5/);
+
+    const extraRow = extraSelect.closest('.items-end') as HTMLElement;
+    fireEvent.change(within(extraRow).getByLabelText('Seleccionar imágenes de referencia'), { target: { files: [photo()] } });
+    await waitFor(() => expect(within(extraRow).getByAltText('Referencia 1')).toBeInTheDocument());
+
+    await fillRequiredCustomerFields(user);
+    await user.click(screen.getByRole('button', { name: 'Crear Pedido' }));
+
+    expect(onSubmit.mock.calls[0][0].sweetTableExtras[0]).toMatchObject({
+      productId: expect.any(String), referenceImages: ['https://signed/postre.jpg'],
+    });
+  });
+
+  it('removing an image from a sweet table takes it out of the payload', async () => {
+    const user = userEvent.setup();
+    const uploadsApi = makeUploads(['https://signed/a.jpg', 'https://signed/b.jpg']);
+    const { onSubmit } = renderForm({ uploadsApi });
+
+    await user.click(screen.getByLabelText('Mesa dulce'));
+    await chooseOption(user, getPresetComboSelect(), /Mesa Dulce 50/);
+    const combo = screen.getByText('Mesa Dulce 50').closest('.border') as HTMLElement;
+    const input = within(combo).getByLabelText('Seleccionar imágenes de referencia');
+    fireEvent.change(input, { target: { files: [photo(), photo()] } });
+    await waitFor(() => expect(within(combo).getAllByAltText(/Referencia/)).toHaveLength(2));
+
+    await user.click(within(combo).getByRole('button', { name: 'Quitar imagen 1' }));
+    await fillRequiredCustomerFields(user);
+    await user.click(screen.getByRole('button', { name: 'Crear Pedido' }));
+
+    expect(onSubmit.mock.calls[0][0].sweetTableCombos[0].referenceImages).toEqual(['https://signed/b.jpg']);
   });
 });
 

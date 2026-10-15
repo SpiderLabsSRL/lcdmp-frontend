@@ -245,6 +245,12 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
     setFormData({ ...formData, sweetTableCombos: updated });
   };
 
+  const updateSweetTableComboImages = (comboIndex: number, referenceImages: string[]) => {
+    const updated = [...(formData.sweetTableCombos || [])];
+    updated[comboIndex] = { ...updated[comboIndex], referenceImages };
+    setFormData({ ...formData, sweetTableCombos: updated });
+  };
+
   const addComboProduct = (comboIndex: number) => {
     const updated = [...(formData.sweetTableCombos || [])];
     const combo = { ...updated[comboIndex] };
@@ -1043,6 +1049,15 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
                       onChange={(e) => updateSweetTableComboDetails(comboIndex, e.target.value)}
                     />
                   </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Imágenes de referencia (opcional)</Label>
+                    <ReferenceImagesInput
+                      value={combo.referenceImages || []}
+                      onChange={(images) => updateSweetTableComboImages(comboIndex, images)}
+                      uploadsApi={uploadsApi}
+                    />
+                  </div>
                 </div>
               );
             })
@@ -1102,9 +1117,18 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
                     size="sm"
                     onClick={() => removeExtra(index)}
                     className="text-destructive"
+                    aria-label="Quitar postre"
                   >
                     <X className="h-4 w-4" />
                   </Button>
+                  <div className="col-span-full space-y-1">
+                    <Label className="text-xs">Imágenes de referencia (opcional)</Label>
+                    <ReferenceImagesInput
+                      value={extra.referenceImages || []}
+                      onChange={(images) => updateExtra(index, 'referenceImages', images)}
+                      uploadsApi={uploadsApi}
+                    />
+                  </div>
                 </div>
               ))
             )}
