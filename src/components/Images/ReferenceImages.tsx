@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { ImageOff } from 'lucide-react';
+import { ImageLightbox } from './ImageLightbox';
 
-function ReferenceImage({ src, index }: { src: string; index: number }) {
+function ReferenceImage({ src, index, onOpen }: { src: string; index: number; onOpen: (index: number) => void }) {
   const [failed, setFailed] = useState(false);
 
   // Las imágenes de pedidos son URLs firmadas que vencen al día: si una página lleva abierta
@@ -19,7 +20,12 @@ function ReferenceImage({ src, index }: { src: string; index: number }) {
   }
 
   return (
-    <a href={src} target="_blank" rel="noreferrer" title="Abrir en tamaño completo">
+    <button
+      type="button"
+      onClick={() => onOpen(index)}
+      title="Ampliar imagen"
+      className="rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
       <img
         src={src}
         alt={`Referencia ${index + 1}`}
@@ -27,19 +33,30 @@ function ReferenceImage({ src, index }: { src: string; index: number }) {
         onError={() => setFailed(true)}
         className="w-20 h-20 object-cover rounded border"
       />
-    </a>
+    </button>
   );
 }
 
-// Miniaturas de las imágenes de referencia de una torta; al tocar una se abre completa.
+// Miniaturas de las imágenes de referencia; al tocar una se amplía en un visor con zoom
+// (sin salir de la pantalla ni abrir otra pestaña).
 export function ReferenceImages({ images }: { images?: string[] }) {
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+
   if (!images || images.length === 0) return null;
 
   return (
-    <div className="flex gap-2 flex-wrap">
-      {images.map((src, index) => (
-        <ReferenceImage key={`${index}-${src}`} src={src} index={index} />
-      ))}
-    </div>
+    <>
+      <div className="flex gap-2 flex-wrap">
+        {images.map((src, index) => (
+          <ReferenceImage key={`${index}-${src}`} src={src} index={index} onOpen={setOpenIndex} />
+        ))}
+      </div>
+      <ImageLightbox
+        images={images}
+        index={openIndex}
+        onIndexChange={setOpenIndex}
+        onClose={() => setOpenIndex(null)}
+      />
+    </>
   );
 }

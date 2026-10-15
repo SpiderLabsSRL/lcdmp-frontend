@@ -260,6 +260,11 @@ export default function OrderDetail({ order, onDeliver, onCancel, onMarkAtStore,
                   {combo.details && (
                     <p className="text-sm text-foreground mt-1">{combo.details}</p>
                   )}
+                  {combo.referenceImages && combo.referenceImages.length > 0 && (
+                    <div className="mt-2">
+                      <ReferenceImages images={combo.referenceImages} />
+                    </div>
+                  )}
                 </div>
                 <p className="font-bold text-primary">Bs. {combo.price}</p>
               </div>
@@ -285,6 +290,11 @@ export default function OrderDetail({ order, onDeliver, onCancel, onMarkAtStore,
                 </div>
                 <p className="font-semibold text-foreground">Bs. {extra.price * extra.quantity}</p>
               </div>
+              {extra.referenceImages && extra.referenceImages.length > 0 && (
+                <div className="mt-2">
+                  <ReferenceImages images={extra.referenceImages} />
+                </div>
+              )}
             </div>
           ))}
         </div>

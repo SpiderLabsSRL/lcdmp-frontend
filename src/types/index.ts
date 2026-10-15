@@ -308,6 +308,8 @@ export interface OrderCombo {
   totalQuantity: number;
   price: number;
   details?: string;
+  // Imágenes de referencia de la mesa dulce (URLs firmadas al leer; el backend guarda las keys)
+  referenceImages?: string[];
 }
 
 export interface OrderGuarantee {
@@ -384,6 +386,8 @@ export interface WorkItem {
   notes?: string;
   // Personalización de una línea de catálogo (descripción + imágenes), si la tiene
   customization?: { notes: string; images: string[] };
+  // Imágenes de referencia de la mesa dulce (o del postre adicional) a la que pertenece la línea
+  referenceImages?: string[];
 }
 
 export interface ItemStageLogEntry {
@@ -413,6 +417,8 @@ export interface Transaction {
   amount: number;
   method: PaymentMethod;
   orderId?: string;
+  // Las filas de una misma venta pagada con varios métodos comparten saleId
+  saleId?: string | null;
   description: string;
   createdAt: Date;
   createdBy: string;

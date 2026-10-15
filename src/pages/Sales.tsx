@@ -5,8 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Search, ShoppingCart, QrCode, Banknote, X, Minus, Plus as PlusIcon } from 'lucide-react';
+import { Search, ShoppingCart, QrCode, Banknote, Coins, X, Minus, Plus as PlusIcon } from 'lucide-react';
 import { toast } from 'sonner';
+import { NumberInput } from '@/components/ui/number-input';
+import { PaymentMode, buildPayments, describePayments, mixedSplit } from '@/utils/payments';
 import { CartItem, Product } from '@/types';
 import { ISalesApi, defaultSalesApi, SaleData, ReservationConflict, ReservationConflictError } from '@/api/SalesApi';
 import {
@@ -29,7 +31,8 @@ export default function Sales({ api = defaultSalesApi }: SalesProps) {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'qr'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMode>('cash');
+  const [cashAmount, setCashAmount] = useState(0);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,7 +107,14 @@ export default function Sales({ api = defaultSalesApi }: SalesProps) {
 
   const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
+  const mixed = mixedSplit(total, cashAmount);
+
   const completeSale = async (overrideReservation = false) => {
+    if (paymentMethod === 'mixed' && !mixed.valid) {
+      toast.error('En un pago mixto el efectivo debe ser mayor a 0 y menor al total; el resto se cobra por QR');
+      return;
+    }
+    const payments = buildPayments(paymentMethod, total, cashAmount);
     const saleData: SaleData = {
       items: cart.map(item => ({
         productId: item.productId,
@@ -112,14 +122,16 @@ export default function Sales({ api = defaultSalesApi }: SalesProps) {
         price: item.price,
       })),
       total,
-      paymentMethod,
+      paymentMethod: paymentMethod === 'mixed' ? 'both' : paymentMethod,
+      payments,
       timestamp: new Date(),
       overrideReservation,
     };
 
     try {
       await api.createSale(saleData);
-      toast.success(`Venta completada por Bs. ${total} (${paymentMethod === 'cash' ? 'Efectivo' : 'QR'})`);
+      toast.success(`Venta completada por Bs. ${total} (${describePayments(payments)})`);
+      setCashAmount(0);
       if (overrideReservation) {
         toast.info('Las líneas de pedido afectadas pasaron a producción');
       }
@@ -351,7 +363,7 @@ export default function Sales({ api = defaultSalesApi }: SalesProps) {
                           {/* Payment Methods */}
                           <div className="space-y-2">
                             <label className="text-xs sm:text-sm font-medium">Método de pago</label>
-                            <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                            <div className="grid grid-cols-3 gap-2 sm:gap-3">
                               <Button 
                                 variant={paymentMethod === 'cash' ? 'default' : 'outline'}
                                 className="h-16 sm:h-20 flex-col gap-1 sm:gap-2"
@@ -368,8 +380,53 @@ export default function Sales({ api = defaultSalesApi }: SalesProps) {
                                 <QrCode className="h-4 w-4 sm:h-6 sm:w-6" />
                                 <span className="text-xs sm:text-sm">QR</span>
                               </Button>
+                              <Button
+                                variant={paymentMethod === 'mixed' ? 'default' : 'outline'}
+                                className="h-16 sm:h-20 flex-col gap-1 sm:gap-2"
+                                onClick={() => setPaymentMethod('mixed')}
+                              >
+                                <Coins className="h-4 w-4 sm:h-6 sm:w-6" />
+                                <span className="text-xs sm:text-sm">Mixto</span>
+                              </Button>
                             </div>
                           </div>
+
+                          {paymentMethod === 'mixed' && (
+                            <div className="space-y-3 border rounded-lg p-3 sm:p-4">
+                              <div className="space-y-1.5">
+                                <label className="text-xs sm:text-sm font-medium">Monto en efectivo (Bs.)</label>
+                                <NumberInput
+                                  decimal
+                                  min="0"
+                                  placeholder="0"
+                                  fallback={0}
+                                  value={cashAmount}
+                                  onChange={setCashAmount}
+                                  aria-label="Monto en efectivo"
+                                  className="text-sm"
+                                />
+                              </div>
+                              <div className="flex items-center justify-between text-sm">
+                                <span>Resto por QR</span>
+                                <span className="font-semibold" data-testid="mixed-qr-amount">
+                                  Bs. {mixed.qr > 0 ? mixed.qr.toLocaleString() : 0}
+                                </span>
+                              </div>
+                              {!mixed.valid && (
+                                <p className="text-xs text-destructive">
+                                  {cashAmount > 0 && mixed.qr <= 0
+                                    ? 'El efectivo cubre todo el total: usa el método Efectivo.'
+                                    : 'Ingresa cuánto se recibe en efectivo; el resto se cobra por QR.'}
+                                </p>
+                              )}
+                              {mixed.valid && (
+                                <div className="bg-muted p-3 rounded-lg text-center">
+                                  <QrCode className="h-10 w-10 mx-auto" />
+                                  <p className="text-xs sm:text-sm mt-1">Escanear para pagar Bs. {mixed.qr.toLocaleString()}</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
 
                           {paymentMethod === 'qr' && (
                             <div className="bg-muted p-4 sm:p-6 rounded-lg text-center">
@@ -382,7 +439,12 @@ export default function Sales({ api = defaultSalesApi }: SalesProps) {
                             </div>
                           )}
 
-                          <Button className="w-full" size="default" onClick={() => completeSale()}>
+                          <Button
+                            className="w-full"
+                            size="default"
+                            disabled={paymentMethod === 'mixed' && !mixed.valid}
+                            onClick={() => completeSale()}
+                          >
                             Confirmar Venta
                           </Button>
                         </div>

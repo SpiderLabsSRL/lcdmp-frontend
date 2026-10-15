@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
+import { toast } from 'sonner';
 import Sales from '../Sales';
 import type { Product } from '@/types';
 import { ReservationConflictError, type ISalesApi } from '@/api/SalesApi';
@@ -149,6 +151,119 @@ describe('Sales', () => {
     const image = screen.getByAltText('Cupcake de vainilla');
     expect(image).toHaveAttribute('src', 'https://img.example.com/Productos/p1/a.jpg');
     expect(screen.queryByAltText('Galleta de chocolate')).not.toBeInTheDocument();
+  });
+
+  describe('pago mixto', () => {
+    const openCheckout = async (user: ReturnType<typeof userEvent.setup>, mockApi: ISalesApi) => {
+      renderWithProviders(<Sales api={mockApi} />);
+      await screen.findByText('Cupcake de vainilla');
+      await user.click(screen.getByText('Cupcake de vainilla'));
+      await user.click(screen.getAllByText('Cupcake de vainilla')[0]); // 2 x 15 = Bs. 30 (el carrito repite el nombre)
+      await user.click(screen.getByRole('button', { name: 'Cobrar' }));
+      await screen.findByText('Completar Venta');
+    };
+    const cashInput = () => screen.getByLabelText('Monto en efectivo') as HTMLInputElement;
+    const confirm = () => screen.getByRole('button', { name: 'Confirmar Venta' });
+
+    it('offers Efectivo, QR and Mixto', async () => {
+      const user = userEvent.setup();
+      await openCheckout(user, buildMockApi({ getProducts: vi.fn().mockResolvedValue([cupcake]) }));
+
+      expect(screen.getByRole('button', { name: 'Efectivo' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'QR' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Mixto' })).toBeInTheDocument();
+      expect(screen.queryByLabelText('Monto en efectivo')).not.toBeInTheDocument();
+    });
+
+    it('shows the cash input and computes the QR rest as the user types', async () => {
+      const user = userEvent.setup();
+      await openCheckout(user, buildMockApi({ getProducts: vi.fn().mockResolvedValue([cupcake]) }));
+
+      await user.click(screen.getByRole('button', { name: 'Mixto' }));
+      fireEvent.change(cashInput(), { target: { value: '20' } });
+
+      expect(screen.getByTestId('mixed-qr-amount')).toHaveTextContent('Bs. 10');
+      expect(screen.getByText(/Escanear para pagar Bs. 10/)).toBeInTheDocument();
+    });
+
+    it('cannot confirm until the cash is between 0 and the total, and explains why', async () => {
+      const user = userEvent.setup();
+      await openCheckout(user, buildMockApi({ getProducts: vi.fn().mockResolvedValue([cupcake]) }));
+      await user.click(screen.getByRole('button', { name: 'Mixto' }));
+
+      expect(confirm()).toBeDisabled();
+      expect(screen.getByText(/Ingresa cuánto se recibe en efectivo/)).toBeInTheDocument();
+
+      fireEvent.change(cashInput(), { target: { value: '30' } });
+      expect(confirm()).toBeDisabled();
+      expect(screen.getByText(/usa el método Efectivo/)).toBeInTheDocument();
+
+      fireEvent.change(cashInput(), { target: { value: '12.5' } });
+      expect(confirm()).toBeEnabled();
+    });
+
+    it('sends the payments breakdown with the "both" method and a success message naming both parts', async () => {
+      const createSale = vi.fn().mockResolvedValue(undefined);
+      const user = userEvent.setup();
+      await openCheckout(user, buildMockApi({ getProducts: vi.fn().mockResolvedValue([cupcake]), createSale }));
+      await user.click(screen.getByRole('button', { name: 'Mixto' }));
+      fireEvent.change(cashInput(), { target: { value: '20' } });
+
+      await user.click(confirm());
+
+      await waitFor(() => expect(createSale).toHaveBeenCalledTimes(1));
+      expect(createSale.mock.calls[0][0]).toMatchObject({
+        total: 30,
+        paymentMethod: 'both',
+        payments: [{ method: 'cash', amount: 20 }, { method: 'qr', amount: 10 }],
+      });
+      await waitFor(() => expect(toast.success).toHaveBeenCalledWith(
+        'Venta completada por Bs. 30 (Efectivo Bs. 20 + QR Bs. 10)'
+      ));
+    });
+
+    it('a plain cash sale still sends one payment for the whole total', async () => {
+      const createSale = vi.fn().mockResolvedValue(undefined);
+      const user = userEvent.setup();
+      await openCheckout(user, buildMockApi({ getProducts: vi.fn().mockResolvedValue([cupcake]), createSale }));
+
+      await user.click(confirm());
+
+      await waitFor(() => expect(createSale).toHaveBeenCalledTimes(1));
+      expect(createSale.mock.calls[0][0]).toMatchObject({
+        paymentMethod: 'cash', payments: [{ method: 'cash', amount: 30 }],
+      });
+    });
+
+    it('a QR sale sends one qr payment', async () => {
+      const createSale = vi.fn().mockResolvedValue(undefined);
+      const user = userEvent.setup();
+      await openCheckout(user, buildMockApi({ getProducts: vi.fn().mockResolvedValue([cupcake]), createSale }));
+      await user.click(screen.getByRole('button', { name: 'QR' }));
+
+      await user.click(confirm());
+
+      await waitFor(() => expect(createSale).toHaveBeenCalledTimes(1));
+      expect(createSale.mock.calls[0][0]).toMatchObject({ paymentMethod: 'qr', payments: [{ method: 'qr', amount: 30 }] });
+    });
+
+    it('does not keep the cash amount of a previous mixed sale', async () => {
+      const createSale = vi.fn().mockResolvedValue(undefined);
+      const user = userEvent.setup();
+      await openCheckout(user, buildMockApi({ getProducts: vi.fn().mockResolvedValue([cupcake]), createSale }));
+      await user.click(screen.getByRole('button', { name: 'Mixto' }));
+      fireEvent.change(cashInput(), { target: { value: '20' } });
+      await user.click(confirm());
+      await waitFor(() => expect(createSale).toHaveBeenCalledTimes(1));
+
+      // nueva venta: abrir el cobro de nuevo y volver a Mixto
+      await user.click((await screen.findAllByText('Cupcake de vainilla'))[0]);
+      await user.click(screen.getByRole('button', { name: 'Cobrar' }));
+      await screen.findByText('Completar Venta');
+      await user.click(screen.getByRole('button', { name: 'Mixto' }));
+
+      expect(cashInput().value).toBe('0');
+    });
   });
 
   it('completes a sale with the cart contents and clears the cart afterward', async () => {

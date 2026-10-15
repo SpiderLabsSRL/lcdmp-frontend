@@ -14,6 +14,7 @@ import { getLocalDateString } from '@/utils/DateUtils';
 import ReferenceImagesInput from '@/components/Images/ReferenceImagesInput';
 import { cakeShapes } from '@/types/consts';
 import { isCustomizedItem, itemLineTotal } from '@/utils/orderItems';
+import { sanitizePhone, PHONE_MAX_DIGITS } from '@/utils/phone';
 import type { IUploadsApi } from '@/api/UploadsApi';
 import { es } from 'date-fns/locale';
 
@@ -245,6 +246,12 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
     setFormData({ ...formData, sweetTableCombos: updated });
   };
 
+  const updateSweetTableComboImages = (comboIndex: number, referenceImages: string[]) => {
+    const updated = [...(formData.sweetTableCombos || [])];
+    updated[comboIndex] = { ...updated[comboIndex], referenceImages };
+    setFormData({ ...formData, sweetTableCombos: updated });
+  };
+
   const addComboProduct = (comboIndex: number) => {
     const updated = [...(formData.sweetTableCombos || [])];
     const combo = { ...updated[comboIndex] };
@@ -315,8 +322,19 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.customerName || !formData.customerPhone || !formData.pickupDate || !formData.pickupTime) {
-      toast.error('Por favor complete todos los campos requeridos');
+    const missing = [
+      !formData.customerName?.trim() && 'nombre del cliente',
+      !formData.customerPhone && 'teléfono',
+      !formData.pickupDate && 'fecha de entrega',
+      !formData.pickupTime && 'hora de entrega',
+    ].filter(Boolean);
+    if (missing.length > 0) {
+      toast.error(`Faltan datos requeridos: ${missing.join(', ')}`);
+      return;
+    }
+
+    if ((formData.customerPhone || '').length > PHONE_MAX_DIGITS) {
+      toast.error(`El teléfono del cliente no puede tener más de ${PHONE_MAX_DIGITS} dígitos`);
       return;
     }
 
@@ -403,9 +421,12 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
           <Input 
             placeholder="Número de teléfono" 
             required 
+            type="tel"
+            inputMode="numeric"
+            autoComplete="tel"
             className="text-sm"
             value={formData.customerPhone || ''}
-            onChange={(e) => updateFormField('customerPhone', e.target.value)}
+            onChange={(e) => updateFormField('customerPhone', sanitizePhone(e.target.value))}
           />
         </div>
       </div>
@@ -1043,6 +1064,15 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
                       onChange={(e) => updateSweetTableComboDetails(comboIndex, e.target.value)}
                     />
                   </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Imágenes de referencia (opcional)</Label>
+                    <ReferenceImagesInput
+                      value={combo.referenceImages || []}
+                      onChange={(images) => updateSweetTableComboImages(comboIndex, images)}
+                      uploadsApi={uploadsApi}
+                    />
+                  </div>
                 </div>
               );
             })
@@ -1102,9 +1132,18 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
                     size="sm"
                     onClick={() => removeExtra(index)}
                     className="text-destructive"
+                    aria-label="Quitar postre"
                   >
                     <X className="h-4 w-4" />
                   </Button>
+                  <div className="col-span-full space-y-1">
+                    <Label className="text-xs">Imágenes de referencia (opcional)</Label>
+                    <ReferenceImagesInput
+                      value={extra.referenceImages || []}
+                      onChange={(images) => updateExtra(index, 'referenceImages', images)}
+                      uploadsApi={uploadsApi}
+                    />
+                  </div>
                 </div>
               ))
             )}

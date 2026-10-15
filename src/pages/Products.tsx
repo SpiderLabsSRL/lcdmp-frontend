@@ -1304,7 +1304,7 @@ function ProductForm({ onClose, onSave, initialProduct }: {
     // El stock del formulario es el de TIENDA específicamente — el de planta
     // no se edita acá, solo vía "Agregar stock" con su propia ubicación.
     stock: initialProduct?.storeStock ?? 0,
-    minStock: initialProduct?.minStock || 1,
+    minStock: initialProduct?.minStock ?? 1,
     restockQuantity: initialProduct?.restockQuantity ?? undefined,
     isActive: initialProduct?.isActive ?? true,
   });

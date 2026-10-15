@@ -310,6 +310,27 @@ describe('Baking', () => {
       expect(screen.getByAltText('Referencia 1')).toHaveAttribute('src', 'https://signed.example/Pedidos/p.jpg');
     });
 
+    it('a sweet table product shows a reference-images hint on the card and the images in the details dialog', async () => {
+      const order = makeOrder({
+        sweetTableCombos: [{
+          id: 'combo-img', totalQuantity: 10, price: 30,
+          products: [{ id: 'cp-1', productId: 'p1', productName: 'Alfajores', quantity: 10, pricePerUnit: 3, status: 'baking' }],
+          referenceImages: ['https://signed.example/Pedidos/mesa1.jpg', 'https://signed.example/Pedidos/mesa2.jpg'],
+        }],
+      });
+      const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([order]) });
+      const user = userEvent.setup();
+      renderWithProviders(<Baking bakingApi={mockApi} />);
+
+      expect(await screen.findByText(/🖼 2 imágenes de referencia/)).toBeInTheDocument();
+
+      await user.click(screen.getByText('#ORD-100'));
+
+      expect(await screen.findByText('Imágenes de referencia:')).toBeInTheDocument();
+      expect(screen.getByAltText('Referencia 1')).toHaveAttribute('src', 'https://signed.example/Pedidos/mesa1.jpg');
+      expect(screen.getByAltText('Referencia 2')).toBeInTheDocument();
+    });
+
     it('a plain catalog line has no personalization preview', async () => {
       const order = makeOrder({
         items: [{ id: 'item-p', productId: 'p3', product: {} as any, productName: 'Pan integral', quantity: 3, price: 15, status: 'baking' }],

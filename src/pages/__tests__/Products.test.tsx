@@ -401,6 +401,50 @@ describe('Products - Productos tab', () => {
     );
   });
 
+  describe('stock mínimo when editing', () => {
+    const minStockInput = () =>
+      screen.getByText('Stock mínimo').parentElement!.querySelector('input') as HTMLInputElement;
+
+    const openEdit = async (minStock: number) => {
+      const products = [{ ...baseProducts[0], minStock }, baseProducts[1]];
+      const api = buildMockApi({ getProducts: vi.fn().mockResolvedValue(products) });
+      const user = userEvent.setup();
+      renderWithProviders(<Products api={api} />);
+      await waitFor(() => expect(screen.getByText('Torta de chocolate')).toBeInTheDocument());
+      await user.click(within(screen.getByText('Torta de chocolate').closest('tr')!).getByTitle('Editar'));
+      return { api, user };
+    };
+
+    it('keeps the product minimum stock of 7 in the form and in what gets saved', async () => {
+      const { api, user } = await openEdit(7);
+
+      expect(minStockInput().value).toBe('7');
+      await user.click(screen.getByRole('button', { name: 'Actualizar Producto' }));
+
+      await waitFor(() => expect(api.editProduct).toHaveBeenCalledWith(expect.objectContaining({ id: 'p1', minStock: 7 })));
+    });
+
+    it('keeps a minimum stock of 0 (it must not be replaced by the default 1)', async () => {
+      const { api, user } = await openEdit(0);
+
+      expect(minStockInput().value).toBe('0');
+      await user.click(screen.getByRole('button', { name: 'Actualizar Producto' }));
+
+      await waitFor(() => expect(api.editProduct).toHaveBeenCalledWith(expect.objectContaining({ id: 'p1', minStock: 0 })));
+    });
+
+    it('a NEW product still starts with a minimum stock of 1', async () => {
+      const api = buildMockApi();
+      const user = userEvent.setup();
+      renderWithProviders(<Products api={api} />);
+      await waitFor(() => expect(screen.getByText('Torta de chocolate')).toBeInTheDocument());
+
+      await user.click(screen.getByRole('button', { name: /Nuevo Producto/i }));
+
+      expect(minStockInput().value).toBe('1');
+    });
+  });
+
   it('edits an existing product via the row edit button', async () => {
     const api = buildMockApi();
     const user = userEvent.setup();

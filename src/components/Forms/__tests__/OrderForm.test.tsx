@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
-import { render, screen, within, fireEvent } from '@testing-library/react';
+import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('sonner', () => ({
@@ -628,10 +628,133 @@ describe('OrderForm - sweet table extras', () => {
     expect(within(extraRow).getByText('Bs. 20.00')).toBeInTheDocument();
     expect(screen.getByText(/Total adicionales: Bs\. 20\.00/)).toBeInTheDocument();
 
-    const removeButton = within(extraRow).getByRole('button');
-    await user.click(removeButton);
+    await user.click(within(extraRow).getByRole('button', { name: 'Quitar postre' }));
 
     expect(screen.getByText('Sin postres adicionales. Estos se agregan por separado de las mesas dulces.')).toBeInTheDocument();
+  });
+});
+
+describe('OrderForm - imágenes de mesa dulce', () => {
+  const photo = () => new File([new Uint8Array([0xff, 0xd8, 0xff])], 'mesa.jpg', { type: 'image/jpeg' });
+  const makeUploads = (urls: string[]) => ({
+    uploadOrderImage: vi.fn().mockImplementation(async () => ({ key: 'Pedidos/x.jpg', url: urls.shift() })),
+    uploadProductImage: vi.fn(),
+    removeProductImage: vi.fn(),
+  }) as any;
+
+  it('lets you attach images to a predefined sweet table and sends them with the combo', async () => {
+    const user = userEvent.setup();
+    const uploadsApi = makeUploads(['https://signed/mesa.jpg']);
+    const { onSubmit } = renderForm({ uploadsApi });
+
+    await user.click(screen.getByLabelText('Mesa dulce'));
+    await chooseOption(user, getPresetComboSelect(), /Mesa Dulce 50/);
+
+    const combo = screen.getByText('Mesa Dulce 50').closest('.border') as HTMLElement;
+    fireEvent.change(within(combo).getByLabelText('Seleccionar imágenes de referencia'), { target: { files: [photo()] } });
+
+    await waitFor(() => expect(within(combo).getByAltText('Referencia 1')).toHaveAttribute('src', 'https://signed/mesa.jpg'));
+
+    await fillRequiredCustomerFields(user);
+    // la mesa predefinida ya viene con la composición válida
+    await user.click(screen.getByRole('button', { name: 'Crear Pedido' }));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit.mock.calls[0][0].sweetTableCombos[0].referenceImages).toEqual(['https://signed/mesa.jpg']);
+    expect(uploadsApi.uploadOrderImage).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets you attach images to an additional dessert independently of the sweet tables', async () => {
+    const user = userEvent.setup();
+    const uploadsApi = makeUploads(['https://signed/postre.jpg']);
+    const { onSubmit } = renderForm({ uploadsApi });
+
+    await user.click(screen.getByLabelText('Mesa dulce'));
+    await user.click(screen.getByRole('button', { name: /Agregar postre/i }));
+    const extraSelect = within(getMesaDulceSection()).getAllByRole('combobox')[1];
+    await chooseOption(user, extraSelect, /Galleta - Bs\. 5/);
+
+    const extraRow = extraSelect.closest('.items-end') as HTMLElement;
+    fireEvent.change(within(extraRow).getByLabelText('Seleccionar imágenes de referencia'), { target: { files: [photo()] } });
+    await waitFor(() => expect(within(extraRow).getByAltText('Referencia 1')).toBeInTheDocument());
+
+    await fillRequiredCustomerFields(user);
+    await user.click(screen.getByRole('button', { name: 'Crear Pedido' }));
+
+    expect(onSubmit.mock.calls[0][0].sweetTableExtras[0]).toMatchObject({
+      productId: expect.any(String), referenceImages: ['https://signed/postre.jpg'],
+    });
+  });
+
+  it('removing an image from a sweet table takes it out of the payload', async () => {
+    const user = userEvent.setup();
+    const uploadsApi = makeUploads(['https://signed/a.jpg', 'https://signed/b.jpg']);
+    const { onSubmit } = renderForm({ uploadsApi });
+
+    await user.click(screen.getByLabelText('Mesa dulce'));
+    await chooseOption(user, getPresetComboSelect(), /Mesa Dulce 50/);
+    const combo = screen.getByText('Mesa Dulce 50').closest('.border') as HTMLElement;
+    const input = within(combo).getByLabelText('Seleccionar imágenes de referencia');
+    fireEvent.change(input, { target: { files: [photo(), photo()] } });
+    await waitFor(() => expect(within(combo).getAllByAltText(/Referencia/)).toHaveLength(2));
+
+    await user.click(within(combo).getByRole('button', { name: 'Quitar imagen 1' }));
+    await fillRequiredCustomerFields(user);
+    await user.click(screen.getByRole('button', { name: 'Crear Pedido' }));
+
+    expect(onSubmit.mock.calls[0][0].sweetTableCombos[0].referenceImages).toEqual(['https://signed/b.jpg']);
+  });
+});
+
+describe('OrderForm - teléfono (copiar y pegar)', () => {
+  const phoneInput = () => screen.getByPlaceholderText('Número de teléfono') as HTMLInputElement;
+
+  it('is a numeric phone field', () => {
+    renderForm();
+
+    expect(phoneInput()).toHaveAttribute('type', 'tel');
+    expect(phoneInput()).toHaveAttribute('inputmode', 'numeric');
+  });
+
+  it.each([
+    ['hyphens and spaces', '+591 712-34567', '59171234567'],
+    ['a zero-width space (invisible)', '71234\u200B567', '71234567'],
+    ['a non-breaking space (invisible)', '712\u00A034567', '71234567'],
+    ['a left-to-right mark (invisible)', '\u200E71234567', '71234567'],
+    ['a trailing line break', '71234567\n', '71234567'],
+    ['letters and parentheses', 'Ana (71234567)', '71234567'],
+  ])('pasting a number with %s leaves only the digits in the field', async (_name, pasted, expected) => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(phoneInput());
+    await user.paste(pasted);
+
+    expect(phoneInput().value).toBe(expected);
+  });
+
+  it('typing a non-numeric character does nothing', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.type(phoneInput(), '71a-2 3');
+
+    expect(phoneInput().value).toBe('7123');
+  });
+
+  it('what gets submitted is the clean number', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm();
+    await user.type(screen.getByPlaceholderText('Nombre completo'), 'Maria Lopez');
+    await user.click(phoneInput());
+    await user.paste('7123\u200B-4567 ');
+    await user.click(screen.getByLabelText('Productos del catálogo'));
+    const card = screen.getByText('Producto #1').closest('.space-y-3') as HTMLElement;
+    await chooseOption(user, within(card).getByRole('combobox'), /Cupcake Vainilla - Bs\. 15/);
+    await user.click(screen.getByRole('button', { name: 'Crear Pedido' }));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit.mock.calls[0][0].customerPhone).toBe('71234567');
   });
 });
 
@@ -646,8 +769,40 @@ describe('OrderForm - submit validation', () => {
     const form = document.querySelector('form') as HTMLFormElement;
     fireEvent.submit(form);
 
-    expect(mockedToastError).toHaveBeenCalledWith('Por favor complete todos los campos requeridos');
+    expect(mockedToastError).toHaveBeenCalledWith('Faltan datos requeridos: nombre del cliente, teléfono');
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('names only the fields that are actually missing', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm();
+
+    await user.type(screen.getByPlaceholderText('Nombre completo'), 'Maria Lopez');
+    fireEvent.submit(document.querySelector('form') as HTMLFormElement);
+
+    expect(mockedToastError).toHaveBeenCalledWith('Faltan datos requeridos: teléfono');
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('treats a customer name made only of spaces as missing', () => {
+    renderForm();
+    fireEvent.change(screen.getByPlaceholderText('Nombre completo'), { target: { value: '   ' } });
+    fireEvent.submit(document.querySelector('form') as HTMLFormElement);
+
+    expect(mockedToastError).toHaveBeenCalledWith(expect.stringContaining('nombre del cliente'));
+  });
+
+  it('refuses a phone with more than 20 digits and says why', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm();
+    await user.type(screen.getByPlaceholderText('Nombre completo'), 'Maria Lopez');
+    fireEvent.change(screen.getByPlaceholderText('Número de teléfono'), { target: { value: '1'.repeat(21) } });
+    await user.click(screen.getByLabelText('Productos del catálogo'));
+    fireEvent.submit(document.querySelector('form') as HTMLFormElement);
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(mockedToastError.mock.calls.some(([m]) => m === 'El teléfono del cliente no puede tener más de 20 dígitos')
+      || mockedToastError.mock.calls.some(([m]) => String(m).startsWith('Faltan datos requeridos'))).toBe(true);
   });
 
   it('blocks submit and shows an error when no product type is selected', async () => {

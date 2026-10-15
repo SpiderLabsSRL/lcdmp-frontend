@@ -52,6 +52,7 @@ export function getWorkItemsAtStage(orders: Order[], stage: ProductStatus): Work
           title: `Mesa dulce: ${product.quantity} ${product.productName || product.product?.name || ''}`,
           detail: combo.details,
           quantity: product.quantity,
+          referenceImages: combo.referenceImages,
         });
       }
     }
@@ -66,6 +67,7 @@ export function getWorkItemsAtStage(orders: Order[], stage: ProductStatus): Work
         title: `Mesa dulce: ${extra.quantity} ${extra.productName || extra.product?.name || ''}`,
         quantity: extra.quantity,
         notes: extra.notes,
+        referenceImages: extra.referenceImages,
       });
     }
   }

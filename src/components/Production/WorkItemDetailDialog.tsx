@@ -14,8 +14,15 @@ export const getCakeForItem = (item: WorkItem): CustomCake | undefined => {
 export function DesignPreview({ item }: { item: WorkItem }) {
   // Diseño de una torta, o descripción de la personalización de un producto de catálogo
   const text = getCakeForItem(item)?.design || item.customization?.notes;
-  if (!text) return null;
-  return <p className=" mt-0.5">🎨 {text.substring(0, 100)}{text.length > 100 ? '...' : ''}</p>;
+  if (text) {
+    return <p className=" mt-0.5">🎨 {text.substring(0, 100)}{text.length > 100 ? '...' : ''}</p>;
+  }
+  // Mesa dulce / postre adicional: no hay texto de diseño, pero sí pueden tener imágenes de referencia
+  const count = item.referenceImages?.length ?? 0;
+  if (count > 0) {
+    return <p className=" mt-0.5">🖼 {count} {count === 1 ? 'imagen' : 'imágenes'} de referencia</p>;
+  }
+  return null;
 }
 
 interface WorkItemDetailDialogProps {
@@ -96,6 +103,12 @@ export function WorkItemDetailDialog({ item, open, onOpenChange }: WorkItemDetai
                     </div>
                   )}
                 </>
+              )}
+              {item.referenceImages && item.referenceImages.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-sm font-semibold mb-1 text-foreground">Imágenes de referencia:</p>
+                  <ReferenceImages images={item.referenceImages} />
+                </div>
               )}
               {item.notes && (
                 <p className="text-sm text-foreground">Notas: "{item.notes}"</p>

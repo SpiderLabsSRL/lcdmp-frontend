@@ -147,6 +147,23 @@ describe('getWorkItemsAtStage', () => {
     expect(result.map(r => r.customization)).toEqual([undefined, undefined]);
   });
 
+  it('gives the products of a sweet table the images of that table, and extras their own', () => {
+    const comboWithImages = makeCombo(
+      { id: 'c1', referenceImages: ['https://signed/mesa.jpg'] },
+      [makeComboProduct({ id: 'cp1', status: 'baking' })],
+    );
+    const extraWithImages = {
+      ...makeItem({ id: 'e1', status: 'baking' }),
+      referenceImages: ['https://signed/postre.jpg'],
+    };
+    const order = makeOrder({ sweetTableCombos: [comboWithImages], sweetTableExtras: [extraWithImages as any] });
+
+    const result = getWorkItemsAtStage([order], 'baking');
+
+    expect(result.find(r => r.itemType === 'combo_item')?.referenceImages).toEqual(['https://signed/mesa.jpg']);
+    expect(result.find(r => r.itemType === 'sweet_table_extra')?.referenceImages).toEqual(['https://signed/postre.jpg']);
+  });
+
   it('skips an order_item without an id even if its status matches', () => {
     const item = makeItem({ id: undefined, status: 'baking' });
     const order = makeOrder({ items: [item] });

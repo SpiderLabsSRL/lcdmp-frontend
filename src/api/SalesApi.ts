@@ -1,6 +1,7 @@
 import { Product } from '@/types';
 import api from '@/api/api';
 import { mockProducts } from '@/data/mockData';
+import type { SalePayment } from '@/utils/payments';
 
 export interface SaleItem {
   productId: string;
@@ -11,7 +12,8 @@ export interface SaleItem {
 export interface SaleData {
   items: SaleItem[];
   total: number;
-  paymentMethod: 'cash' | 'qr';
+  paymentMethod: 'cash' | 'qr' | 'both';
+  payments?: SalePayment[];
   timestamp: Date;
   // Confirma que la venta pise unidades reservadas por pedidos de hoy.
   overrideReservation?: boolean;
@@ -91,6 +93,7 @@ export class SalesApi implements ISalesApi {
         items: sale.items,
         total: sale.total,
         paymentMethod: sale.paymentMethod,
+        payments: sale.payments,
         overrideReservation: sale.overrideReservation === true
       };
 
