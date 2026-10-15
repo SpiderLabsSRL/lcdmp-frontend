@@ -19,14 +19,13 @@ describe('ReferenceImages', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('renders a thumbnail per image, each opening the full image in a new tab', () => {
+  it('renders a thumbnail per image, as a button that enlarges it (no link to another tab)', () => {
     render(<ReferenceImages images={['https://signed/a.jpg', 'https://signed/b.jpg']} />);
 
     expect(screen.getByAltText('Referencia 1')).toHaveAttribute('src', 'https://signed/a.jpg');
     expect(screen.getByAltText('Referencia 2')).toBeInTheDocument();
-    const link = screen.getByAltText('Referencia 1').closest('a')!;
-    expect(link).toHaveAttribute('href', 'https://signed/a.jpg');
-    expect(link).toHaveAttribute('target', '_blank');
+    expect(screen.getByAltText('Referencia 1').closest('button')).toHaveAttribute('title', 'Ampliar imagen');
+    expect(screen.getByAltText('Referencia 1').closest('a')).toBeNull();
   });
 
   it('shows a "No disponible" placeholder when a (probably expired) URL fails to load', () => {
