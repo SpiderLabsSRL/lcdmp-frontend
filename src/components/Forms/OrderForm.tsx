@@ -14,6 +14,7 @@ import { getLocalDateString } from '@/utils/DateUtils';
 import ReferenceImagesInput from '@/components/Images/ReferenceImagesInput';
 import { cakeShapes } from '@/types/consts';
 import { isCustomizedItem, itemLineTotal } from '@/utils/orderItems';
+import { sanitizePhone, PHONE_MAX_DIGITS } from '@/utils/phone';
 import type { IUploadsApi } from '@/api/UploadsApi';
 import { es } from 'date-fns/locale';
 
@@ -321,8 +322,19 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.customerName || !formData.customerPhone || !formData.pickupDate || !formData.pickupTime) {
-      toast.error('Por favor complete todos los campos requeridos');
+    const missing = [
+      !formData.customerName?.trim() && 'nombre del cliente',
+      !formData.customerPhone && 'teléfono',
+      !formData.pickupDate && 'fecha de entrega',
+      !formData.pickupTime && 'hora de entrega',
+    ].filter(Boolean);
+    if (missing.length > 0) {
+      toast.error(`Faltan datos requeridos: ${missing.join(', ')}`);
+      return;
+    }
+
+    if ((formData.customerPhone || '').length > PHONE_MAX_DIGITS) {
+      toast.error(`El teléfono del cliente no puede tener más de ${PHONE_MAX_DIGITS} dígitos`);
       return;
     }
 
@@ -409,9 +421,12 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
           <Input 
             placeholder="Número de teléfono" 
             required 
+            type="tel"
+            inputMode="numeric"
+            autoComplete="tel"
             className="text-sm"
             value={formData.customerPhone || ''}
-            onChange={(e) => updateFormField('customerPhone', e.target.value)}
+            onChange={(e) => updateFormField('customerPhone', sanitizePhone(e.target.value))}
           />
         </div>
       </div>
