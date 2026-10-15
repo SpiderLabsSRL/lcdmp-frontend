@@ -82,6 +82,25 @@ describe('SalesApi (real, axios-backed)', () => {
       });
     });
 
+    it('sends the mixed payment breakdown (payments) with the "both" method', async () => {
+      mockedApi.post.mockResolvedValue({ data: { success: true }, status: 201 });
+      const payments = [{ method: 'cash' as const, amount: 60 }, { method: 'qr' as const, amount: 40 }];
+
+      await salesApi.createSale({ ...sale, total: 100, paymentMethod: 'both', payments });
+
+      expect(mockedApi.post).toHaveBeenCalledWith('/sales', expect.objectContaining({
+        total: 100, paymentMethod: 'both', payments,
+      }));
+    });
+
+    it('surfaces a payment error from the backend (the amounts do not add up)', async () => {
+      mockedApi.post.mockRejectedValue({
+        response: { data: { message: 'La suma de los pagos (Bs. 90) no coincide con el total de la venta (Bs. 100)' } },
+      });
+
+      await expect(salesApi.createSale(sale)).rejects.toThrow('La suma de los pagos (Bs. 90) no coincide');
+    });
+
     it('throws a ReservationConflictError carrying the conflicts when the backend answers RESERVATION_CONFLICT', async () => {
       const conflicts = [{ productId: 'p1', lines: [] }];
       mockedApi.post.mockRejectedValue({

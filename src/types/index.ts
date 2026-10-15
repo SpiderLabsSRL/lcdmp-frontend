@@ -417,6 +417,8 @@ export interface Transaction {
   amount: number;
   method: PaymentMethod;
   orderId?: string;
+  // Las filas de una misma venta pagada con varios métodos comparten saleId
+  saleId?: string | null;
   description: string;
   createdAt: Date;
   createdBy: string;
