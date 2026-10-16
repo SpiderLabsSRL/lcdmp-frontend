@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { ChevronLeft, ChevronRight, Minus, Plus, RotateCcw, X } from 'lucide-react';
+import { useBackButtonClose } from '@/hooks/useBackButtonClose';
 
 const MIN_SCALE = 1;
 const MAX_SCALE = 6;
@@ -25,6 +26,8 @@ interface Point { x: number; y: number }
 // imágenes se navega con las flechas. Esc o la X lo cierran.
 export function ImageLightbox({ images, index, onIndexChange, onClose }: ImageLightboxProps) {
   const open = index !== null;
+  // "Atrás" cierra el visor (y no la pantalla de detrás)
+  useBackButtonClose(open, onClose);
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState<Point>({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
