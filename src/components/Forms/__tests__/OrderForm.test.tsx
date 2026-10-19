@@ -992,3 +992,123 @@ describe('OrderForm - editing an existing order', () => {
     expect(submitted.discount).toBe(10);
   });
 });
+
+describe('OrderForm - guarantee (loaned pedestals/bases)', () => {
+  const baseOrder = (guarantee?: Order['guarantee']): Order => ({
+    id: 'o1', orderNumber: 'ORD-1', orderType: 'products', customerName: 'Juana', customerPhone: '70011122',
+    pickupDate: new Date(2099, 9, 10), pickupTime: '15:30', status: 'pending',
+    items: [{ productId: 'p1', product: products[0], quantity: 2, price: 15 }],
+    customCakes: [], sweetTableCombos: [], sweetTableExtras: [],
+    deliveryCost: 0, deposit: 0, total: 30, createdAt: new Date(2026, 8, 1), createdBy: 'u1',
+    guarantee,
+  } as unknown as Order);
+
+  it('shows the loan fields only when "Se presta algo con garantía" is checked', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    expect(screen.queryByLabelText(/Qué se presta/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByLabelText(/Se presta algo con garantía/));
+
+    expect(screen.getByLabelText(/Qué se presta/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Garantía \(Bs\.\)/)).toBeInTheDocument();
+  });
+
+  it('adds the guarantee to the total to pay and lists it as its own line', async () => {
+    const user = userEvent.setup();
+    renderForm({ initialData: baseOrder(), isEditing: true });
+    expect(within(getTotalsRow('Total a pagar:')).getByText('Bs. 30.00')).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText(/Se presta algo con garantía/));
+    setNumberValue(screen.getByLabelText(/Garantía \(Bs\.\)/), '100');
+
+    expect(within(getTotalsRow('Total a pagar:')).getByText('Bs. 130.00')).toBeInTheDocument();
+    expect(within(getTotalsRow('Garantía (se devuelve):')).getByText('+ Bs. 100.00')).toBeInTheDocument();
+  });
+
+  it('blocks the submit when it says something is loaned but not what', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm({ initialData: baseOrder(), isEditing: true });
+    mockedToastError.mockClear();
+
+    await user.click(screen.getByLabelText(/Se presta algo con garantía/));
+    setNumberValue(screen.getByLabelText(/Garantía \(Bs\.\)/), '100');
+    await user.click(screen.getByRole('button', { name: 'Actualizar Pedido' }));
+
+    expect(mockedToastError).toHaveBeenCalledWith('Indica qué artículos se prestan con la garantía');
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('blocks the submit when the guarantee amount is missing', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm({ initialData: baseOrder(), isEditing: true });
+    mockedToastError.mockClear();
+
+    await user.click(screen.getByLabelText(/Se presta algo con garantía/));
+    await user.type(screen.getByLabelText(/Qué se presta/), 'Pedestal');
+    await user.click(screen.getByRole('button', { name: 'Actualizar Pedido' }));
+
+    expect(mockedToastError).toHaveBeenCalledWith('Indica el monto de la garantía');
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('sends the trimmed loan and the amount with the order', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm({ initialData: baseOrder(), isEditing: true });
+
+    await user.click(screen.getByLabelText(/Se presta algo con garantía/));
+    await user.type(screen.getByLabelText(/Qué se presta/), '  1 pedestal grande ');
+    setNumberValue(screen.getByLabelText(/Garantía \(Bs\.\)/), '100');
+    await user.click(screen.getByRole('button', { name: 'Actualizar Pedido' }));
+
+    const submitted = onSubmit.mock.calls[0][0];
+    expect(submitted.guarantee).toEqual({ amount: 100, items: '1 pedestal grande' });
+    expect(submitted.total).toBe(130);
+  });
+
+  it('pre-fills an existing guarantee when editing', () => {
+    renderForm({ initialData: baseOrder({ amount: 80, items: 'Base redonda' }), isEditing: true });
+
+    expect(screen.getByLabelText(/Se presta algo con garantía/)).toBeChecked();
+    expect(screen.getByLabelText(/Qué se presta/)).toHaveValue('Base redonda');
+    expect(screen.getByLabelText(/Garantía \(Bs\.\)/)).toHaveValue(80);
+    expect(within(getTotalsRow('Total a pagar:')).getByText('Bs. 110.00')).toBeInTheDocument();
+  });
+
+  it('unchecking it on an edit sends null so the backend removes the guarantee', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm({ initialData: baseOrder({ amount: 80, items: 'Base redonda' }), isEditing: true });
+
+    await user.click(screen.getByLabelText(/Se presta algo con garantía/));
+    await user.click(screen.getByRole('button', { name: 'Actualizar Pedido' }));
+
+    expect(onSubmit.mock.calls[0][0].guarantee).toBeNull();
+    expect(onSubmit.mock.calls[0][0].total).toBe(30);
+  });
+
+  it('an order without guarantee sends nothing about it when created', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm({ initialData: { ...baseOrder(), orderNumber: 'ORD-2' } });
+
+    await user.click(screen.getByRole('button', { name: /Crear Pedido/ }));
+
+    expect(onSubmit.mock.calls[0][0].guarantee).toBeUndefined();
+  });
+
+  it('a guarantee that was already returned is locked and is not sent again', async () => {
+    const user = userEvent.setup();
+    const returned = { amount: 80, items: 'Base redonda', returnedAt: '2026-10-16T10:00:00Z', returnedAmount: 80 };
+    const { onSubmit } = renderForm({ initialData: baseOrder(returned), isEditing: true });
+
+    expect(screen.getByLabelText(/Se presta algo con garantía/)).toBeDisabled();
+    expect(screen.getByLabelText(/Qué se presta/)).toBeDisabled();
+    expect(screen.getByText(/ya fue devuelta/)).toBeInTheDocument();
+    // sigue contando en el total (ya se cobró)
+    expect(within(getTotalsRow('Total a pagar:')).getByText('Bs. 110.00')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Actualizar Pedido' }));
+
+    expect(onSubmit.mock.calls[0][0].guarantee).toBeUndefined();
+  });
+});

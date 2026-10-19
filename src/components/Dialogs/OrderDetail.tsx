@@ -314,10 +314,17 @@ export default function OrderDetail({ order, onDeliver, onCancel, onMarkAtStore,
       {/* Garantía */}
       {order.guarantee && (
         <div className="border-t pt-3 sm:pt-4">
-          <h4 className="font-semibold text-base text-foreground mb-2">Garantía</h4>
+          <h4 className="font-semibold text-base text-foreground mb-2">Préstamo y garantía</h4>
           <div className="bg-muted/50 p-3 rounded-lg">
-            <p className="text-sm text-foreground">Artículos: {order.guarantee.items}</p>
-            <p className="text-sm text-foreground mt-1">Valor: Bs. {order.guarantee.amount}</p>
+            <p className="text-sm text-foreground">Se presta: {order.guarantee.items}</p>
+            <p className="text-sm text-foreground mt-1">Garantía: Bs. {order.guarantee.amount} (incluida en el total)</p>
+            <p className={`text-sm mt-1 font-medium ${order.guarantee.returnedAt ? 'text-green-600' : 'text-orange-500'}`}>
+              {order.guarantee.returnedAt
+                ? `Devuelta: Bs. ${order.guarantee.returnedAmount ?? 0}`
+                : order.status === 'delivered'
+                  ? 'Pendiente de devolver (ver sección Garantías)'
+                  : 'Se devuelve cuando el cliente regrese lo prestado'}
+            </p>
           </div>
         </div>
       )}
@@ -347,7 +354,7 @@ export default function OrderDetail({ order, onDeliver, onCancel, onMarkAtStore,
           <div className="space-y-2">
             <div className="flex justify-between text-sm text-foreground">
               <span>Subtotal:</span>
-              <span>Bs. {order.total + (order.discount || 0) - (order.deliveryCost || 0)}</span>
+              <span>Bs. {order.total + (order.discount || 0) - (order.deliveryCost || 0) - (order.guarantee?.amount || 0)}</span>
             </div>
             {order.deliveryCost > 0 && (
               <div className="flex justify-between text-sm text-foreground">
@@ -359,6 +366,12 @@ export default function OrderDetail({ order, onDeliver, onCancel, onMarkAtStore,
               <div className="flex justify-between text-sm text-green-600">
                 <span>Descuento:</span>
                 <span>- Bs. {order.discount}</span>
+              </div>
+            )}
+            {order.guarantee && (
+              <div className="flex justify-between text-sm text-foreground">
+                <span>Garantía (se devuelve):</span>
+                <span>+ Bs. {order.guarantee.amount}</span>
               </div>
             )}
             <div className="flex justify-between pt-2 border-t">

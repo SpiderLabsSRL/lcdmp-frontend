@@ -212,7 +212,7 @@ describe('OrderDetail', () => {
       expect(screen.queryByText('Mesas Dulces')).not.toBeInTheDocument();
       expect(screen.queryByText('Mesa Dulce')).not.toBeInTheDocument();
       expect(screen.queryByText('Información de envío')).not.toBeInTheDocument();
-      expect(screen.queryByText('Garantía')).not.toBeInTheDocument();
+      expect(screen.queryByText('Préstamo y garantía')).not.toBeInTheDocument();
       expect(screen.queryByText(/Cupón aplicado/)).not.toBeInTheDocument();
       expect(screen.queryByText('Notas adicionales')).not.toBeInTheDocument();
       expect(screen.queryByText(/Método de pago del adelanto/)).not.toBeInTheDocument();
@@ -270,9 +270,31 @@ describe('OrderDetail', () => {
     it('renders the guarantee section', () => {
       render(<OrderDetail order={fullOrder} />);
 
-      expect(screen.getByText('Garantía')).toBeInTheDocument();
-      expect(screen.getByText('Artículos: Fuentes y bandejas')).toBeInTheDocument();
-      expect(screen.getByText('Valor: Bs. 50')).toBeInTheDocument();
+      expect(screen.getByText('Préstamo y garantía')).toBeInTheDocument();
+      expect(screen.getByText('Se presta: Fuentes y bandejas')).toBeInTheDocument();
+      expect(screen.getByText('Garantía: Bs. 50 (incluida en el total)')).toBeInTheDocument();
+      expect(screen.getByText('Se devuelve cuando el cliente regrese lo prestado')).toBeInTheDocument();
+    });
+
+    it('tells sales the guarantee is pending once the order was delivered', () => {
+      render(<OrderDetail order={{ ...fullOrder, status: 'delivered' }} />);
+
+      expect(screen.getByText('Pendiente de devolver (ver sección Garantías)')).toBeInTheDocument();
+    });
+
+    it('shows the refunded amount once the guarantee was returned', () => {
+      render(
+        <OrderDetail
+          order={{
+            ...fullOrder,
+            status: 'delivered',
+            guarantee: { items: 'Fuentes y bandejas', amount: 50, returnedAt: '2026-10-16T10:00:00Z', returnedAmount: 40 },
+          }}
+        />
+      );
+
+      expect(screen.getByText('Devuelta: Bs. 40')).toBeInTheDocument();
+      expect(screen.queryByText(/Pendiente de devolver/)).not.toBeInTheDocument();
     });
 
     it('renders the coupon/discount section', () => {
@@ -301,9 +323,10 @@ describe('OrderDetail', () => {
     it('computes and renders the subtotal, delivery cost, discount and balances', () => {
       render(<OrderDetail order={fullOrder} />);
 
-      // subtotal = total + discount - deliveryCost = 900 + 25 - 30 = 895
-      expect(screen.getByText('Bs. 895')).toBeInTheDocument();
+      // subtotal = total + discount - deliveryCost - guarantee = 900 + 25 - 30 - 50 = 845
+      expect(screen.getByText('Bs. 845')).toBeInTheDocument();
       expect(screen.getByText('+ Bs. 30')).toBeInTheDocument();
+      expect(screen.getByText('+ Bs. 50')).toBeInTheDocument(); // guarantee, included in the total
       expect(screen.getByText('- Bs. 25')).toBeInTheDocument();
       expect(screen.getByText('Bs. 900')).toBeInTheDocument();
       expect(screen.getByText('Bs. 200')).toBeInTheDocument(); // deposit

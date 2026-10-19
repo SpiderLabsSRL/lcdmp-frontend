@@ -58,6 +58,20 @@ describe('AppSidebar', () => {
     expect(screen.getByText('Usuarios')).toBeInTheDocument();
     expect(screen.getByText('Configuración')).toBeInTheDocument();
     expect(screen.getByText('Delivery')).toBeInTheDocument();
+    expect(screen.getByText('Garantías')).toBeInTheDocument();
+  });
+
+  it('shows Garantías to a seller but not to a baker', async () => {
+    setLoggedInUser(['seller']);
+    const { unmount } = renderSidebar();
+    await waitFor(() => expect(screen.getByText('Test User')).toBeInTheDocument());
+    expect(screen.getByText('Garantías')).toBeInTheDocument();
+    unmount();
+
+    setLoggedInUser(['baker']);
+    renderSidebar();
+    await waitFor(() => expect(screen.getByText('Test User')).toBeInTheDocument());
+    expect(screen.queryByText('Garantías')).not.toBeInTheDocument();
   });
 
   it('shows only role-appropriate nav items for a baker-only user', async () => {

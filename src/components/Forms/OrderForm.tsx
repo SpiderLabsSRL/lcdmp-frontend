@@ -54,6 +54,7 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
         depositMethod: initialData.depositMethod,
         discount: initialData.discount,
         notes: initialData.notes,
+        guarantee: initialData.guarantee,
         paymentMethod: 'cash',
       };
     }
@@ -126,12 +127,18 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
     if (formData.deliveryCost) {
       total += formData.deliveryCost;
     }
+
+    // La garantía se cobra con el pedido y se devuelve después (egreso en caja)
+    if (formData.guarantee?.amount) {
+      total += formData.guarantee.amount;
+    }
     
     return total;
   };
 
   const subtotal = calculateSubtotal();
   const total = calculateTotal();
+  const guaranteeReturned = !!initialData?.guarantee?.returnedAt;
 
   const cakeFlavors = flavors.filter((f: any) => f.type === 'cake' && f.isActive);
   const fillingFlavors = flavors.filter((f: any) => f.type === 'filling' && f.isActive);
@@ -346,6 +353,17 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
       return;
     }
 
+    if (formData.guarantee && !guaranteeReturned) {
+      if (!formData.guarantee.items.trim()) {
+        toast.error('Indica qué artículos se prestan con la garantía');
+        return;
+      }
+      if (!(formData.guarantee.amount > 0)) {
+        toast.error('Indica el monto de la garantía');
+        return;
+      }
+    }
+
     if (!selectedOptions.hasCake && !selectedOptions.hasProducts && !selectedOptions.hasSweetTable) {
       toast.error('Debe seleccionar al menos un tipo de producto');
       return;
@@ -384,6 +402,12 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
           ? { ...item, customizationNotes: item.customizationNotes!.trim(), customizationPrice: item.customizationPrice || 0, referenceImages: item.referenceImages || [] }
           : { ...item, customizationNotes: undefined, customizationPrice: undefined, referenceImages: undefined }
       ),
+      // Una garantía ya devuelta no se vuelve a enviar (el backend la deja intacta)
+      guarantee: guaranteeReturned
+        ? undefined
+        : formData.guarantee
+          ? { amount: formData.guarantee.amount, items: formData.guarantee.items.trim() }
+          : isEditing ? null : undefined,
       total,
       orderType: typesSelected > 1 ? 'mixed' :
                   selectedOptions.hasCake ? 'cake' :
@@ -1180,17 +1204,60 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
               fallback={0}
             />
           </div>
-          {/*
-            <div className="space-y-1.5">
-              <Label className="text-sm">Garantía (opcional)</Label>
-              <Input 
-                placeholder="Descripción de garantía" 
-                className="text-sm"
-                value={formData.guarantee?.items || ''}
-                onChange={(e) => updateFormField('guarantee', { amount: formData.guarantee?.amount || 0, items: e.target.value })}
-              />
+        </div>
+
+        {/* Préstamo de pedestales / bases con garantía */}
+        <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
+          <label className="flex items-center gap-2 cursor-pointer text-sm font-medium">
+            <input
+              type="checkbox"
+              id="hasGuarantee"
+              checked={!!formData.guarantee}
+              disabled={guaranteeReturned}
+              onChange={(e) =>
+                updateFormField('guarantee', e.target.checked ? { amount: 0, items: '' } : undefined)
+              }
+            />
+            Agregar garantía (pedestal, base...)
+          </label>
+
+          {guaranteeReturned && (
+            <p className="text-xs text-muted-foreground">
+              La garantía de este pedido ya fue devuelta; no se puede modificar.
+            </p>
+          )}
+
+          {formData.guarantee && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label className="text-sm" htmlFor="guarantee-items">Qué se presta *</Label>
+                <Input
+                  id="guarantee-items"
+                  placeholder="Ej: 1 pedestal grande, 1 base redonda"
+                  className="text-sm"
+                  disabled={guaranteeReturned}
+                  value={formData.guarantee.items}
+                  onChange={(e) => updateFormField('guarantee', { ...formData.guarantee!, items: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm" htmlFor="guarantee-amount">Garantía (Bs.) *</Label>
+                <NumberInput
+                  id="guarantee-amount"
+                  placeholder="0"
+                  className="text-sm"
+                  disabled={guaranteeReturned}
+                  value={formData.guarantee.amount}
+                  onChange={(v) => updateFormField('guarantee', { ...formData.guarantee!, amount: v })}
+                  decimal
+                  fallback={0}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground sm:col-span-3">
+                La garantía se suma al total del pedido y se devuelve cuando el cliente regrese lo prestado.
+              </p>
             </div>
-          */}
+          )}
         </div>
       </div>
 
@@ -1253,6 +1320,13 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
           <div className="flex justify-between items-center py-2 text-sm ">
             <span>Costo de envío:</span>
             <span>+ Bs. {formData.deliveryCost.toFixed(2)}</span>
+          </div>
+        )}
+
+        {(formData.guarantee?.amount || 0) > 0 && (
+          <div className="flex justify-between items-center py-2 text-sm ">
+            <span>Garantía (se devuelve):</span>
+            <span>+ Bs. {formData.guarantee!.amount.toFixed(2)}</span>
           </div>
         )}
         

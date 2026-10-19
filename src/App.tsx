@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Sales from "./pages/Sales";
 import Orders from "./pages/Orders";
+import Guarantees from "./pages/Guarantees";
 import Products from "./pages/Products";
 import Inventory from "./pages/Inventory";
 import SpecialMenus from "./pages/SpecialMenus";
@@ -36,6 +37,7 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/sales" element={<ProtectedRoute requiredRoles={['admin', 'seller']}><Sales /></ProtectedRoute>} />
+            <Route path="/guarantees" element={<ProtectedRoute requiredRoles={['admin', 'seller']}><Guarantees /></ProtectedRoute>} />
             <Route path="/orders" element={<ProtectedRoute requiredRoles={['admin', 'seller']}><Orders /></ProtectedRoute>} />
             <Route path="/products" element={<ProtectedRoute requiredRoles={['admin', 'seller']}><Products /></ProtectedRoute>} />
             <Route path="/inventory" element={<ProtectedRoute requiredRoles={['admin']}><Inventory /></ProtectedRoute>} />

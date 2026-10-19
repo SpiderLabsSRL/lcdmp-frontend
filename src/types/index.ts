@@ -312,9 +312,27 @@ export interface OrderCombo {
   referenceImages?: string[];
 }
 
+// Lo que se presta con el pedido (pedestales, bases...) y el dinero dejado en garantía. El monto
+// va sumado al total del pedido; al devolverlo se registra un egreso en caja.
 export interface OrderGuarantee {
   amount: number;
   items: string;
+  returnedAt?: string | null;
+  returnedAmount?: number | null;
+}
+
+// Garantía de un pedido ya entregado, en la sección de devoluciones de Ventas.
+export interface GuaranteeEntry {
+  orderId: string;
+  orderNumber: string;
+  customerName: string;
+  customerPhone: string;
+  pickupDate: string; // YYYY-MM-DD
+  items: string;
+  amount: number;
+  returnedAt: string | null;
+  returnedAmount: number | null;
+  returnedMethod: PaymentMethod | null;
 }
 
 export interface CreateOrderData {
@@ -354,7 +372,8 @@ export interface UpdateOrderData {
   depositMethod?: 'cash' | 'qr';
   discount?: number;
   notes?: string;
-  guarantee?: OrderGuarantee;
+  // null = quitar la garantía; sin el campo = dejarla como está
+  guarantee?: OrderGuarantee | null;
   paymentMethod?: 'cash' | 'qr' | 'both';
 }
 
