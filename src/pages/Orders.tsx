@@ -48,6 +48,9 @@ export const getOrderType = (orderType: OrderType) => {
   return type;
 }
 
+// Pedidos solo muestra lo que sigue en curso: lo entregado o cancelado ya no requiere acción.
+const HIDDEN_STATUSES: OrderStatus[] = ['delivered', 'cancelled'];
+
 export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
   const isMobile = useIsMobile();
   const [searchTerm, setSearchTerm] = useState('');
@@ -78,6 +81,7 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
   const { orders, setOrders, isConnected } = useOrdersSocket({
     statusFilter,
     excludeOrderType: 'restock',
+    excludeStatuses: HIDDEN_STATUSES,
     initialOrders,
   });
 
@@ -94,7 +98,7 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
       // Los pedidos de reposición de stock ('restock') son internos — no
       // tienen cliente real y se confirman desde la pantalla de Reposición,
       // no acá.
-      const filters: OrderFilters = { excludeOrderType: 'restock' };
+      const filters: OrderFilters = { excludeOrderType: 'restock', excludeStatus: HIDDEN_STATUSES };
 
       if (selectedStatus !== 'all') {
         filters.status = selectedStatus as OrderStatus;
@@ -154,14 +158,13 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
     };
   }, []);
 
-  const getOrderPriority = (order: Order) => {
-    const hoursUntilPickup = (order.pickupDate.getTime() - Date.now()) / (1000 * 60 * 60);
-    const totalPortions = order.customCakes.reduce((sum, cake) => sum + cake.portions, 0);
-    return hoursUntilPickup - (totalPortions / 10);
-  };
-
+  // Por entrega: fecha y hora más próximas primero (mismo orden que el backend)
   const sortedOrders = useMemo(() => {
-    return [...orders].sort((a, b) => getOrderPriority(a) - getOrderPriority(b));
+    return [...orders].sort((a, b) =>
+      a.pickupDate.getTime() - b.pickupDate.getTime() ||
+      (a.pickupTime || '99:99').localeCompare(b.pickupTime || '99:99') ||
+      b.createdAt.getTime() - a.createdAt.getTime()
+    );
   }, [orders]);
 
   const handleCreateOrder = async (orderData: CreateOrderData) => {
@@ -351,9 +354,11 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los estados</SelectItem>
-                    {Object.entries(statusConfig).map(([value, { label }]) => (
-                      <SelectItem key={value} value={value}>{label}</SelectItem>
-                    ))}
+                    {Object.entries(statusConfig)
+                      .filter(([value]) => !HIDDEN_STATUSES.includes(value as OrderStatus))
+                      .map(([value, { label }]) => (
+                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
 

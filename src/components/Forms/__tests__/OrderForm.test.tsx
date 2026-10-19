@@ -1003,13 +1003,13 @@ describe('OrderForm - guarantee (loaned pedestals/bases)', () => {
     guarantee,
   } as unknown as Order);
 
-  it('shows the loan fields only when "Se presta algo con garantía" is checked', async () => {
+  it('shows the loan fields only when "Agregar garantía" is checked', async () => {
     const user = userEvent.setup();
     renderForm();
 
     expect(screen.queryByLabelText(/Qué se presta/)).not.toBeInTheDocument();
 
-    await user.click(screen.getByLabelText(/Se presta algo con garantía/));
+    await user.click(screen.getByLabelText(/Agregar garantía/));
 
     expect(screen.getByLabelText(/Qué se presta/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Garantía \(Bs\.\)/)).toBeInTheDocument();
@@ -1020,7 +1020,7 @@ describe('OrderForm - guarantee (loaned pedestals/bases)', () => {
     renderForm({ initialData: baseOrder(), isEditing: true });
     expect(within(getTotalsRow('Total a pagar:')).getByText('Bs. 30.00')).toBeInTheDocument();
 
-    await user.click(screen.getByLabelText(/Se presta algo con garantía/));
+    await user.click(screen.getByLabelText(/Agregar garantía/));
     setNumberValue(screen.getByLabelText(/Garantía \(Bs\.\)/), '100');
 
     expect(within(getTotalsRow('Total a pagar:')).getByText('Bs. 130.00')).toBeInTheDocument();
@@ -1032,7 +1032,7 @@ describe('OrderForm - guarantee (loaned pedestals/bases)', () => {
     const { onSubmit } = renderForm({ initialData: baseOrder(), isEditing: true });
     mockedToastError.mockClear();
 
-    await user.click(screen.getByLabelText(/Se presta algo con garantía/));
+    await user.click(screen.getByLabelText(/Agregar garantía/));
     setNumberValue(screen.getByLabelText(/Garantía \(Bs\.\)/), '100');
     await user.click(screen.getByRole('button', { name: 'Actualizar Pedido' }));
 
@@ -1045,7 +1045,7 @@ describe('OrderForm - guarantee (loaned pedestals/bases)', () => {
     const { onSubmit } = renderForm({ initialData: baseOrder(), isEditing: true });
     mockedToastError.mockClear();
 
-    await user.click(screen.getByLabelText(/Se presta algo con garantía/));
+    await user.click(screen.getByLabelText(/Agregar garantía/));
     await user.type(screen.getByLabelText(/Qué se presta/), 'Pedestal');
     await user.click(screen.getByRole('button', { name: 'Actualizar Pedido' }));
 
@@ -1057,7 +1057,7 @@ describe('OrderForm - guarantee (loaned pedestals/bases)', () => {
     const user = userEvent.setup();
     const { onSubmit } = renderForm({ initialData: baseOrder(), isEditing: true });
 
-    await user.click(screen.getByLabelText(/Se presta algo con garantía/));
+    await user.click(screen.getByLabelText(/Agregar garantía/));
     await user.type(screen.getByLabelText(/Qué se presta/), '  1 pedestal grande ');
     setNumberValue(screen.getByLabelText(/Garantía \(Bs\.\)/), '100');
     await user.click(screen.getByRole('button', { name: 'Actualizar Pedido' }));
@@ -1070,7 +1070,7 @@ describe('OrderForm - guarantee (loaned pedestals/bases)', () => {
   it('pre-fills an existing guarantee when editing', () => {
     renderForm({ initialData: baseOrder({ amount: 80, items: 'Base redonda' }), isEditing: true });
 
-    expect(screen.getByLabelText(/Se presta algo con garantía/)).toBeChecked();
+    expect(screen.getByLabelText(/Agregar garantía/)).toBeChecked();
     expect(screen.getByLabelText(/Qué se presta/)).toHaveValue('Base redonda');
     expect(screen.getByLabelText(/Garantía \(Bs\.\)/)).toHaveValue(80);
     expect(within(getTotalsRow('Total a pagar:')).getByText('Bs. 110.00')).toBeInTheDocument();
@@ -1080,7 +1080,7 @@ describe('OrderForm - guarantee (loaned pedestals/bases)', () => {
     const user = userEvent.setup();
     const { onSubmit } = renderForm({ initialData: baseOrder({ amount: 80, items: 'Base redonda' }), isEditing: true });
 
-    await user.click(screen.getByLabelText(/Se presta algo con garantía/));
+    await user.click(screen.getByLabelText(/Agregar garantía/));
     await user.click(screen.getByRole('button', { name: 'Actualizar Pedido' }));
 
     expect(onSubmit.mock.calls[0][0].guarantee).toBeNull();
@@ -1101,7 +1101,7 @@ describe('OrderForm - guarantee (loaned pedestals/bases)', () => {
     const returned = { amount: 80, items: 'Base redonda', returnedAt: '2026-10-16T10:00:00Z', returnedAmount: 80 };
     const { onSubmit } = renderForm({ initialData: baseOrder(returned), isEditing: true });
 
-    expect(screen.getByLabelText(/Se presta algo con garantía/)).toBeDisabled();
+    expect(screen.getByLabelText(/Agregar garantía/)).toBeDisabled();
     expect(screen.getByLabelText(/Qué se presta/)).toBeDisabled();
     expect(screen.getByText(/ya fue devuelta/)).toBeInTheDocument();
     // sigue contando en el total (ya se cobró)

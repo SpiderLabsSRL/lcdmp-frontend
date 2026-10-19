@@ -92,6 +92,17 @@ describe('OrdersApi (real, axios-backed)', () => {
       });
     });
 
+    it('sends excludeStatus as a comma-separated list', async () => {
+      mockedApi.get.mockResolvedValue({ data: { success: true, data: [] } });
+
+      await ordersApi.getOrders({ excludeStatus: ['delivered', 'cancelled'] });
+
+      expect(mockedApi.get).toHaveBeenLastCalledWith('/orders', {
+        params: { excludeStatus: 'delivered,cancelled' },
+        signal: undefined,
+      });
+    });
+
     it('maps pickupDate (local, from Y-M-D) and createdAt on each order', async () => {
       const rawOrders = [{ id: '1', pickupDate: '2026-03-05', createdAt: '2026-01-01T10:00:00.000Z' }];
       mockedApi.get.mockResolvedValue({ data: { success: true, data: rawOrders } });
@@ -458,6 +469,11 @@ describe('MockOrdersApi (in-memory)', () => {
       const orders = await mockApi.getOrders({ orderType: 'mixed' });
       expect(orders.length).toBeGreaterThan(0);
       expect(orders.every(o => o.orderType === 'mixed')).toBe(true);
+    });
+
+    it('filters by excludeStatus', async () => {
+      const orders = await mockApi.getOrders({ excludeStatus: ['delivered', 'cancelled'] });
+      expect(orders.every(o => o.status !== 'delivered' && o.status !== 'cancelled')).toBe(true);
     });
 
     it('filters by excludeOrderType', async () => {

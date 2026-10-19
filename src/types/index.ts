@@ -386,6 +386,8 @@ export interface OrderFilters {
   customerPhone?: string;
   orderType?: SystemOrderType;
   excludeOrderType?: SystemOrderType;
+  // Estados a ocultar (la vista Pedidos no muestra entregados ni cancelados)
+  excludeStatus?: OrderStatus[];
 }
 
 // Seguimiento de producción por línea (torta/producto/item de combo/extra)
