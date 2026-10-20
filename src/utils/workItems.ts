@@ -2,9 +2,9 @@ import type { Order, WorkItem, ProductStatus } from '@/types';
 import { getCakeShapeLabel } from '@/types/consts';
 import { isCustomizedItem } from '@/utils/orderItems';
 
-// Aplana las 4 fuentes de líneas de producción de un pedido (tortas
+// Aplana las 5 fuentes de líneas de producción de un pedido (tortas
 // personalizadas, productos de catálogo, productos dentro de una mesa dulce,
-// y postres adicionales de mesa dulce) en una lista plana de WorkItem,
+// postres adicionales de mesa dulce y maquetas) en una lista plana de WorkItem,
 // filtrando solo las que están en la etapa pedida. Reutilizado por
 // Hornos/Armado/Decoración para renderizar una tarjeta por línea en vez de
 // una tarjeta por pedido completo.
@@ -55,6 +55,21 @@ export function getWorkItemsAtStage(orders: Order[], stage: ProductStatus): Work
           referenceImages: combo.referenceImages,
         });
       }
+    }
+
+    for (const mockup of order.mockups || []) {
+      if (mockup.status !== stage || !mockup.id) continue;
+      items.push({
+        itemType: 'mockup',
+        itemId: mockup.id,
+        order,
+        status: mockup.status,
+        title: `Maqueta - ${mockup.floors} ${mockup.floors === 1 ? 'piso' : 'pisos'}`,
+        detail: mockup.heightCm ? `Altura: ${mockup.heightCm} cm` : undefined,
+        quantity: 1,
+        referenceImages: mockup.referenceImages,
+        mockup: { design: mockup.design, floors: mockup.floors, heightCm: mockup.heightCm },
+      });
     }
 
     for (const extra of order.sweetTableExtras || []) {

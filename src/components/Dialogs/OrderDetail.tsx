@@ -311,6 +311,28 @@ export default function OrderDetail({ order, onDeliver, onCancel, onMarkAtStore,
         </div>
       )}
 
+      {/* Maquetas */}
+      {(order.mockups?.length ?? 0) > 0 && (
+        <div className="border-t pt-3 sm:pt-4">
+          <h4 className="font-semibold text-base text-foreground mb-2">Maquetas</h4>
+          <div className="space-y-3">
+            {order.mockups!.map((mockup, i) => (
+              <div key={mockup.id || i} className="bg-muted/50 p-3 rounded-lg space-y-1">
+                <div className="flex justify-between">
+                  <p className="font-medium text-sm text-foreground">
+                    Maqueta #{i + 1} · {mockup.floors} {mockup.floors === 1 ? 'piso' : 'pisos'}
+                    {mockup.heightCm ? ` · ${mockup.heightCm} cm` : ''}
+                  </p>
+                  <p className="text-sm font-medium text-foreground">Bs. {mockup.price}</p>
+                </div>
+                <p className="text-sm text-foreground whitespace-pre-wrap">Diseño: {mockup.design}</p>
+                {mockup.referenceImages?.length > 0 && <ReferenceImages images={mockup.referenceImages} />}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Garantía */}
       {order.guarantee && (
         <div className="border-t pt-3 sm:pt-4">

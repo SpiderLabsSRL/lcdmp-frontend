@@ -267,6 +267,38 @@ describe('OrderDetail', () => {
       expect(screen.getByText('Costo de envío: Bs. 30')).toBeInTheDocument();
     });
 
+    it('renders the mockups with design, floors, height and price', () => {
+      render(
+        <OrderDetail
+          order={{
+            ...fullOrder,
+            mockups: [{ id: 'm1', design: 'Torta de 3 pisos azul', floors: 3, heightCm: 12, price: 500, referenceImages: [] }],
+          }}
+        />
+      );
+
+      expect(screen.getByText('Maquetas')).toBeInTheDocument();
+      expect(screen.getByText('Maqueta #1 · 3 pisos · 12 cm')).toBeInTheDocument();
+      expect(screen.getByText('Diseño: Torta de 3 pisos azul')).toBeInTheDocument();
+      expect(screen.getByText('Bs. 500')).toBeInTheDocument();
+    });
+
+    it('omits the height when the mockup has none and uses the singular for one floor', () => {
+      render(
+        <OrderDetail
+          order={{ ...fullOrder, mockups: [{ id: 'm1', design: 'x', floors: 1, heightCm: null, price: 100, referenceImages: [] }] }}
+        />
+      );
+
+      expect(screen.getByText('Maqueta #1 · 1 piso')).toBeInTheDocument();
+    });
+
+    it('does not render the mockups section when the order has none', () => {
+      render(<OrderDetail order={fullOrder} />);
+
+      expect(screen.queryByText('Maquetas')).not.toBeInTheDocument();
+    });
+
     it('renders the guarantee section', () => {
       render(<OrderDetail order={fullOrder} />);
 

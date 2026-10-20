@@ -38,6 +38,9 @@ export const getOrderType = (orderType: OrderType) => {
     case "sweet_table":
       type = "Mesa Dulce";
       break;
+    case "mockup":
+      type = "Maqueta";
+      break;
     case "mixed":
       type = "Varios";
       break;

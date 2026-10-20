@@ -1112,3 +1112,127 @@ describe('OrderForm - guarantee (loaned pedestals/bases)', () => {
     expect(onSubmit.mock.calls[0][0].guarantee).toBeUndefined();
   });
 });
+
+describe('OrderForm - mockup (maqueta)', () => {
+  const fillMockup = async (user: ReturnType<typeof userEvent.setup>, design = 'Torta de 3 pisos azul con flores') => {
+    await user.type(screen.getByLabelText(/Diseño/), design);
+    setNumberValue(screen.getByLabelText(/Pisos/), '3');
+    setNumberValue(screen.getByLabelText(/Precio \(Bs\.\)/), '500');
+  };
+
+  it('offers Maqueta next to the other order types and shows its fields when checked', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    expect(screen.queryByLabelText(/Diseño/)).not.toBeInTheDocument();
+    await user.click(screen.getByLabelText('Maqueta'));
+
+    expect(screen.getByLabelText(/Diseño/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Pisos/)).toHaveValue(1);
+    expect(screen.getByLabelText(/Altura en cm/)).toHaveValue(null);
+    expect(screen.getByLabelText(/Precio \(Bs\.\)/)).toBeInTheDocument();
+    expect(screen.getByText('Maqueta #1')).toBeInTheDocument();
+  });
+
+  it('adds its price to the total', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(screen.getByLabelText('Maqueta'));
+    await fillMockup(user);
+
+    expect(within(getTotalsRow('Total a pagar:')).getByText('Bs. 500.00')).toBeInTheDocument();
+  });
+
+  it('submits a mockup-only order as type "mockup" with the design, floors and optional height', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm();
+
+    await fillRequiredCustomerFields(user);
+    await user.click(screen.getByLabelText('Maqueta'));
+    await fillMockup(user, '  Torta de 3 pisos  ');
+    setNumberValue(screen.getByLabelText(/Altura en cm/), '12.5');
+    await user.click(screen.getByRole('button', { name: 'Crear Pedido' }));
+
+    expect(mockedToastError).not.toHaveBeenCalled();
+    const submitted = onSubmit.mock.calls[0][0];
+    expect(submitted.orderType).toBe('mockup');
+    expect(submitted.mockups).toEqual([
+      expect.objectContaining({ design: 'Torta de 3 pisos', floors: 3, heightCm: 12.5, price: 500, referenceImages: [] }),
+    ]);
+    expect(submitted.total).toBe(500);
+  });
+
+  it('sends no height when it is left empty', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm();
+
+    await fillRequiredCustomerFields(user);
+    await user.click(screen.getByLabelText('Maqueta'));
+    await fillMockup(user);
+    await user.click(screen.getByRole('button', { name: 'Crear Pedido' }));
+
+    expect(onSubmit.mock.calls[0][0].mockups[0].heightCm).toBeNull();
+  });
+
+  it('is "mixed" when combined with another type', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm();
+
+    await fillRequiredCustomerFields(user);
+    await user.click(screen.getByLabelText('Maqueta'));
+    await fillMockup(user);
+    await user.click(screen.getByLabelText('Productos del catálogo'));
+    const productCard = screen.getByText('Producto #1').closest('.space-y-3') as HTMLElement;
+    await chooseOption(user, within(productCard).getByRole('combobox'), /Brownie - Bs\. 10/);
+    await user.click(screen.getByRole('button', { name: 'Crear Pedido' }));
+
+    expect(onSubmit.mock.calls[0][0].orderType).toBe('mixed');
+  });
+
+  it('blocks the submit when the design is empty', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm();
+    mockedToastError.mockClear();
+
+    await fillRequiredCustomerFields(user);
+    await user.click(screen.getByLabelText('Maqueta'));
+    await user.click(screen.getByRole('button', { name: 'Crear Pedido' }));
+
+    expect(mockedToastError).toHaveBeenCalledWith('Maqueta #1: describe el diseño');
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('lets you add and remove several mockups, and unchecking clears them', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(screen.getByLabelText('Maqueta'));
+    await user.click(screen.getByRole('button', { name: /Agregar Maqueta/ }));
+    expect(screen.getByText('Maqueta #2')).toBeInTheDocument();
+
+    await user.click(screen.getAllByRole('button', { name: 'Quitar maqueta' })[0]);
+    expect(screen.queryByText('Maqueta #2')).not.toBeInTheDocument();
+
+    await user.click(screen.getByLabelText('Maqueta'));
+    expect(screen.queryByLabelText(/Diseño/)).not.toBeInTheDocument();
+  });
+
+  it('pre-fills the mockups when editing an order', () => {
+    const order = {
+      id: 'o1', orderNumber: 'ORD-1', orderType: 'mockup', customerName: 'Juana', customerPhone: '70011122',
+      pickupDate: new Date(2099, 9, 10), pickupTime: '15:30', status: 'decorating',
+      items: [], customCakes: [], sweetTableCombos: [], sweetTableExtras: [],
+      mockups: [{ id: 'm1', design: 'Diseño existente', floors: 2, heightCm: 10, price: 300, referenceImages: ['https://signed/a.jpg'] }],
+      deliveryCost: 0, deposit: 0, total: 300, createdAt: new Date(2026, 8, 1), createdBy: 'u1',
+    } as unknown as Order;
+    renderForm({ initialData: order, isEditing: true });
+
+    expect(screen.getByLabelText('Maqueta')).toBeChecked();
+    expect(screen.getByDisplayValue('Diseño existente')).toBeInTheDocument();
+    expect(screen.getByLabelText(/Pisos/)).toHaveValue(2);
+    expect(screen.getByLabelText(/Altura en cm/)).toHaveValue(10);
+    expect(screen.getByAltText('Referencia 1')).toHaveAttribute('src', 'https://signed/a.jpg');
+    expect(within(getTotalsRow('Total a pagar:')).getByText('Bs. 300.00')).toBeInTheDocument();
+  });
+});

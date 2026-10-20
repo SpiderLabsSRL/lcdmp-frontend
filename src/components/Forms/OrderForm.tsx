@@ -6,7 +6,7 @@ import { TimePicker } from '@/components/ui/time-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Banknote, Plus, QrCode, X } from 'lucide-react';
 import { format } from 'date-fns';
-import { CreateOrderData, CustomCake, Order, UpdateOrderData, OrderItem, OrderCombo, ComboProduct, SweetTableCombo } from '@/types';
+import { CreateOrderData, CustomCake, Mockup, Order, UpdateOrderData, OrderItem, OrderCombo, ComboProduct, SweetTableCombo } from '@/types';
 import { toast } from 'sonner';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -48,6 +48,7 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
           products: c.products.map(p => ({ ...p }))
         })) : [],
         sweetTableExtras: initialData.sweetTableExtras ? initialData.sweetTableExtras.map(e => ({ ...e })) : [],
+        mockups: initialData.mockups ? initialData.mockups.map(m => ({ ...m })) : [],
         deliveryAddress: initialData.deliveryAddress,
         deliveryCost: initialData.deliveryCost,
         deposit: initialData.deposit,
@@ -67,6 +68,7 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
       customCakes: [],
       sweetTableCombos: [],
       sweetTableExtras: [],
+      mockups: [],
       deliveryCost: 0,
       deposit: 0,
       discount: 0,
@@ -82,6 +84,7 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
   const selectedOptions = {
     hasCake: (formData.customCakes?.length || 0) > 0,
     hasProducts: (formData.items?.length || 0) > 0,
+    hasMockup: (formData.mockups?.length || 0) > 0,
     hasSweetTable: (formData.sweetTableCombos?.length || 0) > 0 || (formData.sweetTableExtras?.length || 0) > 0
   };
 
@@ -102,6 +105,10 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
 
     (formData.sweetTableExtras || []).forEach(extra => {
       subtotal += (extra.price || 0) * (extra.quantity || 0);
+    });
+
+    (formData.mockups || []).forEach(mockup => {
+      subtotal += mockup.price || 0;
     });
     
     return subtotal;
@@ -173,6 +180,30 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
     const updated = [...(formData.customCakes || [])];
     updated[index] = { ...updated[index], [field]: value };
     setFormData({ ...formData, customCakes: updated });
+  };
+
+  const addMockup = () => {
+    const newMockup: Mockup = {
+      id: Date.now().toString(),
+      design: '',
+      floors: 1,
+      heightCm: null,
+      price: 0,
+      referenceImages: [],
+    };
+    setFormData({ ...formData, mockups: [...(formData.mockups || []), newMockup] });
+  };
+
+  const removeMockup = (index: number) => {
+    const updated = [...(formData.mockups || [])];
+    updated.splice(index, 1);
+    setFormData({ ...formData, mockups: updated });
+  };
+
+  const updateMockup = (index: number, field: keyof Mockup, value: any) => {
+    const updated = [...(formData.mockups || [])];
+    updated[index] = { ...updated[index], [field]: value };
+    setFormData({ ...formData, mockups: updated });
   };
 
   const addProduct = () => {
@@ -364,7 +395,18 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
       }
     }
 
-    if (!selectedOptions.hasCake && !selectedOptions.hasProducts && !selectedOptions.hasSweetTable) {
+    for (const [i, mockup] of (formData.mockups || []).entries()) {
+      if (!mockup.design.trim()) {
+        toast.error(`Maqueta #${i + 1}: describe el diseño`);
+        return;
+      }
+      if (!Number.isInteger(mockup.floors) || mockup.floors < 1) {
+        toast.error(`Maqueta #${i + 1}: indica cuántos pisos tiene (mínimo 1)`);
+        return;
+      }
+    }
+
+    if (!selectedOptions.hasCake && !selectedOptions.hasProducts && !selectedOptions.hasSweetTable && !selectedOptions.hasMockup) {
       toast.error('Debe seleccionar al menos un tipo de producto');
       return;
     }
@@ -392,7 +434,7 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
     setIsSubmitting(true);
 
     const hasSweetTableFinal = selectedOptions.hasSweetTable;
-    const typesSelected = [selectedOptions.hasCake, selectedOptions.hasProducts, hasSweetTableFinal].filter(Boolean).length;
+    const typesSelected = [selectedOptions.hasCake, selectedOptions.hasProducts, hasSweetTableFinal, selectedOptions.hasMockup].filter(Boolean).length;
     
     const submitData = {
       ...formData,
@@ -402,6 +444,12 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
           ? { ...item, customizationNotes: item.customizationNotes!.trim(), customizationPrice: item.customizationPrice || 0, referenceImages: item.referenceImages || [] }
           : { ...item, customizationNotes: undefined, customizationPrice: undefined, referenceImages: undefined }
       ),
+      mockups: (formData.mockups || []).map(m => ({
+        ...m,
+        design: m.design.trim(),
+        heightCm: m.heightCm && m.heightCm > 0 ? m.heightCm : null,
+        referenceImages: m.referenceImages || [],
+      })),
       // Una garantía ya devuelta no se vuelve a enviar (el backend la deja intacta)
       guarantee: guaranteeReturned
         ? undefined
@@ -411,7 +459,8 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
       total,
       orderType: typesSelected > 1 ? 'mixed' :
                   selectedOptions.hasCake ? 'cake' :
-                  selectedOptions.hasProducts ? 'products' : 'sweet_table'
+                  selectedOptions.hasProducts ? 'products' :
+                  selectedOptions.hasMockup ? 'mockup' : 'sweet_table'
     };
     
     try {
@@ -481,7 +530,7 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
       </div>
 
       <div className="space-y-3 border rounded-lg p-4 bg-muted/30">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
           <label className="flex items-center gap-2 sm:justify-self-center justify-self-start">
             <div className="flex items-center gap-2 cursor-pointer group">
               <div className="relative flex items-center">
@@ -570,6 +619,35 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
               </div>
             </div>
             <span className="text-sm">Mesa dulce</span>
+          </label>
+
+          <label className="flex items-center gap-2 sm:justify-self-center justify-self-start">
+            <div className="relative flex items-center">
+              <input
+                type="checkbox"
+                checked={selectedOptions.hasMockup}
+                onChange={(e) => {
+                  if (!e.target.checked) {
+                    setFormData({ ...formData, mockups: [] });
+                  } else if ((formData.mockups?.length || 0) === 0) {
+                    addMockup();
+                  }
+                }}
+                className="sr-only peer"
+                id="hasMockup"
+              />
+              <div className="w-5 h-5 border-2 rounded-md border-muted-foreground/30 peer-checked:border-primary peer-checked:bg-primary transition-all duration-200 flex items-center justify-center group-hover:border-primary/50">
+                <svg
+                  className="w-3 h-3 text-primary-foreground opacity-0 peer-checked:opacity-100 transition-opacity duration-200"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+            </div>
+            <span className="text-sm">Maqueta</span>
           </label>
         </div>
       </div>
@@ -1178,6 +1256,102 @@ export default function OrderForm({ initialData, onSubmit, onClose, products, fl
               </p>
             )}
           </div>
+        </div>
+      )}
+
+      {selectedOptions.hasMockup && (
+        <div className="space-y-4 border rounded-lg p-4">
+          <div className="flex justify-between items-center">
+            <h3 className="font-semibold text-base">Maquetas</h3>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={addMockup}
+            >
+              <Plus className="h-4 w-4 mr-1" /> Agregar Maqueta
+            </Button>
+          </div>
+
+          {(formData.mockups || []).map((mockup, index) => (
+            <div key={mockup.id || index} className="border rounded-lg p-3 space-y-3 relative">
+              <div className="flex justify-between items-center">
+                <span className="font-medium text-sm">Maqueta #{index + 1}</span>
+                {(formData.mockups?.length || 0) > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeMockup(index)}
+                    className="text-destructive"
+                    aria-label="Quitar maqueta"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-sm" htmlFor={`mockup-design-${index}`}>Diseño *</Label>
+                <Textarea
+                  id={`mockup-design-${index}`}
+                  placeholder="Describe el diseño de la maqueta (colores, decoración, tema...)"
+                  className="text-sm"
+                  rows={3}
+                  value={mockup.design}
+                  onChange={(e) => updateMockup(index, 'design', e.target.value)}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-sm" htmlFor={`mockup-floors-${index}`}>Pisos *</Label>
+                  <NumberInput
+                    id={`mockup-floors-${index}`}
+                    min="1"
+                    value={mockup.floors}
+                    onChange={(v) => updateMockup(index, 'floors', v)}
+                    fallback={1}
+                    className="text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm" htmlFor={`mockup-height-${index}`}>Altura en cm (opcional)</Label>
+                  <NumberInput
+                    id={`mockup-height-${index}`}
+                    placeholder="Ej: 12"
+                    value={mockup.heightCm}
+                    onChange={(v) => updateMockup(index, 'heightCm', v > 0 ? v : null)}
+                    decimal
+                    fallback={0}
+                    className="text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">De la torta o de cada piso</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm" htmlFor={`mockup-price-${index}`}>Precio (Bs.) *</Label>
+                  <NumberInput
+                    id={`mockup-price-${index}`}
+                    placeholder="0"
+                    value={mockup.price}
+                    onChange={(v) => updateMockup(index, 'price', v)}
+                    decimal
+                    fallback={0}
+                    className="text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-sm">Imágenes de referencia (opcional)</Label>
+                <ReferenceImagesInput
+                  value={mockup.referenceImages || []}
+                  onChange={(images) => updateMockup(index, 'referenceImages', images)}
+                  uploadsApi={uploadsApi}
+                />
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

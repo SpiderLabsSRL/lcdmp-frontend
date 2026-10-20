@@ -278,3 +278,47 @@ describe('getWorkItemsAtStage', () => {
     ]);
   });
 });
+
+describe('getWorkItemsAtStage - mockups (maquetas)', () => {
+  const mockup = (overrides = {}) => ({
+    id: 'm1', design: 'Torta de 3 pisos', floors: 3, heightCm: 12, price: 500, referenceImages: ['a.jpg'], status: 'decorating' as const, ...overrides,
+  });
+
+  it('lists a mockup in the stage it is in, with its design, floors, height and images', () => {
+    const order = { id: 'o1', mockups: [mockup()], customCakes: [], items: [] } as unknown as Order;
+
+    const result = getWorkItemsAtStage([order], 'decorating');
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      itemType: 'mockup',
+      itemId: 'm1',
+      title: 'Maqueta - 3 pisos',
+      detail: 'Altura: 12 cm',
+      quantity: 1,
+      referenceImages: ['a.jpg'],
+      mockup: { design: 'Torta de 3 pisos', floors: 3, heightCm: 12 },
+    });
+  });
+
+  it('does not show a mockup in Hornos or Armado (it only goes through Decoración)', () => {
+    const order = { id: 'o1', mockups: [mockup()], customCakes: [], items: [] } as unknown as Order;
+
+    expect(getWorkItemsAtStage([order], 'baking')).toHaveLength(0);
+    expect(getWorkItemsAtStage([order], 'assembling')).toHaveLength(0);
+  });
+
+  it('singular "piso" and no height line when the height is not set', () => {
+    const order = { id: 'o1', mockups: [mockup({ floors: 1, heightCm: null })], customCakes: [], items: [] } as unknown as Order;
+
+    const [item] = getWorkItemsAtStage([order], 'decorating');
+
+    expect(item.title).toBe('Maqueta - 1 piso');
+    expect(item.detail).toBeUndefined();
+  });
+
+  it('works for orders that came without the mockups field (older data)', () => {
+    const order = { id: 'o1', customCakes: [], items: [] } as unknown as Order;
+    expect(getWorkItemsAtStage([order], 'decorating')).toEqual([]);
+  });
+});
