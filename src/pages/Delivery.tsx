@@ -229,6 +229,11 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
                                   Mesa dulce: {order.sweetTableExtras.map(e => `${e.quantity} ${e.product?.name || e.productName}`).join(', ')}
                                 </p>
                               )}
+                              {(order.mockups?.length || 0) > 0 && (
+                                <p>
+                                  {order.mockups!.map(m => `Maqueta: ${m.floors} ${m.floors === 1 ? 'piso' : 'pisos'}`).join(', ')}
+                                </p>
+                              )}
                               {order.items.map((item, i) => (
                                 <p key={i}>
                                   <strong>{item.productName}</strong> - {item.quantity} Unidades
@@ -321,6 +326,11 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
                           {(order.sweetTableExtras?.length || 0) > 0 && (
                             <p className="text-sm">
                               Mesa dulce: {order.sweetTableExtras.map(e => `${e.quantity} ${e.product?.name || e.productName}`).join(', ')}
+                            </p>
+                          )}
+                          {(order.mockups?.length || 0) > 0 && (
+                            <p className="text-sm">
+                              {order.mockups!.map(m => `Maqueta: ${m.floors} ${m.floors === 1 ? 'piso' : 'pisos'}`).join(', ')}
                             </p>
                           )}
                           {order.items.map((item, i) => (
@@ -450,6 +460,11 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
                                   Mesa dulce: {order.sweetTableExtras.map(e => `${e.quantity} ${e.product?.name || e.productName}`).join(', ')}
                                 </p>
                               )}
+                              {(order.mockups?.length || 0) > 0 && (
+                                <p>
+                                  {order.mockups!.map(m => `Maqueta: ${m.floors} ${m.floors === 1 ? 'piso' : 'pisos'}`).join(', ')}
+                                </p>
+                              )}
                               {order.items.map((item, i) => (
                                 <p key={i}>
                                   <strong>{item.productName}</strong> - {item.quantity} Unidades
@@ -529,6 +544,11 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
                               Mesa dulce: {order.sweetTableExtras.map(e => `${e.quantity} ${e.product?.name || e.productName}`).join(', ')}
                             </p>
                           )}
+                          {(order.mockups?.length || 0) > 0 && (
+                            <p className="text-sm">
+                              {order.mockups!.map(m => `Maqueta: ${m.floors} ${m.floors === 1 ? 'piso' : 'pisos'}`).join(', ')}
+                            </p>
+                          )}
                           {order.items.map((item, i) => (
                             <p key={i} className="text-sm">
                               <strong>{item.productName}</strong> - {item.quantity} Unidades
@@ -596,9 +616,9 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
 
                 {selectedOrder.guarantee && (
                   <div className="p-3 sm:p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                    <p className="font-medium text-orange-800 text-sm">Garantía a recuperar</p>
+                    <p className="font-medium text-orange-800 text-sm">Préstamo con garantía</p>
                     <p className="text-xs sm:text-sm text-orange-700">
-                      Bs. {selectedOrder.guarantee.amount} - {selectedOrder.guarantee.items}
+                      Bs. {selectedOrder.guarantee.amount} (ya incluida en el saldo a cobrar) - {selectedOrder.guarantee.items}
                     </p>
                   </div>
                 )}

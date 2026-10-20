@@ -4,8 +4,12 @@ import { X } from "lucide-react";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
+import { useBackAwareDialog } from "@/hooks/useBackButtonClose";
 
-const Sheet = SheetPrimitive.Root;
+const Sheet = ({ open, defaultOpen, onOpenChange, ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) => (
+  <SheetPrimitive.Root {...props} {...useBackAwareDialog({ open, defaultOpen, onOpenChange })} />
+);
+Sheet.displayName = "Sheet";
 
 const SheetTrigger = SheetPrimitive.Trigger;
 

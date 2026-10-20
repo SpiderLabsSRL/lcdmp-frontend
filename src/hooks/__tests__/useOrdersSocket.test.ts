@@ -492,6 +492,41 @@ describe('useOrdersSocket', () => {
     });
   });
 
+  describe('excludeStatuses', () => {
+    it('does not add a new order on order:created when its status is excluded', () => {
+      const { result } = renderHook(() =>
+        useOrdersSocket({ excludeStatuses: ['delivered', 'cancelled'], initialOrders: EMPTY_ORDERS })
+      );
+
+      act(() => {
+        getHandler('order:created')(makeOrder({ id: 'd1', status: 'delivered' }));
+      });
+      expect(result.current.orders).toHaveLength(0);
+
+      act(() => {
+        getHandler('order:created')(makeOrder({ id: 'p1', status: 'pending' }));
+      });
+      expect(result.current.orders).toHaveLength(1);
+    });
+
+    it('removes an order from the list when it becomes delivered or cancelled', () => {
+      const initial = [makeOrder({ id: 'o1', status: 'ready' })] as unknown as Order[];
+      const { result } = renderHook(() =>
+        useOrdersSocket({ excludeStatuses: ['delivered', 'cancelled'], initialOrders: initial })
+      );
+
+      act(() => {
+        getHandler('order:status_changed')({
+          id: 'o1',
+          status: 'delivered',
+          order: makeOrder({ id: 'o1', status: 'delivered' }),
+        });
+      });
+
+      expect(result.current.orders).toHaveLength(0);
+    });
+  });
+
   describe('orderTypeFilter', () => {
     it('only adds orders that match the given orderType on order:created', () => {
       const { result } = renderHook(() =>

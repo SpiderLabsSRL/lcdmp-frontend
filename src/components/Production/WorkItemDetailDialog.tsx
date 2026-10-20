@@ -13,7 +13,7 @@ export const getCakeForItem = (item: WorkItem): CustomCake | undefined => {
 // Línea corta para la tarjeta de una línea de producción: el diseño pedido (recortado)
 export function DesignPreview({ item }: { item: WorkItem }) {
   // Diseño de una torta, o descripción de la personalización de un producto de catálogo
-  const text = getCakeForItem(item)?.design || item.customization?.notes;
+  const text = getCakeForItem(item)?.design || item.customization?.notes || item.mockup?.design;
   if (text) {
     return <p className=" mt-0.5">🎨 {text.substring(0, 100)}{text.length > 100 ? '...' : ''}</p>;
   }
@@ -90,6 +90,18 @@ export function WorkItemDetailDialog({ item, open, onOpenChange }: WorkItemDetai
                   </>
                 );
               })()}
+              {item.mockup && (
+                <>
+                  <p className="text-sm text-foreground">
+                    <span className="font-semibold">Pisos:</span> {item.mockup.floors}
+                    {item.mockup.heightCm ? <> · <span className="font-semibold">Altura:</span> {item.mockup.heightCm} cm</> : null}
+                  </p>
+                  <div className="p-2 sm:p-3 bg-background rounded border">
+                    <p className="text-sm font-semibold text-foreground">Diseño requerido:</p>
+                    <p className="text-sm mt-1 whitespace-pre-wrap text-foreground">{item.mockup.design}</p>
+                  </div>
+                </>
+              )}
               {item.customization && (
                 <>
                   <div className="p-2 sm:p-3 bg-background rounded border">

@@ -215,7 +215,7 @@ export interface EditSweetTableComboData extends Partial<CreateSweetTableComboDa
 }
 
 // Order Types
-export type OrderType = 'cake' | 'products' | 'sweet_table' | 'mixed';
+export type OrderType = 'cake' | 'products' | 'sweet_table' | 'mockup' | 'mixed';
 // 'restock' se crea internamente (ver maybeCreateRestockOrder en el backend)
 // cuando el stock de un producto llega a su mínimo — nunca a través del
 // formulario público de creación de pedidos, por eso vive aparte de OrderType.
@@ -249,6 +249,7 @@ export interface Order {
   customCakes: CustomCake[];
   sweetTableCombos?: OrderCombo[];
   sweetTableExtras?: OrderItem[];
+  mockups?: Mockup[];
   deliveryAddress?: string;
   deliveryCost: number;
   deposit: number;
@@ -300,6 +301,18 @@ export interface CustomCake {
   status?: ProductStatus;
 }
 
+// Maqueta (torta de exhibición): se registra el diseño, los pisos y, opcional, la altura en cm
+// (de la torta o de cada piso). No se hornea ni se arma: entra directo a Decoración.
+export interface Mockup {
+  id?: string;
+  design: string;
+  floors: number;
+  heightCm?: number | null;
+  price: number;
+  referenceImages: string[];
+  status?: ProductStatus;
+}
+
 export interface OrderCombo {
   id?: string;
   comboId?: string;
@@ -312,13 +325,31 @@ export interface OrderCombo {
   referenceImages?: string[];
 }
 
+// Lo que se presta con el pedido (pedestales, bases...) y el dinero dejado en garantía. El monto
+// va sumado al total del pedido; al devolverlo se registra un egreso en caja.
 export interface OrderGuarantee {
   amount: number;
   items: string;
+  returnedAt?: string | null;
+  returnedAmount?: number | null;
+}
+
+// Garantía de un pedido ya entregado, en la sección de devoluciones de Ventas.
+export interface GuaranteeEntry {
+  orderId: string;
+  orderNumber: string;
+  customerName: string;
+  customerPhone: string;
+  pickupDate: string; // YYYY-MM-DD
+  items: string;
+  amount: number;
+  returnedAt: string | null;
+  returnedAmount: number | null;
+  returnedMethod: PaymentMethod | null;
 }
 
 export interface CreateOrderData {
-  orderType: 'cake' | 'products' | 'sweet_table' | 'mixed';
+  orderType: 'cake' | 'products' | 'sweet_table' | 'mockup' | 'mixed';
   customerName: string;
   customerPhone: string;
   pickupDate: Date;
@@ -327,6 +358,7 @@ export interface CreateOrderData {
   customCakes?: CustomCake[];
   sweetTableCombos?: OrderCombo[];
   sweetTableExtras?: OrderItem[];
+  mockups?: Mockup[];
   deliveryAddress?: string;
   deliveryCost?: number;
   deposit: number;
@@ -348,13 +380,15 @@ export interface UpdateOrderData {
   customCakes?: CustomCake[];
   sweetTableCombos?: OrderCombo[];
   sweetTableExtras?: OrderItem[];
+  mockups?: Mockup[];
   deliveryAddress?: string;
   deliveryCost?: number;
   deposit?: number;
   depositMethod?: 'cash' | 'qr';
   discount?: number;
   notes?: string;
-  guarantee?: OrderGuarantee;
+  // null = quitar la garantía; sin el campo = dejarla como está
+  guarantee?: OrderGuarantee | null;
   paymentMethod?: 'cash' | 'qr' | 'both';
 }
 
@@ -367,10 +401,12 @@ export interface OrderFilters {
   customerPhone?: string;
   orderType?: SystemOrderType;
   excludeOrderType?: SystemOrderType;
+  // Estados a ocultar (la vista Pedidos no muestra entregados ni cancelados)
+  excludeStatus?: OrderStatus[];
 }
 
 // Seguimiento de producción por línea (torta/producto/item de combo/extra)
-export type WorkItemType = 'custom_cake' | 'order_item' | 'combo_item' | 'sweet_table_extra';
+export type WorkItemType = 'custom_cake' | 'order_item' | 'combo_item' | 'sweet_table_extra' | 'mockup';
 
 // Una línea individual de producción, aplanada desde un Order para que las
 // pantallas de área (Hornos/Armado/Decoración) puedan renderizar una tarjeta
@@ -388,6 +424,8 @@ export interface WorkItem {
   customization?: { notes: string; images: string[] };
   // Imágenes de referencia de la mesa dulce (o del postre adicional) a la que pertenece la línea
   referenceImages?: string[];
+  // Maqueta: diseño, pisos y altura (cm, opcional)
+  mockup?: { design: string; floors: number; heightCm?: number | null };
 }
 
 export interface ItemStageLogEntry {

@@ -212,6 +212,48 @@ beforeEach(() => {
   vi.stubGlobal('confirm', vi.fn(() => true));
 });
 
+describe('Orders - which orders are listed and in what order', () => {
+  it('asks the API to hide delivered and cancelled orders (and restock tasks)', async () => {
+    const api = buildMockApi();
+    renderWithProviders(<Orders ordersApi={api} />);
+
+    await waitFor(() => expect(screen.getByText('Maria Lopez')).toBeInTheDocument());
+
+    expect(api.getOrders).toHaveBeenCalledWith(
+      expect.objectContaining({ excludeOrderType: 'restock', excludeStatus: ['delivered', 'cancelled'] }),
+      expect.anything()
+    );
+  });
+
+  it('lists the orders due soonest first (by delivery date, then time), not by creation', async () => {
+    const day = (d: number) => new Date(2026, 9, d);
+    const late = { ...orderWithCake, id: 'a', customerName: 'Lejana', pickupDate: day(25), pickupTime: '09:00', createdAt: new Date(2026, 9, 20) };
+    const soonLater = { ...orderWithCombo, id: 'b', customerName: 'ManianaTarde', pickupDate: day(21), pickupTime: '16:00', createdAt: new Date(2026, 9, 1) };
+    const soonEarly = { ...orderWithItems, id: 'c', customerName: 'ManianaTemprano', pickupDate: day(21), pickupTime: '08:30', createdAt: new Date(2026, 9, 5) };
+    const api = buildMockApi({ getOrders: vi.fn().mockResolvedValue([late, soonLater, soonEarly]) });
+    renderWithProviders(<Orders ordersApi={api} />);
+
+    await waitFor(() => expect(screen.getByText('Lejana')).toBeInTheDocument());
+
+    const rows = screen.getAllByRole('row').slice(1).map(r => r.textContent || '');
+    const position = (name: string) => rows.findIndex(r => r.includes(name));
+    expect(position('ManianaTemprano')).toBeLessThan(position('ManianaTarde'));
+    expect(position('ManianaTarde')).toBeLessThan(position('Lejana'));
+  });
+
+  it('does not offer Entregado or Cancelado in the status filter', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Orders ordersApi={buildMockApi()} />);
+    await waitFor(() => expect(screen.getByText('Maria Lopez')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('combobox'));
+
+    expect(await screen.findByRole('option', { name: 'Horneando' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Entregado' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Cancelado' })).not.toBeInTheDocument();
+  });
+});
+
 describe('Orders - loading & list states', () => {
   it('shows a loading spinner while orders are being fetched', async () => {
     let resolveOrders: (v: Order[]) => void;

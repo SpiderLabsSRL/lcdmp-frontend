@@ -52,6 +52,12 @@ interface UseOrdersSocketOptions {
   orderTypeFilter?: string;
 
   /**
+   * Estados que esta vista nunca muestra (p. ej. Pedidos oculta entregados y
+   * cancelados), también en tiempo real. Se aplica además de statusFilter.
+   */
+  excludeStatuses?: string[];
+
+  /**
    * Lista inicial de pedidos (cargada via REST al montar el componente).
    * El hook la usa como estado base y la actualiza con los eventos del socket.
    */
@@ -78,6 +84,7 @@ export const useOrdersSocket = ({
   itemStageFilter,
   excludeOrderType,
   orderTypeFilter,
+  excludeStatuses,
   initialOrders = [],
 }: UseOrdersSocketOptions = {}): UseOrdersSocketResult => {
   const [orders, setOrders] = useState<Order[]>(initialOrders);
@@ -86,6 +93,7 @@ export const useOrdersSocket = ({
   const itemStageFilterRef = useRef(itemStageFilter);
   const excludeOrderTypeRef = useRef(excludeOrderType);
   const orderTypeFilterRef = useRef(orderTypeFilter);
+  const excludeStatusesRef = useRef(excludeStatuses);
 
   // Mantener las refs actualizadas sin re-suscribir
   useEffect(() => {
@@ -103,6 +111,10 @@ export const useOrdersSocket = ({
   useEffect(() => {
     orderTypeFilterRef.current = orderTypeFilter;
   }, [orderTypeFilter]);
+
+  useEffect(() => {
+    excludeStatusesRef.current = excludeStatuses;
+  }, [excludeStatuses]);
 
   // Sincronizar cuando cambia initialOrders (por la carga inicial REST)
   useEffect(() => {
@@ -127,6 +139,9 @@ export const useOrdersSocket = ({
       return false;
     }
     if (orderTypeFilterRef.current && order.orderType !== orderTypeFilterRef.current) {
+      return false;
+    }
+    if (excludeStatusesRef.current?.includes(order.status)) {
       return false;
     }
     if (itemStageFilterRef.current) {

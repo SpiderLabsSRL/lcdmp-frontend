@@ -3,8 +3,12 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { useBackAwareDialog } from "@/hooks/useBackButtonClose";
 
-const Dialog = DialogPrimitive.Root;
+const Dialog = ({ open, defaultOpen, onOpenChange, ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) => (
+  <DialogPrimitive.Root {...props} {...useBackAwareDialog({ open, defaultOpen, onOpenChange })} />
+);
+Dialog.displayName = "Dialog";
 
 const DialogTrigger = DialogPrimitive.Trigger;
 

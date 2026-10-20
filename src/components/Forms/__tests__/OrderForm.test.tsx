@@ -992,3 +992,247 @@ describe('OrderForm - editing an existing order', () => {
     expect(submitted.discount).toBe(10);
   });
 });
+
+describe('OrderForm - guarantee (loaned pedestals/bases)', () => {
+  const baseOrder = (guarantee?: Order['guarantee']): Order => ({
+    id: 'o1', orderNumber: 'ORD-1', orderType: 'products', customerName: 'Juana', customerPhone: '70011122',
+    pickupDate: new Date(2099, 9, 10), pickupTime: '15:30', status: 'pending',
+    items: [{ productId: 'p1', product: products[0], quantity: 2, price: 15 }],
+    customCakes: [], sweetTableCombos: [], sweetTableExtras: [],
+    deliveryCost: 0, deposit: 0, total: 30, createdAt: new Date(2026, 8, 1), createdBy: 'u1',
+    guarantee,
+  } as unknown as Order);
+
+  it('shows the loan fields only when "Agregar garantía" is checked', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    expect(screen.queryByLabelText(/Qué se presta/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByLabelText(/Agregar garantía/));
+
+    expect(screen.getByLabelText(/Qué se presta/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Garantía \(Bs\.\)/)).toBeInTheDocument();
+  });
+
+  it('adds the guarantee to the total to pay and lists it as its own line', async () => {
+    const user = userEvent.setup();
+    renderForm({ initialData: baseOrder(), isEditing: true });
+    expect(within(getTotalsRow('Total a pagar:')).getByText('Bs. 30.00')).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText(/Agregar garantía/));
+    setNumberValue(screen.getByLabelText(/Garantía \(Bs\.\)/), '100');
+
+    expect(within(getTotalsRow('Total a pagar:')).getByText('Bs. 130.00')).toBeInTheDocument();
+    expect(within(getTotalsRow('Garantía (se devuelve):')).getByText('+ Bs. 100.00')).toBeInTheDocument();
+  });
+
+  it('blocks the submit when it says something is loaned but not what', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm({ initialData: baseOrder(), isEditing: true });
+    mockedToastError.mockClear();
+
+    await user.click(screen.getByLabelText(/Agregar garantía/));
+    setNumberValue(screen.getByLabelText(/Garantía \(Bs\.\)/), '100');
+    await user.click(screen.getByRole('button', { name: 'Actualizar Pedido' }));
+
+    expect(mockedToastError).toHaveBeenCalledWith('Indica qué artículos se prestan con la garantía');
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('blocks the submit when the guarantee amount is missing', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm({ initialData: baseOrder(), isEditing: true });
+    mockedToastError.mockClear();
+
+    await user.click(screen.getByLabelText(/Agregar garantía/));
+    await user.type(screen.getByLabelText(/Qué se presta/), 'Pedestal');
+    await user.click(screen.getByRole('button', { name: 'Actualizar Pedido' }));
+
+    expect(mockedToastError).toHaveBeenCalledWith('Indica el monto de la garantía');
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('sends the trimmed loan and the amount with the order', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm({ initialData: baseOrder(), isEditing: true });
+
+    await user.click(screen.getByLabelText(/Agregar garantía/));
+    await user.type(screen.getByLabelText(/Qué se presta/), '  1 pedestal grande ');
+    setNumberValue(screen.getByLabelText(/Garantía \(Bs\.\)/), '100');
+    await user.click(screen.getByRole('button', { name: 'Actualizar Pedido' }));
+
+    const submitted = onSubmit.mock.calls[0][0];
+    expect(submitted.guarantee).toEqual({ amount: 100, items: '1 pedestal grande' });
+    expect(submitted.total).toBe(130);
+  });
+
+  it('pre-fills an existing guarantee when editing', () => {
+    renderForm({ initialData: baseOrder({ amount: 80, items: 'Base redonda' }), isEditing: true });
+
+    expect(screen.getByLabelText(/Agregar garantía/)).toBeChecked();
+    expect(screen.getByLabelText(/Qué se presta/)).toHaveValue('Base redonda');
+    expect(screen.getByLabelText(/Garantía \(Bs\.\)/)).toHaveValue(80);
+    expect(within(getTotalsRow('Total a pagar:')).getByText('Bs. 110.00')).toBeInTheDocument();
+  });
+
+  it('unchecking it on an edit sends null so the backend removes the guarantee', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm({ initialData: baseOrder({ amount: 80, items: 'Base redonda' }), isEditing: true });
+
+    await user.click(screen.getByLabelText(/Agregar garantía/));
+    await user.click(screen.getByRole('button', { name: 'Actualizar Pedido' }));
+
+    expect(onSubmit.mock.calls[0][0].guarantee).toBeNull();
+    expect(onSubmit.mock.calls[0][0].total).toBe(30);
+  });
+
+  it('an order without guarantee sends nothing about it when created', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm({ initialData: { ...baseOrder(), orderNumber: 'ORD-2' } });
+
+    await user.click(screen.getByRole('button', { name: /Crear Pedido/ }));
+
+    expect(onSubmit.mock.calls[0][0].guarantee).toBeUndefined();
+  });
+
+  it('a guarantee that was already returned is locked and is not sent again', async () => {
+    const user = userEvent.setup();
+    const returned = { amount: 80, items: 'Base redonda', returnedAt: '2026-10-16T10:00:00Z', returnedAmount: 80 };
+    const { onSubmit } = renderForm({ initialData: baseOrder(returned), isEditing: true });
+
+    expect(screen.getByLabelText(/Agregar garantía/)).toBeDisabled();
+    expect(screen.getByLabelText(/Qué se presta/)).toBeDisabled();
+    expect(screen.getByText(/ya fue devuelta/)).toBeInTheDocument();
+    // sigue contando en el total (ya se cobró)
+    expect(within(getTotalsRow('Total a pagar:')).getByText('Bs. 110.00')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Actualizar Pedido' }));
+
+    expect(onSubmit.mock.calls[0][0].guarantee).toBeUndefined();
+  });
+});
+
+describe('OrderForm - mockup (maqueta)', () => {
+  const fillMockup = async (user: ReturnType<typeof userEvent.setup>, design = 'Torta de 3 pisos azul con flores') => {
+    await user.type(screen.getByLabelText(/Diseño/), design);
+    setNumberValue(screen.getByLabelText(/Pisos/), '3');
+    setNumberValue(screen.getByLabelText(/Precio \(Bs\.\)/), '500');
+  };
+
+  it('offers Maqueta next to the other order types and shows its fields when checked', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    expect(screen.queryByLabelText(/Diseño/)).not.toBeInTheDocument();
+    await user.click(screen.getByLabelText('Maqueta'));
+
+    expect(screen.getByLabelText(/Diseño/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Pisos/)).toHaveValue(1);
+    expect(screen.getByLabelText(/Altura en cm/)).toHaveValue(null);
+    expect(screen.getByLabelText(/Precio \(Bs\.\)/)).toBeInTheDocument();
+    expect(screen.getByText('Maqueta #1')).toBeInTheDocument();
+  });
+
+  it('adds its price to the total', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(screen.getByLabelText('Maqueta'));
+    await fillMockup(user);
+
+    expect(within(getTotalsRow('Total a pagar:')).getByText('Bs. 500.00')).toBeInTheDocument();
+  });
+
+  it('submits a mockup-only order as type "mockup" with the design, floors and optional height', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm();
+
+    await fillRequiredCustomerFields(user);
+    await user.click(screen.getByLabelText('Maqueta'));
+    await fillMockup(user, '  Torta de 3 pisos  ');
+    setNumberValue(screen.getByLabelText(/Altura en cm/), '12.5');
+    await user.click(screen.getByRole('button', { name: 'Crear Pedido' }));
+
+    expect(mockedToastError).not.toHaveBeenCalled();
+    const submitted = onSubmit.mock.calls[0][0];
+    expect(submitted.orderType).toBe('mockup');
+    expect(submitted.mockups).toEqual([
+      expect.objectContaining({ design: 'Torta de 3 pisos', floors: 3, heightCm: 12.5, price: 500, referenceImages: [] }),
+    ]);
+    expect(submitted.total).toBe(500);
+  });
+
+  it('sends no height when it is left empty', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm();
+
+    await fillRequiredCustomerFields(user);
+    await user.click(screen.getByLabelText('Maqueta'));
+    await fillMockup(user);
+    await user.click(screen.getByRole('button', { name: 'Crear Pedido' }));
+
+    expect(onSubmit.mock.calls[0][0].mockups[0].heightCm).toBeNull();
+  });
+
+  it('is "mixed" when combined with another type', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm();
+
+    await fillRequiredCustomerFields(user);
+    await user.click(screen.getByLabelText('Maqueta'));
+    await fillMockup(user);
+    await user.click(screen.getByLabelText('Productos del catálogo'));
+    const productCard = screen.getByText('Producto #1').closest('.space-y-3') as HTMLElement;
+    await chooseOption(user, within(productCard).getByRole('combobox'), /Brownie - Bs\. 10/);
+    await user.click(screen.getByRole('button', { name: 'Crear Pedido' }));
+
+    expect(onSubmit.mock.calls[0][0].orderType).toBe('mixed');
+  });
+
+  it('blocks the submit when the design is empty', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm();
+    mockedToastError.mockClear();
+
+    await fillRequiredCustomerFields(user);
+    await user.click(screen.getByLabelText('Maqueta'));
+    await user.click(screen.getByRole('button', { name: 'Crear Pedido' }));
+
+    expect(mockedToastError).toHaveBeenCalledWith('Maqueta #1: describe el diseño');
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('lets you add and remove several mockups, and unchecking clears them', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(screen.getByLabelText('Maqueta'));
+    await user.click(screen.getByRole('button', { name: /Agregar Maqueta/ }));
+    expect(screen.getByText('Maqueta #2')).toBeInTheDocument();
+
+    await user.click(screen.getAllByRole('button', { name: 'Quitar maqueta' })[0]);
+    expect(screen.queryByText('Maqueta #2')).not.toBeInTheDocument();
+
+    await user.click(screen.getByLabelText('Maqueta'));
+    expect(screen.queryByLabelText(/Diseño/)).not.toBeInTheDocument();
+  });
+
+  it('pre-fills the mockups when editing an order', () => {
+    const order = {
+      id: 'o1', orderNumber: 'ORD-1', orderType: 'mockup', customerName: 'Juana', customerPhone: '70011122',
+      pickupDate: new Date(2099, 9, 10), pickupTime: '15:30', status: 'decorating',
+      items: [], customCakes: [], sweetTableCombos: [], sweetTableExtras: [],
+      mockups: [{ id: 'm1', design: 'Diseño existente', floors: 2, heightCm: 10, price: 300, referenceImages: ['https://signed/a.jpg'] }],
+      deliveryCost: 0, deposit: 0, total: 300, createdAt: new Date(2026, 8, 1), createdBy: 'u1',
+    } as unknown as Order;
+    renderForm({ initialData: order, isEditing: true });
+
+    expect(screen.getByLabelText('Maqueta')).toBeChecked();
+    expect(screen.getByDisplayValue('Diseño existente')).toBeInTheDocument();
+    expect(screen.getByLabelText(/Pisos/)).toHaveValue(2);
+    expect(screen.getByLabelText(/Altura en cm/)).toHaveValue(10);
+    expect(screen.getByAltText('Referencia 1')).toHaveAttribute('src', 'https://signed/a.jpg');
+    expect(within(getTotalsRow('Total a pagar:')).getByText('Bs. 300.00')).toBeInTheDocument();
+  });
+});

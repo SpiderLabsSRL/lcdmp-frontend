@@ -67,6 +67,10 @@ export class MockOrdersApi implements IOrdersApi {
         filtered = filtered.filter(o => o.orderType !== filters.excludeOrderType);
       }
 
+      if (filters.excludeStatus?.length) {
+        filtered = filtered.filter(o => !filters.excludeStatus!.includes(o.status));
+      }
+
       if (filters.startDate && filters.endDate) {
         filtered = filtered.filter(o => 
           o.pickupDate >= filters.startDate! && 
@@ -309,6 +313,7 @@ export class OrdersApi implements IOrdersApi {
         if (filters.itemStage) params.itemStage = filters.itemStage;
         if (filters.orderType) params.orderType = filters.orderType;
         if (filters.excludeOrderType) params.excludeOrderType = filters.excludeOrderType;
+        if (filters.excludeStatus?.length) params.excludeStatus = filters.excludeStatus.join(',');
         if (filters.startDate) params.startDate = filters.startDate.toISOString();
         if (filters.endDate) params.endDate = filters.endDate.toISOString();
         if (filters.customerName) params.customerName = filters.customerName;
