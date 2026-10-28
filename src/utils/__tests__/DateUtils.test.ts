@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { getLocalDateString, parseLocalDate, hoursUntilPickupDateTime } from '../DateUtils';
+import { getLocalDateString, parseLocalDate, hoursUntilPickupDateTime, formatPickupDate } from '../DateUtils';
 import type { Order } from '@/types';
 
 const baseOrder: Order = {
@@ -68,5 +68,32 @@ describe('hoursUntilPickupDateTime', () => {
     const hours = hoursUntilPickupDateTime(baseOrder);
 
     expect(hours).toBeLessThan(0);
+  });
+});
+
+describe('formatPickupDate', () => {
+  const today = new Date(2026, 9, 28, 15, 30); // miércoles 28 de octubre
+
+  it('shows the weekday for today and up to 6 days ahead', () => {
+    expect(formatPickupDate(new Date(2026, 9, 28), today)).toBe('miércoles');
+    expect(formatPickupDate(new Date(2026, 9, 29), today)).toBe('jueves');
+    expect(formatPickupDate(new Date(2026, 10, 3), today)).toBe('martes'); // +6
+  });
+
+  it('shows the date from 7 days ahead, so next Wednesday is not confused with this one', () => {
+    expect(formatPickupDate(new Date(2026, 10, 4), today)).toBe('04 nov');
+    expect(formatPickupDate(new Date(2026, 11, 25), today)).toBe('25 dic');
+  });
+
+  it('shows the date for orders already past due', () => {
+    expect(formatPickupDate(new Date(2026, 9, 27), today)).toBe('27 oct');
+  });
+
+  it('ignores the time of day when counting days', () => {
+    expect(formatPickupDate(new Date(2026, 10, 3, 23, 59), new Date(2026, 9, 28, 0, 1))).toBe('martes');
+  });
+
+  it('accepts another pattern for the date form', () => {
+    expect(formatPickupDate(new Date(2026, 10, 4), today, 'dd MMMM yyyy')).toBe('04 noviembre 2026');
   });
 });

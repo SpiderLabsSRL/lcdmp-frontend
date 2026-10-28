@@ -85,10 +85,19 @@ describe('getWorkItemsAtStage', () => {
       itemId: 'c1',
       order,
       status: 'baking',
-      title: '30 porciones - Vainilla',
+      title: '2 tortas de 30 porciones - Vainilla',
       detail: 'Redonda',
       quantity: 2,
     });
+  });
+
+  it('says how many cakes when the line has more than one (so Hornos/Armado/Decoración see the amount)', () => {
+    const order = makeOrder({ customCakes: [makeCake({ quantity: 3, portions: 20 })] });
+
+    const [item] = getWorkItemsAtStage([order], 'baking');
+
+    expect(item.title).toBe('3 tortas de 20 porciones - Chocolate');
+    expect(item.quantity).toBe(3);
   });
 
   it('includes both flavors in the title when a second cake flavor is set', () => {

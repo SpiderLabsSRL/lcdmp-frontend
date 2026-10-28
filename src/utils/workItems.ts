@@ -19,7 +19,7 @@ export function getWorkItemsAtStage(orders: Order[], stage: ProductStatus): Work
         itemId: cake.id,
         order,
         status: cake.status,
-        title: `${cake.portions} porciones - ${cake.cakeFlavor}${cake.secondCakeFlavor ? `/${cake.secondCakeFlavor}` : ''}`,
+        title: `${(cake.quantity || 1) > 1 ? `${cake.quantity} tortas de ` : ''}${cake.portions} porciones - ${cake.cakeFlavor}${cake.secondCakeFlavor ? `/${cake.secondCakeFlavor}` : ''}`,
         detail: getCakeShapeLabel(cake.shape) || undefined,
         quantity: cake.quantity || 1,
       });

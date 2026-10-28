@@ -1,3 +1,4 @@
+import { formatPickupDate } from '@/utils/DateUtils';
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent } from '@/components/ui/card';
@@ -458,7 +459,7 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
                           <p className="text-xs ">{order.customerPhone}</p>
                         </div>
                         <div className="text-right flex-shrink-0">
-                          <p className="font-medium text-sm">{format(order.pickupDate, 'dd MMM', { locale: es })}</p>
+                          <p className="font-medium text-sm">{formatPickupDate(order.pickupDate)}</p>
                           <p className="text-xs ">{order.pickupTime}</p>
                         </div>
                       </div>
@@ -560,7 +561,7 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
                           </TableCell>
                           <TableCell>
                             <div>
-                              <p className="font-medium">{format(order.pickupDate, 'dd MMM', { locale: es })}</p>
+                              <p className="font-medium">{formatPickupDate(order.pickupDate)}</p>
                               <p className="text-sm ">{order.pickupTime}</p>
                             </div>
                           </TableCell>

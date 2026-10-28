@@ -6,7 +6,7 @@ import { Clock, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { WorkItem } from '@/types';
-import { hoursUntilPickupDateTime } from '@/utils/DateUtils';
+import { hoursUntilPickupDateTime, formatPickupDate } from '@/utils/DateUtils';
 
 interface WorkItemCardProps {
   item: WorkItem;
@@ -66,7 +66,7 @@ export function WorkItemCard({ item, urgentHours, soonHours, completeLabel = 'Co
                 <Clock className="h-3.5 w-3.5" />
                 <span className="text-xs">{hoursUntil > 0 ? `${hoursUntil}h` : 'Atrasado'}</span>
                 <span className="text-xs ml-1">
-                  {format(order.pickupDate, 'dd MMM', { locale: es })} {order.pickupTime}
+                  {formatPickupDate(order.pickupDate)} {order.pickupTime}
                 </span>
               </div>
               <Button size="sm" className="h-8 text-xs" onClick={handleComplete}>
@@ -110,7 +110,7 @@ export function WorkItemCard({ item, urgentHours, soonHours, completeLabel = 'Co
           <span className="text-sm">{hoursUntil > 0 ? `${hoursUntil}h` : 'Atrasado'}</span>
         </div>
         <p className="text-sm font-medium whitespace-nowrap">
-          {format(order.pickupDate, 'dd MMM', { locale: es })} {order.pickupTime}
+          {formatPickupDate(order.pickupDate)} {order.pickupTime}
         </p>
       </div>
 

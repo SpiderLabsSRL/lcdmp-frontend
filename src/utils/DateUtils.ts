@@ -1,5 +1,6 @@
 import { Order } from '@/types';
-import { format, differenceInHours } from 'date-fns';
+import { format, differenceInHours, differenceInCalendarDays } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 export const getLocalDateString = (date = new Date()): string => {
   const year = date.getFullYear();
@@ -21,3 +22,10 @@ export const hoursUntilPickupDateTime = (order: Order) => {
 
   return differenceInHours(pickupDateTime, new Date());
 }
+
+export const formatPickupDate = (date: Date, today: Date = new Date(), pattern = 'dd MMM'): string => {
+  const daysAhead = differenceInCalendarDays(date, today);
+  return daysAhead >= 0 && daysAhead <= 6
+    ? format(date, 'EEEE', { locale: es })
+    : format(date, pattern, { locale: es });
+};
