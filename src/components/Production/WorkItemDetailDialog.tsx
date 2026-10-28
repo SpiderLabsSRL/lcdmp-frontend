@@ -1,3 +1,4 @@
+import { formatPickupDate } from '@/utils/DateUtils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -51,7 +52,7 @@ export function WorkItemDetailDialog({ item, open, onOpenChange }: WorkItemDetai
               <div>
                 <p className="text-sm text-foreground">Fecha de entrega</p>
                 <p className="font-semibold text-base text-foreground">
-                  {format(new Date(item.order.pickupDate), 'dd MMMM yyyy', { locale: es })}
+                  {formatPickupDate(new Date(item.order.pickupDate), new Date(), 'dd MMMM yyyy')}
                 </p>
               </div>
               <div>

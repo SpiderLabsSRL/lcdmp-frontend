@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import { IDeliveryApi, defaultDeliveryApi } from '@/api/DeliveryApi';
 import { useOrdersSocket } from '@/hooks/useOrdersSocket';
 import type { Order, PaymentMethod } from '@/types';
-import { hoursUntilPickupDateTime } from '@/utils/DateUtils';
+import { hoursUntilPickupDateTime, formatPickupDate } from '@/utils/DateUtils';
 import { isDeliveryOrder } from '@/utils/orderUtils';
 
 interface DeliveryProps {
@@ -273,7 +273,7 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
                                 {hoursUntil > 0 ? `${hoursUntil}h` : 'Atrasado'}
                               </span>
                               <span className="text-xs ml-1">
-                                {format(order.pickupDate, 'dd MMM', { locale: es })} {order.pickupTime}
+                                {formatPickupDate(order.pickupDate)} {order.pickupTime}
                               </span>
                             </div>
 
@@ -358,7 +358,7 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
                           </span>
                         </div>
                         <p className="text-sm">
-                          {format(order.pickupDate, 'dd MMM', { locale: es })} {order.pickupTime}
+                          {formatPickupDate(order.pickupDate)} {order.pickupTime}
                         </p>
                         <p className="text-xs ">
                           Saldo: Bs. {order.total - order.deposit}
@@ -436,7 +436,7 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
                                 <span className="text-xs">{hoursUntil > 0 ? `${hoursUntil}h` : 'Atrasado'}</span>
                               </div>
                               <p className="text-xs font-medium mt-1">
-                                {format(order.pickupDate, 'dd MMM', { locale: es })} {order.pickupTime}
+                                {formatPickupDate(order.pickupDate)} {order.pickupTime}
                               </p>
                             </div>
                           </div>
@@ -568,7 +568,7 @@ export default function Delivery({ deliveryApi = defaultDeliveryApi }: DeliveryP
                           </span>
                         </div>
                         <p className="text-sm">
-                          {format(order.pickupDate, 'dd MMM', { locale: es })} {order.pickupTime}
+                          {formatPickupDate(order.pickupDate)} {order.pickupTime}
                         </p>
                         <p className="font-bold text-primary mt-1">Bs. {order.total}</p>
                         <p className="text-xs ">
