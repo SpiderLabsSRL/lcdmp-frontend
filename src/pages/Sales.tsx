@@ -5,12 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Search, ShoppingCart, QrCode, Banknote, Coins, X, Minus, Plus as PlusIcon } from 'lucide-react';
+import { Search, ShoppingCart, QrCode, Banknote, Coins, X, Minus, Plus as PlusIcon, Truck } from 'lucide-react';
 import { toast } from 'sonner';
 import { NumberInput } from '@/components/ui/number-input';
 import { PaymentMode, buildPayments, describePayments, mixedSplit } from '@/utils/payments';
 import { CartItem, Product } from '@/types';
-import { ISalesApi, defaultSalesApi, SaleData, ReservationConflict, ReservationConflictError } from '@/api/SalesApi';
+import { ISalesApi, defaultSalesApi, SaleData, ExpressOrderData, ReservationConflict, ReservationConflictError } from '@/api/SalesApi';
+import { ExpressOrderDialog } from '@/components/Dialogs/ExpressOrderDialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,6 +35,7 @@ export default function Sales({ api = defaultSalesApi }: SalesProps) {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMode>('cash');
   const [cashAmount, setCashAmount] = useState(0);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isExpressOpen, setIsExpressOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [conflicts, setConflicts] = useState<ReservationConflict[] | null>(null);
@@ -150,6 +152,17 @@ export default function Sales({ api = defaultSalesApi }: SalesProps) {
       toast.error(error.toString());
       console.error(error);
     }
+  };
+
+  // Pedido de envío al momento con lo que hay en el carrito: queda en Pedidos para entregarlo
+  const createExpressOrder = async (order: ExpressOrderData) => {
+    const created = await api.createExpressOrder(order);
+    toast.success(`Pedido ${created.orderNumber} creado. Lo ves en Pedidos para entregarlo.`);
+    setCart([]);
+    setIsExpressOpen(false);
+    setIsCartOpen(false);
+    // El stock reservado cambia la disponibilidad: recargar productos
+    setProducts(await api.getProducts(debouncedSearchTerm));
   };
 
   return (
@@ -451,6 +464,15 @@ export default function Sales({ api = defaultSalesApi }: SalesProps) {
                       </DialogContent>
                     </Dialog>
 
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => setIsExpressOpen(true)}
+                    >
+                      <Truck className="h-4 w-4 mr-2" />
+                      Envío al momento
+                    </Button>
+
                     <Button 
                       variant="outline" 
                       className="w-full lg:hidden"
@@ -464,6 +486,13 @@ export default function Sales({ api = defaultSalesApi }: SalesProps) {
             </Card>
           </div>
         </div>
+
+        <ExpressOrderDialog
+          open={isExpressOpen}
+          onOpenChange={setIsExpressOpen}
+          items={cart}
+          onSubmit={createExpressOrder}
+        />
 
         <AlertDialog open={!!conflicts} onOpenChange={(open) => { if (!open) setConflicts(null); }}>
           <AlertDialogContent>

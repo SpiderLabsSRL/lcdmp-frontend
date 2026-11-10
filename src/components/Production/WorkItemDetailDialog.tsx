@@ -128,6 +128,12 @@ export function WorkItemDetailDialog({ item, open, onOpenChange }: WorkItemDetai
               )}
             </div>
 
+            {item.order.dedication && (
+              <p className="text-sm text-foreground p-3 sm:p-4 bg-muted/50 rounded-lg">
+                <span className="font-semibold">Dedicatoria:</span> "{item.order.dedication}"
+              </p>
+            )}
+
             {item.order.notes && (
               <div className="p-3 sm:p-4 bg-muted/50 rounded-lg space-y-1">
                 <p className="text-sm font-semibold text-foreground">📝 Notas del pedido:</p>

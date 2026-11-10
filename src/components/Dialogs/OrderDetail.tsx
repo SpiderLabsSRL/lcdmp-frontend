@@ -2,7 +2,7 @@ import { Order, ItemStageLogEntry } from "@/types";
 import { format, differenceInMinutes } from 'date-fns';
 import { Truck, XCircle, ChevronDown, ChevronUp, History, Store } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { statusConfig, getCakeShapeLabel } from '@/types/consts';
+import { statusConfig, getCakeShapeLabel, pickupMethodLabels } from '@/types/consts';
 import { es } from "date-fns/locale";
 import { Button } from "../ui/button";
 import { PaymentMethod } from '../../types/index';
@@ -307,6 +307,21 @@ export default function OrderDetail({ order, onDeliver, onCancel, onMarkAtStore,
           <div className="bg-muted/50 p-3 rounded-lg">
             <p className="text-sm text-foreground">Dirección: {order.deliveryAddress}</p>
             <p className="text-sm text-foreground mt-1">Costo de envío: Bs. {order.deliveryCost}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Envío al momento */}
+      {(order.pickupMethod || order.dedication) && (
+        <div className="border-t pt-3 sm:pt-4">
+          <h4 className="font-semibold text-base text-foreground mb-2">Envío al momento</h4>
+          <div className="bg-muted/50 p-3 rounded-lg space-y-1">
+            {order.pickupMethod && (
+              <p className="text-sm text-foreground">Lo recoge: {pickupMethodLabels[order.pickupMethod]}</p>
+            )}
+            {order.dedication && (
+              <p className="text-sm text-foreground">Dedicatoria: "{order.dedication}"</p>
+            )}
           </div>
         </div>
       )}

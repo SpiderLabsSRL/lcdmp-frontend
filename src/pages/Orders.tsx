@@ -42,6 +42,9 @@ export const getOrderType = (orderType: OrderType) => {
     case "mockup":
       type = "Maqueta";
       break;
+    case "express":
+      type = "Envío al momento";
+      break;
     case "mixed":
       type = "Varios";
       break;
@@ -437,7 +440,7 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
                           </Badge>
                         )}
                       </div>
-                      {(order.status !== 'cancelled' && order.status !== 'delivered') && (
+                      {(order.status !== 'cancelled' && order.status !== 'delivered' && order.orderType !== 'express') && (
                         <Button
                           variant="outline"
                           size="icon"
@@ -610,7 +613,7 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
-                              {(order.status !== 'cancelled' && order.status !== 'delivered') && (
+                              {(order.status !== 'cancelled' && order.status !== 'delivered' && order.orderType !== 'express') && (
                                 <Button
                                   variant="outline"
                                   size="sm"

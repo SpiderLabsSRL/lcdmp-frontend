@@ -215,7 +215,10 @@ export interface EditSweetTableComboData extends Partial<CreateSweetTableComboDa
 }
 
 // Order Types
-export type OrderType = 'cake' | 'products' | 'sweet_table' | 'mockup' | 'mixed';
+export type OrderType = 'cake' | 'products' | 'sweet_table' | 'mockup' | 'express' | 'mixed';
+
+// Cómo recoge un pedido de envío al momento
+export type PickupMethod = 'mobile' | 'motorcycle' | 'in_person';
 // 'restock' se crea internamente (ver maybeCreateRestockOrder en el backend)
 // cuando el stock de un producto llega a su mínimo — nunca a través del
 // formulario público de creación de pedidos, por eso vive aparte de OrderType.
@@ -250,6 +253,9 @@ export interface Order {
   sweetTableCombos?: OrderCombo[];
   sweetTableExtras?: OrderItem[];
   mockups?: Mockup[];
+  // Envío al momento: cómo lo recoge y la dedicatoria
+  pickupMethod?: PickupMethod | null;
+  dedication?: string | null;
   deliveryAddress?: string;
   deliveryCost: number;
   deposit: number;

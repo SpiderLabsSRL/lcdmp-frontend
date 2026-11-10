@@ -50,6 +50,7 @@ function buildMockApi(overrides: Partial<ISalesApi> = {}): ISalesApi {
   return {
     getProducts: vi.fn().mockResolvedValue([]),
     createSale: vi.fn().mockResolvedValue(undefined),
+    createExpressOrder: vi.fn().mockResolvedValue({ id: 'o1', orderNumber: 'ORD-2026-0099', total: 30 }),
     ...overrides,
   };
 }
@@ -151,6 +152,62 @@ describe('Sales', () => {
     const image = screen.getByAltText('Cupcake de vainilla');
     expect(image).toHaveAttribute('src', 'https://img.example.com/Productos/p1/a.jpg');
     expect(screen.queryByAltText('Galleta de chocolate')).not.toBeInTheDocument();
+  });
+
+  describe('envío al momento', () => {
+    const openExpress = async (user: ReturnType<typeof userEvent.setup>, mockApi: ISalesApi) => {
+      renderWithProviders(<Sales api={mockApi} />);
+      await screen.findByText('Cupcake de vainilla');
+      await user.click(screen.getByText('Cupcake de vainilla'));
+      await user.click(screen.getByRole('button', { name: /Envío al momento/ }));
+      await screen.findByText('Pedido para hoy, con la hora de ahora, de los productos del carrito.');
+    };
+
+    it('is offered next to Cobrar once there is something in the cart', async () => {
+      renderWithProviders(<Sales api={buildMockApi({ getProducts: vi.fn().mockResolvedValue([cupcake]) })} />);
+      await screen.findByText('Cupcake de vainilla');
+
+      expect(screen.queryByRole('button', { name: /Envío al momento/ })).not.toBeInTheDocument();
+
+      await userEvent.setup().click(screen.getByText('Cupcake de vainilla'));
+      expect(screen.getByRole('button', { name: /Envío al momento/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Cobrar' })).toBeInTheDocument();
+    });
+
+    it('creates the order with the cart, empties it and reloads the products (reserved stock changed)', async () => {
+      const user = userEvent.setup();
+      const getProducts = vi.fn().mockResolvedValue([cupcake]);
+      const createExpressOrder = vi.fn().mockResolvedValue({ id: 'o1', orderNumber: 'ORD-2026-0099', total: 15 });
+      await openExpress(user, buildMockApi({ getProducts, createExpressOrder }));
+
+      await user.type(screen.getByLabelText(/A nombre de/), 'Ana Pérez');
+      await user.click(screen.getByRole('button', { name: 'Moto' }));
+      await user.click(screen.getByRole('button', { name: 'Crear pedido' }));
+
+      await waitFor(() => expect(createExpressOrder).toHaveBeenCalledTimes(1));
+      expect(createExpressOrder.mock.calls[0][0]).toMatchObject({
+        recipientName: 'Ana Pérez',
+        pickupMethod: 'motorcycle',
+        items: [{ productId: 'p1', quantity: 1 }],
+        deductStock: true,
+        deposit: 15,
+      });
+      await waitFor(() => expect(screen.getByText('Carrito vacío')).toBeInTheDocument());
+      expect(getProducts.mock.calls.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('keeps the cart when the order fails', async () => {
+      const user = userEvent.setup();
+      const createExpressOrder = vi.fn().mockRejectedValue(new Error('Stock insuficiente en tienda'));
+      await openExpress(user, buildMockApi({ getProducts: vi.fn().mockResolvedValue([cupcake]), createExpressOrder }));
+
+      await user.type(screen.getByLabelText(/A nombre de/), 'Ana');
+      await user.click(screen.getByRole('button', { name: 'Personal' }));
+      await user.click(screen.getByRole('button', { name: 'Crear pedido' }));
+
+      await waitFor(() => expect(createExpressOrder).toHaveBeenCalled());
+      expect(screen.queryByText('Carrito vacío')).not.toBeInTheDocument();
+    });
   });
 
   describe('pago mixto', () => {

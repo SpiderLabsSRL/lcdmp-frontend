@@ -61,6 +61,28 @@ describe('SalesApi (real, axios-backed)', () => {
     });
   });
 
+  describe('createExpressOrder', () => {
+    const order = {
+      recipientName: 'Ana', pickupMethod: 'motorcycle' as const,
+      items: [{ productId: 'p1', quantity: 2 }], deductStock: true, deposit: 30, paymentMethod: 'cash' as const,
+    };
+
+    it('posts the order to /orders/express and returns its number and total', async () => {
+      mockedApi.post.mockResolvedValue({ data: { success: true, data: { id: 'o1', orderNumber: 'ORD-1', total: 30, status: 'ready' } } });
+
+      const result = await salesApi.createExpressOrder(order);
+
+      expect(mockedApi.post).toHaveBeenCalledWith('/orders/express', order);
+      expect(result).toEqual({ id: 'o1', orderNumber: 'ORD-1', total: 30 });
+    });
+
+    it('surfaces the server message (e.g. insufficient stock)', async () => {
+      mockedApi.post.mockRejectedValue({ response: { data: { message: 'Stock insuficiente en tienda' } } });
+
+      await expect(salesApi.createExpressOrder(order)).rejects.toThrow('Stock insuficiente en tienda');
+    });
+  });
+
   describe('createSale', () => {
     const sale: SaleData = {
       items: [{ productId: '1', quantity: 2, price: 15 }],

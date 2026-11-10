@@ -2,6 +2,7 @@ import { Product } from '@/types';
 import api from '@/api/api';
 import { mockProducts } from '@/data/mockData';
 import type { SalePayment } from '@/utils/payments';
+import type { PaymentMethod, PickupMethod } from '@/types';
 
 export interface SaleItem {
   productId: string;
@@ -42,9 +43,38 @@ export class ReservationConflictError extends Error {
   }
 }
 
+// Pedido de envío al momento: productos disponibles ahora que recoge alguien enseguida
+export interface ExpressOrderData {
+  recipientName: string;
+  pickupMethod: PickupMethod;
+  customerPhone?: string;
+  items: {
+    productId: string;
+    quantity: number;
+    customizationNotes?: string;
+    customizationPrice?: number;
+  }[];
+  // true: reserva stock de tienda y se descuenta al entregar. false: no toca el stock.
+  deductStock: boolean;
+  // > 0 = el cliente paga el envío (se suma al total)
+  shippingCost?: number;
+  // Lo pagado al registrar (puede ser parte del total); el resto se cobra al entregar
+  deposit: number;
+  paymentMethod: PaymentMethod;
+  dedication?: string;
+  notes?: string;
+}
+
+export interface ExpressOrderResult {
+  id: string;
+  orderNumber: string;
+  total: number;
+}
+
 export interface ISalesApi {
   getProducts(searchTerm?: string): Promise<Product[]>;
   createSale(sale: SaleData): Promise<void>;
+  createExpressOrder(order: ExpressOrderData): Promise<ExpressOrderResult>;
 }
 
 export class MockSalesApi implements ISalesApi {
@@ -66,6 +96,12 @@ export class MockSalesApi implements ISalesApi {
   async createSale(sale: SaleData): Promise<void> {
     console.log('Mock sale created:', sale);
     await new Promise(resolve => setTimeout(resolve, 200));
+  }
+
+  async createExpressOrder(order: ExpressOrderData): Promise<ExpressOrderResult> {
+    console.log('Mock express order created:', order);
+    await new Promise(resolve => setTimeout(resolve, 200));
+    return { id: 'mock-express', orderNumber: 'ORD-MOCK-EXPRESS', total: order.deposit };
   }
 }
 
@@ -109,6 +145,22 @@ export class SalesApi implements ISalesApi {
       }
       const message = error.response?.data?.message || error.message || 'Error al procesar la venta';
       throw new Error(message);
+    }
+  }
+
+  async createExpressOrder(order: ExpressOrderData): Promise<ExpressOrderResult> {
+    try {
+      const response = await api.post('/orders/express', order);
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Error al crear el pedido');
+      }
+
+      const { id, orderNumber, total } = response.data.data;
+      return { id, orderNumber, total };
+    } catch (error: any) {
+      console.error('Error en createExpressOrder:', error);
+      throw new Error(error.response?.data?.message || error.message || 'Error al crear el pedido de envío al momento');
     }
   }
 }

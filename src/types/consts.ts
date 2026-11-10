@@ -13,6 +13,12 @@ export const statusConfig: Record<OrderStatus, { label: string; color: string; i
   cancelled: { label: 'Cancelado', color: 'bg-red-100 text-red-800', icon: AlertCircle },
 };
 
+export const pickupMethodLabels: Record<'mobile' | 'motorcycle' | 'in_person', string> = {
+  mobile: 'Móvil',
+  motorcycle: 'Moto',
+  in_person: 'Personal',
+};
+
 export const roleLabels: Record<UserRole, string> = {
   admin: 'Administrador',
   seller: 'Vendedor',
