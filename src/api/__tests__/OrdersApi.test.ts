@@ -39,14 +39,15 @@ describe('OrdersApi (real, axios-backed)', () => {
       expect(mockedApi.get).toHaveBeenCalledWith('/orders', { params: {}, signal: undefined });
     });
 
-    it('sends every filter field, converting dates to ISO strings', async () => {
+    it('sends every filter field, converting dates to local YYYY-MM-DD', async () => {
       mockedApi.get.mockResolvedValue({ data: { success: true, data: [] } });
       const filters: OrderFilters = {
         status: 'pending',
-        startDate: new Date('2026-01-01T00:00:00.000Z'),
-        endDate: new Date('2026-01-31T00:00:00.000Z'),
+        startDate: new Date(2026, 0, 1),
+        endDate: new Date(2026, 0, 31),
         customerName: 'María',
         customerPhone: '7123',
+        allDates: true,
       };
       const controller = new AbortController();
 
@@ -55,10 +56,11 @@ describe('OrdersApi (real, axios-backed)', () => {
       expect(mockedApi.get).toHaveBeenCalledWith('/orders', {
         params: {
           status: 'pending',
-          startDate: filters.startDate!.toISOString(),
-          endDate: filters.endDate!.toISOString(),
+          startDate: '2026-01-01',
+          endDate: '2026-01-31',
           customerName: 'María',
           customerPhone: '7123',
+          allDates: 'true',
         },
         signal: controller.signal,
       });

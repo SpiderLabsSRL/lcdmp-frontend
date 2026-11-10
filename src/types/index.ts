@@ -409,6 +409,8 @@ export interface OrderFilters {
   excludeOrderType?: SystemOrderType;
   // Estados a ocultar (la vista Pedidos no muestra entregados ni cancelados)
   excludeStatus?: OrderStatus[];
+  // Solo administrador: no oculta los pedidos entregados de fechas pasadas (el rango lo da startDate/endDate)
+  allDates?: boolean;
 }
 
 // Seguimiento de producción por línea (torta/producto/item de combo/extra)

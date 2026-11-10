@@ -101,7 +101,7 @@ export function ExpressOrderDialog({ open, onOpenChange, items, onSubmit }: Expr
       return;
     }
     if (chargeShipping && !(shippingCost > 0)) {
-      toast.error('Indica el costo del envío o desmarca "El cliente paga el envío"');
+      toast.error('Indica el costo del envío o desmarca "Envío Pagado"');
       return;
     }
     if (deposit < 0 || deposit > total) {
@@ -264,7 +264,7 @@ export function ExpressOrderDialog({ open, onOpenChange, items, onSubmit }: Expr
                 checked={chargeShipping}
                 onChange={(e) => setChargeShipping(e.target.checked)}
               />
-              Envio Pagado
+              Envío Pagado
             </label>
             {chargeShipping && (
               <div className="space-y-1.5">

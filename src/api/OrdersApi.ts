@@ -1,6 +1,7 @@
 import api from '@/api/api';
 import { mockOrders, mockProducts, mockCombos } from '@/data/mockData';
 import { getWorkItemsAtStage } from '@/utils/workItems';
+import { getLocalDateString } from '@/utils/DateUtils';
 import type {
   Order,
   OrderStatus,
@@ -314,8 +315,10 @@ export class OrdersApi implements IOrdersApi {
         if (filters.orderType) params.orderType = filters.orderType;
         if (filters.excludeOrderType) params.excludeOrderType = filters.excludeOrderType;
         if (filters.excludeStatus?.length) params.excludeStatus = filters.excludeStatus.join(',');
-        if (filters.startDate) params.startDate = filters.startDate.toISOString();
-        if (filters.endDate) params.endDate = filters.endDate.toISOString();
+        // Solo el día (YYYY-MM-DD, hora local): toISOString() corre la fecha por la zona horaria
+        if (filters.startDate) params.startDate = getLocalDateString(filters.startDate);
+        if (filters.endDate) params.endDate = getLocalDateString(filters.endDate);
+        if (filters.allDates) params.allDates = 'true';
         if (filters.customerName) params.customerName = filters.customerName;
         if (filters.customerPhone) params.customerPhone = filters.customerPhone;
       }

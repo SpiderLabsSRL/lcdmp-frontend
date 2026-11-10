@@ -15,6 +15,7 @@ import {
   Hammer,
   PackagePlus,
   HandCoins,
+  ClipboardList,
   LogOut,
   Menu,
   X
@@ -39,6 +40,7 @@ const navItems: NavItem[] = [
   { icon: Home, label: 'Inicio', href: '/dashboard' },
   { icon: ShoppingCart, label: 'Ventas', href: '/sales', roles: ['seller', 'admin'] },
   { icon: Package, label: 'Pedidos', href: '/orders', roles: ['seller', 'admin'] },
+  { icon: ClipboardList, label: 'Admin Pedidos', href: '/admin/orders', roles: ['admin'] },
   { icon: HandCoins, label: 'Garantías', href: '/guarantees', roles: ['seller', 'admin'] },
   { icon: Cake, label: 'Productos', href: '/products', roles: ['admin'] },
   { icon: Warehouse, label: 'Inventario', href: '/inventory', roles: ['admin', 'baker'] },

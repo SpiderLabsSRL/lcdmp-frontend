@@ -542,11 +542,10 @@ describe('Orders - row/card click opens detail dialog', () => {
   });
 });
 
-describe('Orders - cancel order from detail dialog', () => {
-  it('cancels the order via the detail dialog and reloads the list', async () => {
+describe('Orders - detail dialog', () => {
+  it('no longer offers cancel, history or material usage (admin-only now)', async () => {
     const api = buildMockApi();
     const user = userEvent.setup();
-    vi.stubGlobal('confirm', vi.fn(() => true));
     renderWithProviders(<Orders ordersApi={api} />);
 
     await waitFor(() => expect(screen.getByText('Maria Lopez')).toBeInTheDocument());
@@ -554,10 +553,9 @@ describe('Orders - cancel order from detail dialog', () => {
     await user.click(screen.getByText('Maria Lopez'));
     await screen.findByText('Pedido #ORD-001');
 
-    await user.click(screen.getByRole('button', { name: /Cancelar Pedido/i }));
-
-    await waitFor(() => expect(api.updateOrderStatus).toHaveBeenCalledWith('1', 'cancelled', undefined));
-    expect(screen.queryByText('Pedido #ORD-001')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Cancelar Pedido/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Historial de producción/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Materiales/i)).not.toBeInTheDocument();
   });
 });
 

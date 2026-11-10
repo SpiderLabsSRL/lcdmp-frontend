@@ -96,7 +96,7 @@ describe('ExpressOrderDialog', () => {
     const user = userEvent.setup();
     const { onSubmit } = setup();
 
-    await user.click(screen.getByLabelText(/El cliente paga el envío/));
+    await user.click(screen.getByLabelText(/Envío Pagado/));
     fireEvent.change(screen.getByLabelText(/Costo del envío/), { target: { value: '12' } });
 
     expect(total()).toHaveTextContent('Bs. 52.00');
@@ -108,15 +108,15 @@ describe('ExpressOrderDialog', () => {
     expect(onSubmit.mock.calls[0][0]).toMatchObject({ shippingCost: 12, deposit: 52 });
   });
 
-  it('requires the shipping cost once "paga el envío" is checked', async () => {
+  it('requires the shipping cost once "Envío Pagado" is checked', async () => {
     const user = userEvent.setup();
     const { onSubmit } = setup();
 
     await fillBasics(user);
-    await user.click(screen.getByLabelText(/El cliente paga el envío/));
+    await user.click(screen.getByLabelText(/Envío Pagado/));
     await user.click(submit());
 
-    expect(toast.error).toHaveBeenLastCalledWith('Indica el costo del envío o desmarca "El cliente paga el envío"');
+    expect(toast.error).toHaveBeenLastCalledWith('Indica el costo del envío o desmarca "Envío Pagado"');
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
@@ -135,11 +135,10 @@ describe('ExpressOrderDialog', () => {
     expect(onSubmit.mock.calls[0][0]).toMatchObject({ deposit: 15, paymentMethod: 'qr' });
   });
 
-  it('"Sin pago" leaves everything for the delivery and hides the payment method', async () => {
-    const user = userEvent.setup();
+  it('paying 0 now leaves everything for the delivery and hides the payment method', () => {
     setup();
 
-    await user.click(screen.getByRole('button', { name: 'Sin pago' }));
+    fireEvent.change(screen.getByLabelText(/Paga ahora/), { target: { value: '0' } });
 
     expect(screen.getByLabelText(/Paga ahora/)).toHaveValue(0);
     expect(balance()).toHaveTextContent('Bs. 40.00');

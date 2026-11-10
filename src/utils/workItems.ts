@@ -5,87 +5,90 @@ import { isCustomizedItem } from '@/utils/orderItems';
 // Aplana las 5 fuentes de líneas de producción de un pedido (tortas
 // personalizadas, productos de catálogo, productos dentro de una mesa dulce,
 // postres adicionales de mesa dulce y maquetas) en una lista plana de WorkItem,
-// filtrando solo las que están en la etapa pedida. Reutilizado por
-// Hornos/Armado/Decoración para renderizar una tarjeta por línea en vez de
-// una tarjeta por pedido completo.
-export function getWorkItemsAtStage(orders: Order[], stage: ProductStatus): WorkItem[] {
+// en cualquier etapa. Lo usa la vista de administrador para cambiar el estado
+// de cada línea.
+export function getOrderWorkItems(order: Order): WorkItem[] {
   const items: WorkItem[] = [];
 
-  for (const order of orders) {
-    for (const cake of order.customCakes || []) {
-      if (cake.status !== stage) continue;
-      items.push({
-        itemType: 'custom_cake',
-        itemId: cake.id,
-        order,
-        status: cake.status,
-        title: `${(cake.quantity || 1) > 1 ? `${cake.quantity} tortas de ` : ''}${cake.portions} porciones - ${cake.cakeFlavor}${cake.secondCakeFlavor ? `/${cake.secondCakeFlavor}` : ''}`,
-        detail: getCakeShapeLabel(cake.shape) || undefined,
-        quantity: cake.quantity || 1,
-      });
-    }
+  for (const cake of order.customCakes || []) {
+    if (!cake.status) continue;
+    items.push({
+      itemType: 'custom_cake',
+      itemId: cake.id,
+      order,
+      status: cake.status,
+      title: `${(cake.quantity || 1) > 1 ? `${cake.quantity} tortas de ` : ''}${cake.portions} porciones - ${cake.cakeFlavor}${cake.secondCakeFlavor ? `/${cake.secondCakeFlavor}` : ''}`,
+      detail: getCakeShapeLabel(cake.shape) || undefined,
+      quantity: cake.quantity || 1,
+    });
+  }
 
-    for (const item of order.items || []) {
-      if (item.status !== stage || !item.id) continue;
-      items.push({
-        itemType: 'order_item',
-        itemId: item.id,
-        order,
-        status: item.status,
-        title: `${item.quantity} ${item.productName || item.product?.name || 'Producto'}`,
-        quantity: item.quantity,
-        notes: item.notes,
-        customization: isCustomizedItem(item)
-          ? { notes: item.customizationNotes!.trim(), images: item.referenceImages || [] }
-          : undefined,
-      });
-    }
+  for (const item of order.items || []) {
+    if (!item.status || !item.id) continue;
+    items.push({
+      itemType: 'order_item',
+      itemId: item.id,
+      order,
+      status: item.status,
+      title: `${item.quantity} ${item.productName || item.product?.name || 'Producto'}`,
+      quantity: item.quantity,
+      notes: item.notes,
+      customization: isCustomizedItem(item)
+        ? { notes: item.customizationNotes!.trim(), images: item.referenceImages || [] }
+        : undefined,
+    });
+  }
 
-    for (const combo of order.sweetTableCombos || []) {
-      for (const product of combo.products || []) {
-        if (product.status !== stage || !product.id) continue;
-        items.push({
-          itemType: 'combo_item',
-          itemId: product.id,
-          order,
-          status: product.status,
-          title: `Mesa dulce: ${product.quantity} ${product.productName || product.product?.name || ''}`,
-          detail: combo.details,
-          quantity: product.quantity,
-          referenceImages: combo.referenceImages,
-        });
-      }
-    }
-
-    for (const mockup of order.mockups || []) {
-      if (mockup.status !== stage || !mockup.id) continue;
+  for (const combo of order.sweetTableCombos || []) {
+    for (const product of combo.products || []) {
+      if (!product.status || !product.id) continue;
       items.push({
-        itemType: 'mockup',
-        itemId: mockup.id,
+        itemType: 'combo_item',
+        itemId: product.id,
         order,
-        status: mockup.status,
-        title: `Maqueta - ${mockup.floors} ${mockup.floors === 1 ? 'piso' : 'pisos'}`,
-        detail: mockup.heightCm ? `Altura: ${mockup.heightCm} cm` : undefined,
-        quantity: 1,
-        referenceImages: mockup.referenceImages,
-        mockup: { design: mockup.design, floors: mockup.floors, heightCm: mockup.heightCm },
-      });
-    }
-
-    for (const extra of order.sweetTableExtras || []) {
-      if (extra.status !== stage || !extra.id) continue;
-      items.push({
-        itemType: 'sweet_table_extra',
-        itemId: extra.id,
-        order,
-        status: extra.status,
-        title: `Mesa dulce: ${extra.quantity} ${extra.productName || extra.product?.name || ''}`,
-        quantity: extra.quantity,
-        notes: extra.notes,
-        referenceImages: extra.referenceImages,
+        status: product.status,
+        title: `Mesa dulce: ${product.quantity} ${product.productName || product.product?.name || ''}`,
+        detail: combo.details,
+        quantity: product.quantity,
+        referenceImages: combo.referenceImages,
       });
     }
   }
 
+  for (const mockup of order.mockups || []) {
+    if (!mockup.status || !mockup.id) continue;
+    items.push({
+      itemType: 'mockup',
+      itemId: mockup.id,
+      order,
+      status: mockup.status,
+      title: `Maqueta - ${mockup.floors} ${mockup.floors === 1 ? 'piso' : 'pisos'}`,
+      detail: mockup.heightCm ? `Altura: ${mockup.heightCm} cm` : undefined,
+      quantity: 1,
+      referenceImages: mockup.referenceImages,
+      mockup: { design: mockup.design, floors: mockup.floors, heightCm: mockup.heightCm },
+    });
+  }
+
+  for (const extra of order.sweetTableExtras || []) {
+    if (!extra.status || !extra.id) continue;
+    items.push({
+      itemType: 'sweet_table_extra',
+      itemId: extra.id,
+      order,
+      status: extra.status,
+      title: `Mesa dulce: ${extra.quantity} ${extra.productName || extra.product?.name || ''}`,
+      quantity: extra.quantity,
+      notes: extra.notes,
+      referenceImages: extra.referenceImages,
+    });
+  }
+
   return items;
+}
+
+// Solo las líneas que están en la etapa pedida. Reutilizado por Hornos/Armado/Decoración
+// para renderizar una tarjeta por línea en vez de una tarjeta por pedido completo.
+export function getWorkItemsAtStage(orders: Order[], stage: ProductStatus): WorkItem[] {
+  return orders.flatMap(getOrderWorkItems).filter(item => item.status === stage);
 }

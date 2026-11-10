@@ -240,11 +240,6 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
     }
   };
 
-  const handleCancelOrder = async (orderId: string) => {
-    setSelectedOrder(null);
-    await handleUpdateStatus(orderId, 'cancelled');
-  };
-
   const resetFilters = () => {
     setSearchTerm('');
     setSelectedStatus('all');
@@ -646,9 +641,7 @@ export default function Orders({ ordersApi = defaultOrdersApi }: OrdersProps) {
             {selectedOrder && <OrderDetail
               order={selectedOrder}
               onDeliver={handleDeliverOrder}
-              onCancel={handleCancelOrder}
               onMarkAtStore={handleMarkAtStore}
-              ordersApi={ordersApi}
             />}
           </DialogContent>
         </Dialog>

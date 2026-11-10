@@ -1,12 +1,12 @@
-import { Order, ItemStageLogEntry } from "@/types";
-import { format, differenceInMinutes } from 'date-fns';
-import { Truck, XCircle, ChevronDown, ChevronUp, History, Store } from "lucide-react";
+import { Order } from "@/types";
+import { format } from 'date-fns';
+import { Truck, Store } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { statusConfig, getCakeShapeLabel, pickupMethodLabels } from '@/types/consts';
 import { es } from "date-fns/locale";
 import { Button } from "../ui/button";
 import { PaymentMethod } from '../../types/index';
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Dialog,
   DialogContent,
@@ -17,22 +17,16 @@ import {
 } from "@/components/ui/dialog";
 import { Banknote, QrCode } from "lucide-react";
 import { getOrderType } from "@/pages/Orders";
-import { IOrdersApi, defaultOrdersApi } from "@/api/OrdersApi";
 import { getLocalDateString } from "@/utils/DateUtils";
 import { isCustomizedItem, customizationExtra, itemLineTotal } from "@/utils/orderItems";
-import MaterialUsageSection from "./MaterialUsageSection";
 import { ReferenceImages } from "@/components/Images/ReferenceImages";
-import type { IMaterialsApi } from "@/api/MaterialsApi";
-import type { IInventoryApi } from "@/api/InventoryApi";
 
 interface OrderDetailProps {
   order: Order;
   onDeliver?: (orderId: string, paymentMethod: PaymentMethod) => void;
-  onCancel?: (orderId: string) => void;
   onMarkAtStore?: (orderId: string) => void;
-  ordersApi?: IOrdersApi;
-  materialsApi?: IMaterialsApi;
-  inventoryApi?: IInventoryApi;
+  // Secciones extra al final (la vista de administrador agrega estado, historial, materiales y cancelar)
+  children?: ReactNode;
 }
 
 const itemStatusLabel = (status?: string) => {
@@ -45,12 +39,9 @@ const itemStatusColor = (status?: string) => {
   return statusConfig[status as keyof typeof statusConfig]?.color || '';
 };
 
-export default function OrderDetail({ order, onDeliver, onCancel, onMarkAtStore, ordersApi = defaultOrdersApi, materialsApi, inventoryApi }: OrderDetailProps) {
+export default function OrderDetail({ order, onDeliver, onMarkAtStore, children }: OrderDetailProps) {
   const [showDeliverDialog, setShowDeliverDialog] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
-  const [showHistory, setShowHistory] = useState(false);
-  const [productionLog, setProductionLog] = useState<ItemStageLogEntry[] | null>(null);
-  const [isLoadingLog, setIsLoadingLog] = useState(false);
 
   const handleDeliverClick = () => {
     setShowDeliverDialog(true);
@@ -67,37 +58,6 @@ export default function OrderDetail({ order, onDeliver, onCancel, onMarkAtStore,
   const handleCancelDeliver = () => {
     setShowDeliverDialog(false);
     setPaymentMethod('cash');
-  };
-
-  const handleCancelOrder = () => {
-    if (!confirm('¿Estás seguro de que deseas cancelar este pedido?')) return;
-    onCancel?.(order.id);
-  };
-
-  const toggleHistory = async () => {
-    const next = !showHistory;
-    setShowHistory(next);
-    if (next && productionLog === null) {
-      setIsLoadingLog(true);
-      try {
-        const log = await ordersApi.getOrderProductionLog(order.id);
-        setProductionLog(log);
-      } catch (error) {
-        console.error('Error loading production log:', error);
-        setProductionLog([]);
-      } finally {
-        setIsLoadingLog(false);
-      }
-    }
-  };
-
-  const formatDuration = (entry: ItemStageLogEntry): string => {
-    if (!entry.completedAt) return 'En curso';
-    const minutes = differenceInMinutes(new Date(entry.completedAt), new Date(entry.enteredAt));
-    if (minutes < 60) return `${minutes} min`;
-    const hours = Math.floor(minutes / 60);
-    const rest = minutes % 60;
-    return rest > 0 ? `${hours}h ${rest}min` : `${hours}h`;
   };
 
   return (
@@ -451,68 +411,7 @@ export default function OrderDetail({ order, onDeliver, onCancel, onMarkAtStore,
           </p>
         </div>
 
-        {/* Historial de producción */}
-        <div className="border-t pt-3 sm:pt-4">
-          <Button
-            variant="ghost"
-            className="w-full justify-between px-0 hover:bg-transparent"
-            onClick={toggleHistory}
-          >
-            <span className="flex items-center gap-2 font-semibold text-base text-foreground">
-              <History className="h-4 w-4" />
-              Historial de producción
-            </span>
-            {showHistory ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </Button>
-          {showHistory && (
-            <div className="mt-2 space-y-2">
-              {isLoadingLog ? (
-                <p className="text-sm text-foreground">Cargando historial...</p>
-              ) : !productionLog || productionLog.length === 0 ? (
-                <p className="text-sm text-foreground">Sin historial de producción todavía.</p>
-              ) : (
-                productionLog.map(entry => (
-                  <div key={entry.id} className="bg-muted/50 p-3 rounded-lg text-sm text-foreground">
-                    <div className="flex justify-between items-center flex-wrap gap-2">
-                      <Badge className={itemStatusColor(entry.stage)}>{itemStatusLabel(entry.stage)}</Badge>
-                      <span className="font-medium">{formatDuration(entry)}</span>
-                    </div>
-                    <p className="mt-1">
-                      Entró: {format(new Date(entry.enteredAt), "dd MMM HH:mm", { locale: es })}
-                    </p>
-                    {entry.completedAt && (
-                      <p>
-                        Completado: {format(new Date(entry.completedAt), "dd MMM HH:mm", { locale: es })}
-                        {entry.completedByName && ` — por ${entry.completedByName}`}
-                      </p>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-        </div>
-
-        <MaterialUsageSection
-          orderId={order.id}
-          canRegister={order.status !== 'delivered' && order.status !== 'cancelled'}
-          materialsApi={materialsApi}
-          inventoryApi={inventoryApi}
-        />
-
-        {/* Cancelar pedido */}
-        {order.status !== 'delivered' && order.status !== 'cancelled' && onCancel && (
-          <div className="border-t pt-3 sm:pt-4">
-            <Button
-              onClick={handleCancelOrder}
-              variant="outline"
-              className="w-full text-destructive hover:text-destructive"
-            >
-              <XCircle className="h-4 w-4 mr-2" />
-              Cancelar Pedido
-            </Button>
-          </div>
-        )}
+        {children}
       </div>
 
       {/* Dialog para confirmar entrega */}

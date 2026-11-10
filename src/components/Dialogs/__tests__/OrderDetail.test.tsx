@@ -2,25 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import OrderDetail from '../OrderDetail';
-import type { Order, ItemStageLogEntry } from '@/types';
-import type { IOrdersApi } from '@/api/OrdersApi';
-
-const makeOrdersApi = (overrides: Partial<IOrdersApi> = {}): IOrdersApi => ({
-  getOrders: vi.fn(),
-  getOrderById: vi.fn(),
-  createOrder: vi.fn(),
-  updateOrder: vi.fn(),
-  deleteOrder: vi.fn(),
-  updateOrderStatus: vi.fn(),
-  markOrderAtStore: vi.fn(),
-  advanceItemStage: vi.fn(),
-  confirmRestock: vi.fn(),
-  getOrderProductionLog: vi.fn().mockResolvedValue([]),
-  getFlavors: vi.fn(),
-  getProducts: vi.fn(),
-  getSweetTableCombos: vi.fn(),
-  ...overrides,
-});
+import type { Order } from '@/types';
 
 const baseOrder: Order = {
   id: 'order-1',
@@ -119,12 +101,12 @@ describe('OrderDetail', () => {
 
   it('marks from-stock lines and warns about missing store stock only once the pickup day has come', () => {
     const line = { productId: 'p1', product: { name: 'Cupcake' } as any, quantity: 3, price: 10, status: 'ready' as const, fromStock: true, storeStock: 1 };
-    const { rerender } = render(<OrderDetail order={{ ...baseOrder, pickupDate: new Date(2999, 0, 1), items: [line] }} ordersApi={makeOrdersApi()} />);
+    const { rerender } = render(<OrderDetail order={{ ...baseOrder, pickupDate: new Date(2999, 0, 1), items: [line] }} />);
 
     expect(screen.getByText('De stock')).toBeInTheDocument();
     expect(screen.queryByText('Sin stock en tienda')).not.toBeInTheDocument();
 
-    rerender(<OrderDetail order={{ ...baseOrder, pickupDate: new Date(2020, 0, 1), items: [line] }} ordersApi={makeOrdersApi()} />);
+    rerender(<OrderDetail order={{ ...baseOrder, pickupDate: new Date(2020, 0, 1), items: [line] }} />);
     expect(screen.getByText('Sin stock en tienda')).toBeInTheDocument();
   });
 
@@ -137,7 +119,7 @@ describe('OrderDetail', () => {
         referenceImages: ['https://signed.example/Pedidos/a.jpg'],
       }],
     };
-    render(<OrderDetail order={order} ordersApi={makeOrdersApi()} />);
+    render(<OrderDetail order={order} />);
 
     expect(screen.getByText('Papel comestible con foto')).toBeInTheDocument();
     expect(screen.getByText('(+Bs. 30 c/u)')).toBeInTheDocument();
@@ -151,7 +133,7 @@ describe('OrderDetail', () => {
       ...baseOrder,
       items: [{ id: 'oi-1', productId: 'p1', product: { name: 'Tres leches' } as any, quantity: 2, price: 80, customizationNotes: null, customizationPrice: 0 }],
     };
-    render(<OrderDetail order={order} ordersApi={makeOrdersApi()} />);
+    render(<OrderDetail order={order} />);
 
     expect(screen.getByText('Bs. 160')).toBeInTheDocument();
     expect(screen.queryByText('Personalizado:')).not.toBeInTheDocument();
@@ -169,7 +151,7 @@ describe('OrderDetail', () => {
         referenceImages: ['https://signed.example/Pedidos/postre.jpg'],
       }],
     };
-    render(<OrderDetail order={order} ordersApi={makeOrdersApi()} />);
+    render(<OrderDetail order={order} />);
 
     const images = screen.getAllByAltText(/Referencia/);
     expect(images.map(i => i.getAttribute('src'))).toEqual([
@@ -366,51 +348,19 @@ describe('OrderDetail', () => {
     });
   });
 
-  describe('cancel order', () => {
-    it('does not render the cancel button when onCancel is not provided', () => {
-      render(<OrderDetail order={baseOrder} />);
+  describe('admin-only sections', () => {
+    it('does not render history, material usage or cancel controls', () => {
+      render(<OrderDetail order={baseOrder} onDeliver={vi.fn()} />);
 
+      expect(screen.queryByRole('button', { name: /Historial de producción/ })).not.toBeInTheDocument();
+      expect(screen.queryByText(/Materiales/)).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /Cancelar Pedido/ })).not.toBeInTheDocument();
     });
 
-    it('renders the cancel button for a pending order when onCancel is provided', () => {
-      render(<OrderDetail order={baseOrder} onCancel={vi.fn()} />);
+    it('renders extra sections passed as children', () => {
+      render(<OrderDetail order={baseOrder}><p>Sección extra</p></OrderDetail>);
 
-      expect(screen.getByRole('button', { name: /Cancelar Pedido/ })).toBeInTheDocument();
-    });
-
-    it('does not render the cancel button when the order is already delivered', () => {
-      render(<OrderDetail order={{ ...baseOrder, status: 'delivered' }} onCancel={vi.fn()} />);
-
-      expect(screen.queryByRole('button', { name: /Cancelar Pedido/ })).not.toBeInTheDocument();
-    });
-
-    it('does not render the cancel button when the order is already cancelled', () => {
-      render(<OrderDetail order={{ ...baseOrder, status: 'cancelled' }} onCancel={vi.fn()} />);
-
-      expect(screen.queryByRole('button', { name: /Cancelar Pedido/ })).not.toBeInTheDocument();
-    });
-
-    it('calls onCancel with the order id when confirmed', async () => {
-      const user = userEvent.setup();
-      const onCancel = vi.fn();
-      vi.spyOn(window, 'confirm').mockReturnValue(true);
-      render(<OrderDetail order={baseOrder} onCancel={onCancel} />);
-
-      await user.click(screen.getByRole('button', { name: /Cancelar Pedido/ }));
-
-      expect(onCancel).toHaveBeenCalledWith('order-1');
-    });
-
-    it('does not call onCancel when the confirm prompt is declined', async () => {
-      const user = userEvent.setup();
-      const onCancel = vi.fn();
-      vi.spyOn(window, 'confirm').mockReturnValue(false);
-      render(<OrderDetail order={baseOrder} onCancel={onCancel} />);
-
-      await user.click(screen.getByRole('button', { name: /Cancelar Pedido/ }));
-
-      expect(onCancel).not.toHaveBeenCalled();
+      expect(screen.getByText('Sección extra')).toBeInTheDocument();
     });
   });
 
@@ -481,68 +431,6 @@ describe('OrderDetail', () => {
 
       // Only the order-level status badge ("Pendiente") should be present.
       expect(screen.getAllByText('Pendiente')).toHaveLength(1);
-    });
-  });
-
-  describe('production history', () => {
-    it('does not fetch the production log until the history section is expanded', () => {
-      const ordersApi = makeOrdersApi();
-      render(<OrderDetail order={baseOrder} ordersApi={ordersApi} />);
-
-      expect(ordersApi.getOrderProductionLog).not.toHaveBeenCalled();
-    });
-
-    it('fetches and renders the production log when expanded', async () => {
-      const user = userEvent.setup();
-      const log: ItemStageLogEntry[] = [
-        {
-          id: 'log-1',
-          itemType: 'custom_cake',
-          itemId: 'cake-1',
-          stage: 'baking',
-          enteredAt: '2026-05-01T10:00:00.000Z',
-          completedAt: '2026-05-01T12:00:00.000Z',
-          completedById: 'user-1',
-          completedByName: 'Ana',
-        },
-      ];
-      const ordersApi = makeOrdersApi({ getOrderProductionLog: vi.fn().mockResolvedValue(log) });
-      render(<OrderDetail order={baseOrder} ordersApi={ordersApi} />);
-
-      await user.click(screen.getByRole('button', { name: /Historial de producción/ }));
-
-      expect(ordersApi.getOrderProductionLog).toHaveBeenCalledWith('order-1');
-      await waitFor(() => {
-        expect(screen.getByText(/por Ana/)).toBeInTheDocument();
-      });
-    });
-
-    it('shows an empty-state message when the log has no entries', async () => {
-      const user = userEvent.setup();
-      const ordersApi = makeOrdersApi({ getOrderProductionLog: vi.fn().mockResolvedValue([]) });
-      render(<OrderDetail order={baseOrder} ordersApi={ordersApi} />);
-
-      await user.click(screen.getByRole('button', { name: /Historial de producción/ }));
-
-      await waitFor(() => {
-        expect(screen.getByText('Sin historial de producción todavía.')).toBeInTheDocument();
-      });
-    });
-
-    it('collapses the history section when toggled again, without re-fetching', async () => {
-      const user = userEvent.setup();
-      const ordersApi = makeOrdersApi();
-      render(<OrderDetail order={baseOrder} ordersApi={ordersApi} />);
-
-      const toggle = screen.getByRole('button', { name: /Historial de producción/ });
-      await user.click(toggle);
-      await waitFor(() => expect(ordersApi.getOrderProductionLog).toHaveBeenCalledTimes(1));
-
-      await user.click(toggle);
-      expect(screen.queryByText('Sin historial de producción todavía.')).not.toBeInTheDocument();
-
-      await user.click(toggle);
-      await waitFor(() => expect(ordersApi.getOrderProductionLog).toHaveBeenCalledTimes(1));
     });
   });
 
