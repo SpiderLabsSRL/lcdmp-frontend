@@ -71,35 +71,6 @@ describe('BakingApi (real, axios-backed)', () => {
     });
   });
 
-  describe('getBakedProductsStock', () => {
-    it('gets /inventory/baked-products and maps date fields', async () => {
-      const raw = [
-        { id: '1', name: 'Base chocolate', expiresAt: '2026-02-01T00:00:00.000Z', createdAt: '2026-01-01T00:00:00.000Z' },
-        { id: '2', name: 'Base vainilla', expiresAt: null, createdAt: '2026-01-01T00:00:00.000Z' },
-      ];
-      mockedApi.get.mockResolvedValue({ data: { success: true, data: raw } });
-
-      const result = await bakingApi.getBakedProductsStock();
-
-      expect(mockedApi.get).toHaveBeenCalledWith('/inventory/baked-products');
-      expect(result[0].createdAt).toEqual(new Date(raw[0].createdAt));
-      expect(result[0].expiresAt).toEqual(new Date(raw[0].expiresAt as string));
-      expect(result[1].expiresAt).toBeUndefined();
-    });
-
-    it('throws with the backend message when success is false', async () => {
-      mockedApi.get.mockResolvedValue({ data: { success: false, message: 'Error al obtener stock de productos horneados' } });
-
-      await expect(bakingApi.getBakedProductsStock()).rejects.toThrow('Error al obtener stock de productos horneados');
-    });
-
-    it('throws with a connection error when the request itself fails', async () => {
-      mockedApi.get.mockRejectedValue(new Error('Network Error'));
-
-      await expect(bakingApi.getBakedProductsStock()).rejects.toThrow('Network Error');
-    });
-  });
-
   describe('updateOrderStatus', () => {
     it('patches /orders/:id/status with the new status and returns the mapped order', async () => {
       const raw = { id: '1', status: 'baking', pickupDate: '2026-03-05T00:00:00.000Z', createdAt: '2026-01-01T00:00:00.000Z' };
@@ -137,6 +108,15 @@ describe('BakingApi (real, axios-backed)', () => {
       expect(result.createdAt).toEqual(new Date(raw.createdAt));
     });
 
+    it('sends the baked dough quantities the baker confirmed', async () => {
+      const raw = { id: '1', status: 'baking', pickupDate: '2026-03-05T00:00:00.000Z', createdAt: '2026-01-01T00:00:00.000Z' };
+      mockedApi.patch.mockResolvedValue({ data: { success: true, data: raw } });
+
+      await bakingApi.completeItem('1', 'custom_cake', 'cake-1', [3, 1]);
+
+      expect(mockedApi.patch).toHaveBeenCalledWith('/orders/1/items/custom_cake/cake-1/advance', { toStage: 'assembling', bakedQuantities: [3, 1] });
+    });
+
     it('throws with the backend message when success is false', async () => {
       mockedApi.patch.mockResolvedValue({ data: { success: false, message: 'Error al actualizar la etapa' } });
 
@@ -170,13 +150,6 @@ describe('MockBakingApi (in-memory)', () => {
     )).toBe(true);
     // Order '1' is the only mock order with a custom cake in the baking stage.
     expect(orders.map(o => o.id)).toEqual(['1']);
-  });
-
-  it('returns only cake_base baked products for stock', async () => {
-    const stock = await mockApi.getBakedProductsStock();
-
-    expect(stock.length).toBeGreaterThan(0);
-    expect(stock.every(p => p.type === 'cake_base')).toBe(true);
   });
 
   it('updates the status of an existing order', async () => {

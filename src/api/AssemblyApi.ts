@@ -1,21 +1,19 @@
 import api from '@/api/api';
-import { mockOrders, mockBakedProducts } from '@/data/mockData';
+import { mockOrders } from '@/data/mockData';
 import { getWorkItemsAtStage } from '@/utils/workItems';
-import type { Order, OrderStatus, CustomCake, BakedProduct, WorkItemType } from '@/types';
+import type { Order, OrderStatus, CustomCake, StageResult, WorkItemType } from '@/types';
 
 export interface IAssemblyApi {
   getAssemblyOrders(signal?: AbortSignal): Promise<Order[]>;
   updateOrderStatus(id: string, status: OrderStatus): Promise<Order>;
-  completeItem(orderId: string, itemType: WorkItemType, itemId: string): Promise<Order>;
+  completeItem(orderId: string, itemType: WorkItemType, itemId: string): Promise<StageResult>;
 }
 
 export class MockAssemblyApi implements IAssemblyApi {
   private orders: Order[] = [];
-  private bakedProducts: BakedProduct[] = [];
 
   constructor() {
     this.orders = [...mockOrders];
-    this.bakedProducts = [...mockBakedProducts];
   }
 
   async getAssemblyOrders(): Promise<Order[]> {
@@ -46,7 +44,7 @@ export class MockAssemblyApi implements IAssemblyApi {
     return this.orders[index];
   }
 
-  async completeItem(orderId: string, itemType: WorkItemType, itemId: string): Promise<Order> {
+  async completeItem(orderId: string, itemType: WorkItemType, itemId: string): Promise<StageResult> {
     await this.simulateNetworkDelay();
 
     const index = this.orders.findIndex(o => o.id === orderId);
@@ -132,7 +130,7 @@ export class AssemblyApi implements IAssemblyApi {
     }
   }
 
-  async completeItem(orderId: string, itemType: WorkItemType, itemId: string): Promise<Order> {
+  async completeItem(orderId: string, itemType: WorkItemType, itemId: string): Promise<StageResult> {
     try {
       const response = await api.patch(`/orders/${orderId}/items/${itemType}/${itemId}/advance`, { toStage: 'decorating' });
 
@@ -142,6 +140,7 @@ export class AssemblyApi implements IAssemblyApi {
 
       return {
         ...response.data.data,
+        warnings: response.data.warnings || [],
         pickupDate: new Date(response.data.data.pickupDate),
         createdAt: new Date(response.data.data.createdAt)
       };

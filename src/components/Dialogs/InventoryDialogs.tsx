@@ -1,50 +1,37 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import type { RawMaterial, BakedProduct, Category } from '@/types';
+import type { RawMaterial, Category } from '@/types';
 import { RawMaterialForm } from '@/components/Forms/RawMaterialForm';
-import { BakedProductForm } from '@/components/Forms/BakedProductForm';
 
 interface InventoryDialogsProps {
   isOpen: boolean;
   onClose: () => void;
-  dialogType: 'raw' | 'baked';
-  editingItem: RawMaterial | BakedProduct | null;
+  editingItem: RawMaterial | null;
   categories: Category[];
   onSaveRaw: (data: any, update: boolean) => void;
-  onSaveBaked: (data: any, update: boolean) => void;
 }
 
 export function InventoryDialogs({ 
   isOpen, 
   onClose, 
-  dialogType, 
   editingItem,
   categories,
-  onSaveRaw,
-  onSaveBaked
+  onSaveRaw
 }: InventoryDialogsProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="w-[95vw] sm:w-full max-w-lg rounded-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-lg sm:text-xl">
-            {editingItem ? 'Editar' : dialogType === 'raw' ? 'Nueva Materia Prima' : 'Registrar Productos Horneados'}
+            {editingItem ? 'Editar' : 'Nueva Materia Prima'}
           </DialogTitle>
         </DialogHeader>
         
-        {dialogType === 'raw' ? (
-          <RawMaterialForm 
-            initialData={editingItem as RawMaterial}
-            categories={categories}
-            onClose={onClose}
-            onSave={onSaveRaw}
-          />
-        ) : (
-          <BakedProductForm 
-            initialData={editingItem as BakedProduct}
-            onClose={onClose}
-            onSave={onSaveBaked}
-          />
-        )}
+        <RawMaterialForm 
+          initialData={editingItem as RawMaterial}
+          categories={categories}
+          onClose={onClose}
+          onSave={onSaveRaw}
+        />
       </DialogContent>
     </Dialog>
   );

@@ -2,15 +2,15 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { LowStockAlert } from '../LowStockAlert';
 import type { LowStockSummary } from '@/api/InventoryApi';
-import type { RawMaterial, BakedProduct } from '@/types';
+import type { RawMaterial, BakedItem } from '@/types';
 
 const rawMaterials: RawMaterial[] = [
   { id: 'm1', name: 'Harina', unit: 'kg', quantity: 5, minStock: 10, category: 'flour', lastUpdated: new Date(2026, 0, 1) },
   { id: 'm2', name: 'Leche', unit: 'lt', quantity: 2, minStock: 10, category: 'dairy', lastUpdated: new Date(2026, 0, 1) },
 ];
 
-const bakedProducts: BakedProduct[] = [
-  { id: 'b1', name: 'Pan', type: 'bread', quantity: 1, minStock: 5, createdAt: new Date(2026, 0, 1) },
+const bakedProducts: BakedItem[] = [
+  { id: 'b1', doughTypeId: 'dt1', doughTypeName: 'Masa de pie', name: 'Masa de pie · Manzana', flavor: 'Manzana', portions: 8, shape: null, quantity: 1, minStock: 5, createdAt: '2026-01-01T00:00:00.000Z' },
 ];
 
 describe('LowStockAlert', () => {

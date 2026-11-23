@@ -1,4 +1,4 @@
-import { Product, RawMaterial, BakedProduct, Order, Flavor, SpecialMenu, SweetTableCombo, CashRegister, Branch, UserRole, User } from '@/types';
+import { Product, RawMaterial, Order, Flavor, SpecialMenu, SweetTableCombo, CashRegister, Branch, UserRole, User } from '@/types';
 
 export const mockUsers: User[] = [
   { id: '1', username: 'admin@lacasademipa.com', name: 'Carlos Administrador', roles: ['admin'] as UserRole[]},
@@ -21,16 +21,6 @@ export const mockRawMaterials: RawMaterial[] = [
   { id: '8', name: 'Cacao en polvo', unit: 'kg', quantity: 5, minStock: 2, category: 'flavoring', lastUpdated: new Date() },
   { id: '9', name: 'Fondant', unit: 'kg', quantity: 8, minStock: 3, category: 'decoration', lastUpdated: new Date() },
   { id: '10', name: 'Colorantes', unit: 'set', quantity: 10, minStock: 3, category: 'decoration', lastUpdated: new Date() },
-];
-
-// Baked Products (semi-finished)
-export const mockBakedProducts: BakedProduct[] = [
-  { id: '1', name: 'Base de torta chocolate 20p', type: 'cake_base', quantity: 5, minStock: 2, createdAt: new Date() },
-  { id: '2', name: 'Base de torta vainilla 20p', type: 'cake_base', quantity: 3, minStock: 2, createdAt: new Date() },
-  { id: '3', name: 'Base de torta chocolate 30p', type: 'cake_base', quantity: 2, minStock: 1, createdAt: new Date() },
-  { id: '4', name: 'Cupcakes vainilla', type: 'cupcake', quantity: 24, minStock: 12, createdAt: new Date() },
-  { id: '5', name: 'Cupcakes chocolate', type: 'cupcake', quantity: 18, minStock: 12, createdAt: new Date() },
-  { id: '6', name: 'Galletas decoradas', type: 'cookie', quantity: 36, minStock: 20, createdAt: new Date() },
 ];
 
 // Finished Products

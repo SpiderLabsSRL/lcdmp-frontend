@@ -4,7 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
 import Inventory from '../Inventory';
-import type { RawMaterial, BakedProduct, Category } from '@/types';
+import type { RawMaterial, BakedItem, Category } from '@/types';
+import type { IBakedApi } from '@/api/BakedApi';
 import type { IInventoryApi, LowStockSummary } from '@/api/InventoryApi';
 
 const renderWithProviders = (ui: React.ReactElement) =>
@@ -39,14 +40,25 @@ const normalMaterial: RawMaterial = {
   lastUpdated: new Date(2026, 0, 1),
 };
 
-const lowStockBakedProduct: BakedProduct = {
+const lowStockBakedProduct: BakedItem = {
   id: 'bp1',
-  name: 'Bizcocho de Vainilla',
-  type: 'cake_base',
+  doughTypeId: 'dt1',
+  doughTypeName: 'Masa de torta',
+  name: 'Masa de torta · Vainilla · 20 porciones',
+  flavor: 'Vainilla',
+  portions: 20,
+  shape: 'redonda',
   quantity: 2,
   minStock: 5,
-  createdAt: new Date(2026, 0, 1),
+  createdAt: '2026-01-01T00:00:00.000Z',
 };
+
+function buildBakedApi(items: BakedItem[] = []): IBakedApi {
+  return {
+    getItems: vi.fn().mockResolvedValue(items),
+    getDoughTypes: vi.fn().mockResolvedValue([]),
+  } as unknown as IBakedApi;
+}
 
 const noLowStockSummary: LowStockSummary = { rawMaterials: [], bakedProducts: [], totalLowStock: 0 };
 
@@ -58,12 +70,6 @@ function buildMockApi(overrides: Partial<IInventoryApi> = {}): IInventoryApi {
     updateRawMaterial: vi.fn(),
     deleteRawMaterial: vi.fn(),
     adjustRawMaterialStock: vi.fn().mockResolvedValue(normalMaterial),
-    getBakedProducts: vi.fn().mockResolvedValue([]),
-    getBakedProductById: vi.fn(),
-    createBakedProduct: vi.fn(),
-    updateBakedProduct: vi.fn(),
-    deleteBakedProduct: vi.fn(),
-    adjustBakedProductStock: vi.fn().mockResolvedValue(lowStockBakedProduct),
     getCategories: vi.fn().mockResolvedValue(categories),
     getLowStockItems: vi.fn().mockResolvedValue(noLowStockSummary),
     ...overrides,
@@ -83,7 +89,7 @@ describe('Inventory', () => {
     });
     const mockApi = buildMockApi({ getRawMaterials: vi.fn().mockReturnValue(pending) });
 
-    const { container } = renderWithProviders(<Inventory inventoryApi={mockApi} />);
+    const { container } = renderWithProviders(<Inventory inventoryApi={mockApi} bakedApi={buildBakedApi()} />);
 
     expect(container.querySelector('.animate-pulse')).toBeInTheDocument();
 
@@ -94,25 +100,24 @@ describe('Inventory', () => {
   it('shows empty states for raw materials and baked products', async () => {
     const mockApi = buildMockApi();
     const user = userEvent.setup();
-    renderWithProviders(<Inventory inventoryApi={mockApi} />);
+    renderWithProviders(<Inventory inventoryApi={mockApi} bakedApi={buildBakedApi()} />);
 
     expect(await screen.findByText('No se encontraron materias primas')).toBeInTheDocument();
 
     await user.click(screen.getByRole('tab', { name: 'Productos Horneados' }));
-    expect(await screen.findByText('No hay productos horneados')).toBeInTheDocument();
+    expect(await screen.findByText('No hay masas horneadas registradas')).toBeInTheDocument();
   });
 
   it('renders populated raw materials with low-stock highlighting and shows the low-stock alert', async () => {
     const mockApi = buildMockApi({
       getRawMaterials: vi.fn().mockResolvedValue([lowStockMaterial, normalMaterial]),
-      getBakedProducts: vi.fn().mockResolvedValue([lowStockBakedProduct]),
       getLowStockItems: vi.fn().mockResolvedValue({
         rawMaterials: [lowStockMaterial],
         bakedProducts: [lowStockBakedProduct],
         totalLowStock: 2,
       }),
     });
-    renderWithProviders(<Inventory inventoryApi={mockApi} />);
+    renderWithProviders(<Inventory inventoryApi={mockApi} bakedApi={buildBakedApi()} />);
 
     expect(await screen.findByText('Harina de Trigo')).toBeInTheDocument();
     expect(screen.getByText('Azúcar Blanca')).toBeInTheDocument();
@@ -125,7 +130,7 @@ describe('Inventory', () => {
       getRawMaterials: vi.fn().mockResolvedValue([normalMaterial]),
       getLowStockItems: vi.fn().mockResolvedValue(noLowStockSummary),
     });
-    renderWithProviders(<Inventory inventoryApi={mockApi} />);
+    renderWithProviders(<Inventory inventoryApi={mockApi} bakedApi={buildBakedApi()} />);
 
     await screen.findByText('Azúcar Blanca');
     expect(screen.queryByText('Stock bajo')).not.toBeInTheDocument();
@@ -134,17 +139,17 @@ describe('Inventory', () => {
   it('switches between the raw-materials and baked-products views', async () => {
     const mockApi = buildMockApi({
       getRawMaterials: vi.fn().mockResolvedValue([normalMaterial]),
-      getBakedProducts: vi.fn().mockResolvedValue([lowStockBakedProduct]),
     });
     const user = userEvent.setup();
-    renderWithProviders(<Inventory inventoryApi={mockApi} />);
+    renderWithProviders(<Inventory inventoryApi={mockApi} bakedApi={buildBakedApi([lowStockBakedProduct])} />);
 
     await screen.findByText('Azúcar Blanca');
-    expect(screen.queryByText('Bizcocho de Vainilla')).not.toBeInTheDocument();
+    expect(screen.queryByText('Vainilla')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('tab', { name: 'Productos Horneados' }));
 
-    expect(await screen.findByText('Bizcocho de Vainilla')).toBeInTheDocument();
+    expect(await screen.findByText('Vainilla')).toBeInTheDocument();
+    expect(screen.getByText('Masa de torta')).toBeInTheDocument();
   });
 
   it('adjusts stock for a raw material through the Agregar dialog', async () => {
@@ -152,7 +157,7 @@ describe('Inventory', () => {
       getRawMaterials: vi.fn().mockResolvedValue([normalMaterial]),
     });
     const user = userEvent.setup();
-    renderWithProviders(<Inventory inventoryApi={mockApi} />);
+    renderWithProviders(<Inventory inventoryApi={mockApi} bakedApi={buildBakedApi()} />);
 
     await screen.findByText('Azúcar Blanca');
     await user.click(screen.getByRole('button', { name: /Agregar/i }));

@@ -7,6 +7,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import Baking from '../Baking';
 import type { Order } from '@/types';
 import type { IBakingApi } from '@/api/BakingApi';
+import type { IBakedApi } from '@/api/BakedApi';
 
 vi.mock('sonner', () => ({
   toast: {
@@ -107,10 +108,19 @@ const singleCakeOrder = makeOrder({
   ],
 });
 
+function buildBakedApi(overrides: Partial<IBakedApi> = {}): IBakedApi {
+  return {
+    getItems: vi.fn().mockResolvedValue([]),
+    getDoughTypes: vi.fn().mockResolvedValue([]),
+    getLineEntries: vi.fn().mockResolvedValue([]),
+    addBatch: vi.fn(),
+    ...overrides,
+  } as unknown as IBakedApi;
+}
+
 function buildMockApi(overrides: Partial<IBakingApi> = {}): IBakingApi {
   return {
     getBakingOrders: vi.fn().mockResolvedValue([]),
-    getBakedProductsStock: vi.fn().mockResolvedValue([]),
     updateOrderStatus: vi.fn(),
     completeItem: vi.fn().mockResolvedValue(undefined),
     ...overrides,
@@ -131,7 +141,7 @@ describe('Baking', () => {
     });
     const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockReturnValue(pending) });
 
-    const { container } = renderWithProviders(<Baking bakingApi={mockApi} />);
+    const { container } = renderWithProviders(<Baking bakingApi={mockApi} bakedApi={buildBakedApi()} />);
 
     expect(container.querySelector('.animate-spin')).toBeInTheDocument();
 
@@ -141,14 +151,14 @@ describe('Baking', () => {
 
   it('shows an empty state when there are no work items to bake', async () => {
     const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([]) });
-    renderWithProviders(<Baking bakingApi={mockApi} />);
+    renderWithProviders(<Baking bakingApi={mockApi} bakedApi={buildBakedApi()} />);
 
     expect(await screen.findByText('No hay productos pendientes de hornear')).toBeInTheDocument();
   });
 
   it('renders one card per work item (cake, combo product, extra, catalog item) and computes stats', async () => {
     const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([fullOrder]) });
-    renderWithProviders(<Baking bakingApi={mockApi} />);
+    renderWithProviders(<Baking bakingApi={mockApi} bakedApi={buildBakedApi()} />);
 
     // Four cards, each showing the order number / customer once per card.
     const orderNumberBadges = await screen.findAllByText('#ORD-100');
@@ -182,7 +192,7 @@ describe('Baking', () => {
       }],
     });
     const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([order]) });
-    renderWithProviders(<Baking bakingApi={mockApi} />);
+    renderWithProviders(<Baking bakingApi={mockApi} bakedApi={buildBakedApi()} />);
 
     await screen.findByText('#ORD-100');
 
@@ -210,7 +220,7 @@ describe('Baking', () => {
       }],
     });
     const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([order]) });
-    renderWithProviders(<Baking bakingApi={mockApi} />);
+    renderWithProviders(<Baking bakingApi={mockApi} bakedApi={buildBakedApi()} />);
 
     await screen.findByText('#ORD-100');
 
@@ -223,7 +233,7 @@ describe('Baking', () => {
       items: [{ id: 'item-1', productId: 'p3', product: {} as any, productName: 'Pan integral', quantity: 3, price: 15, status: 'baking' }],
     });
     const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([order]) });
-    renderWithProviders(<Baking bakingApi={mockApi} />);
+    renderWithProviders(<Baking bakingApi={mockApi} bakedApi={buildBakedApi()} />);
 
     await screen.findByText('#ORD-100');
 
@@ -253,7 +263,7 @@ describe('Baking', () => {
 
     it('shows a one-line design preview on the card', async () => {
       const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([detailedOrder]) });
-      renderWithProviders(<Baking bakingApi={mockApi} />);
+      renderWithProviders(<Baking bakingApi={mockApi} bakedApi={buildBakedApi()} />);
 
       expect(await screen.findByText(/🎨 Tema safari con jirafa/)).toBeInTheDocument();
     });
@@ -261,7 +271,7 @@ describe('Baking', () => {
     it('opens the details dialog when the card is tapped: design, dedication, images and order notes', async () => {
       const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([detailedOrder]) });
       const user = userEvent.setup();
-      renderWithProviders(<Baking bakingApi={mockApi} />);
+      renderWithProviders(<Baking bakingApi={mockApi} bakedApi={buildBakedApi()} />);
 
       await user.click(await screen.findByText('#ORD-100'));
 
@@ -281,7 +291,7 @@ describe('Baking', () => {
       });
       const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([order]) });
       const user = userEvent.setup();
-      renderWithProviders(<Baking bakingApi={mockApi} />);
+      renderWithProviders(<Baking bakingApi={mockApi} bakedApi={buildBakedApi()} />);
 
       await user.click(await screen.findByText('#ORD-100'));
 
@@ -299,7 +309,7 @@ describe('Baking', () => {
       });
       const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([order]) });
       const user = userEvent.setup();
-      renderWithProviders(<Baking bakingApi={mockApi} />);
+      renderWithProviders(<Baking bakingApi={mockApi} bakedApi={buildBakedApi()} />);
 
       expect(await screen.findByText(/🎨 Papel comestible con foto de Leo/)).toBeInTheDocument();
 
@@ -320,7 +330,7 @@ describe('Baking', () => {
       });
       const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([order]) });
       const user = userEvent.setup();
-      renderWithProviders(<Baking bakingApi={mockApi} />);
+      renderWithProviders(<Baking bakingApi={mockApi} bakedApi={buildBakedApi()} />);
 
       expect(await screen.findByText(/🖼 2 imágenes de referencia/)).toBeInTheDocument();
 
@@ -336,7 +346,7 @@ describe('Baking', () => {
         items: [{ id: 'item-p', productId: 'p3', product: {} as any, productName: 'Pan integral', quantity: 3, price: 15, status: 'baking' }],
       });
       const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([order]) });
-      renderWithProviders(<Baking bakingApi={mockApi} />);
+      renderWithProviders(<Baking bakingApi={mockApi} bakedApi={buildBakedApi()} />);
 
       await screen.findByText('#ORD-100');
       expect(screen.queryByText(/🎨/)).not.toBeInTheDocument();
@@ -345,7 +355,7 @@ describe('Baking', () => {
     it('tapping "Completar" opens the complete dialog, not the details one', async () => {
       const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([detailedOrder]) });
       const user = userEvent.setup();
-      renderWithProviders(<Baking bakingApi={mockApi} />);
+      renderWithProviders(<Baking bakingApi={mockApi} bakedApi={buildBakedApi()} />);
 
       await screen.findByText('#ORD-100');
       await user.click(screen.getByRole('button', { name: /Completar/i }));
@@ -378,7 +388,7 @@ describe('Baking', () => {
       ],
     });
     const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([urgentOrder]) });
-    renderWithProviders(<Baking bakingApi={mockApi} />);
+    renderWithProviders(<Baking bakingApi={mockApi} bakedApi={buildBakedApi()} />);
 
     await screen.findByText('#ORD-102');
     expect(screen.getByText('Urgentes (<12h)').previousSibling?.textContent).toBe('1');
@@ -387,7 +397,7 @@ describe('Baking', () => {
   it('opens the complete dialog and completes the item, showing a success toast', async () => {
     const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([singleCakeOrder]) });
     const user = userEvent.setup();
-    renderWithProviders(<Baking bakingApi={mockApi} />);
+    renderWithProviders(<Baking bakingApi={mockApi} bakedApi={buildBakedApi()} />);
 
     await screen.findByText('#ORD-101');
     await user.click(screen.getByRole('button', { name: 'Completar' }));
@@ -398,15 +408,50 @@ describe('Baking', () => {
 
     await user.click(screen.getByRole('button', { name: /Confirmar Horneado/i }));
 
-    await waitFor(() => expect(mockApi.completeItem).toHaveBeenCalledWith('order-2', 'custom_cake', 'cake-2'));
+    await waitFor(() => expect(mockApi.completeItem).toHaveBeenCalledWith('order-2', 'custom_cake', 'cake-2', undefined));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Horneado completado, enviado a armado'));
     expect(screen.queryByText('Completar Horneado')).not.toBeInTheDocument();
+  });
+
+  it('proposes the dough that enters the inventory and sends the quantities the baker confirmed', async () => {
+    const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([singleCakeOrder]) });
+    const bakedApi = buildBakedApi({
+      getLineEntries: vi.fn().mockResolvedValue([
+        { label: 'Masa de torta · Chocolate · 15 porciones', quantity: 2 },
+        { label: 'Masa de torta · Vainilla · 15 porciones', quantity: 1 },
+      ]),
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<Baking bakingApi={mockApi} bakedApi={bakedApi} />);
+
+    await screen.findByText('#ORD-101');
+    await user.click(screen.getByRole('button', { name: 'Completar' }));
+
+    const chocolate = await screen.findByLabelText('Cantidad de Masa de torta · Chocolate · 15 porciones');
+    expect(chocolate).toHaveValue(2);
+    expect(screen.getByLabelText('Cantidad de Masa de torta · Vainilla · 15 porciones')).toHaveValue(1);
+
+    await user.clear(chocolate);
+    await user.type(chocolate, '3');
+    await user.click(screen.getByRole('button', { name: /Confirmar Horneado/i }));
+
+    await waitFor(() => expect(mockApi.completeItem).toHaveBeenCalledWith('order-2', 'custom_cake', 'cake-2', [3, 1]));
+  });
+
+  it('registers a free batch of baked dough from the stock card', async () => {
+    const mockApi = buildMockApi();
+    const user = userEvent.setup();
+    renderWithProviders(<Baking bakingApi={mockApi} bakedApi={buildBakedApi()} />);
+
+    await user.click(await screen.findByRole('button', { name: /Registrar masas/i }));
+
+    expect(await screen.findByText('Registrar masas horneadas')).toBeInTheDocument();
   });
 
   it('closes the dialog without completing when Cancelar is clicked', async () => {
     const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockResolvedValue([singleCakeOrder]) });
     const user = userEvent.setup();
-    renderWithProviders(<Baking bakingApi={mockApi} />);
+    renderWithProviders(<Baking bakingApi={mockApi} bakedApi={buildBakedApi()} />);
 
     await screen.findByText('#ORD-101');
     await user.click(screen.getByRole('button', { name: 'Completar' }));
@@ -424,7 +469,7 @@ describe('Baking', () => {
       completeItem: vi.fn().mockRejectedValue(new Error('boom')),
     });
     const user = userEvent.setup();
-    renderWithProviders(<Baking bakingApi={mockApi} />);
+    renderWithProviders(<Baking bakingApi={mockApi} bakedApi={buildBakedApi()} />);
 
     await screen.findByText('#ORD-101');
     await user.click(screen.getByRole('button', { name: 'Completar' }));
@@ -435,7 +480,7 @@ describe('Baking', () => {
 
   it('shows an error toast when loading the initial orders fails', async () => {
     const mockApi = buildMockApi({ getBakingOrders: vi.fn().mockRejectedValue(new Error('network down')) });
-    renderWithProviders(<Baking bakingApi={mockApi} />);
+    renderWithProviders(<Baking bakingApi={mockApi} bakedApi={buildBakedApi()} />);
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Error al cargar los datos'));
     expect(await screen.findByText('No hay productos pendientes de hornear')).toBeInTheDocument();

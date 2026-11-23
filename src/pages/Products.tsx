@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { MobileCard, MobileCardHeader, MobileCardRow, useIsMobile } from '@/components/ui/responsive-table';
-import { Plus, Search, Edit2, Trash2, Cake, Package, Filter, X, PlusCircle, Loader2, Gift, RefreshCw, FlaskConical } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Cake, Package, Filter, X, PlusCircle, Loader2, Gift, RefreshCw, FlaskConical, Wheat } from 'lucide-react';
 import { toast } from 'sonner';
 import { Flavor, Product, CreateProductData, EditProductData, AddStockData, CreateFlavorData, EditFlavorData, SweetTableCombo, CreateSweetTableComboData, EditSweetTableComboData, ComboProduct } from '@/types';
 import { categories } from '@/types/consts';
@@ -22,6 +22,8 @@ import { IProductsApi, defaultProductsApi } from '@/api/ProductsApi';
 import { IMaterialsApi, defaultMaterialsApi } from '@/api/MaterialsApi';
 import { IInventoryApi, defaultInventoryApi } from '@/api/InventoryApi';
 import RecipeDialog from '@/components/Dialogs/RecipeDialog';
+import { BakedLinkDialog } from '@/components/Dialogs/BakedLinkDialog';
+import { IBakedApi, defaultBakedApi } from '@/api/BakedApi';
 import ProductImageField, { ProductImageChange } from '@/components/Images/ProductImageField';
 import { IUploadsApi, defaultUploadsApi } from '@/api/UploadsApi';
 import { prepareImage } from '@/utils/image';
@@ -32,9 +34,10 @@ interface ProductsProps {
   materialsApi?: IMaterialsApi;
   inventoryApi?: IInventoryApi;
   uploadsApi?: IUploadsApi;
+  bakedApi?: IBakedApi;
 }
 
-export default function Products({ api = defaultProductsApi, materialsApi = defaultMaterialsApi, inventoryApi = defaultInventoryApi, uploadsApi = defaultUploadsApi }: ProductsProps) {
+export default function Products({ api = defaultProductsApi, materialsApi = defaultMaterialsApi, inventoryApi = defaultInventoryApi, uploadsApi = defaultUploadsApi, bakedApi = defaultBakedApi }: ProductsProps) {
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState('products');
   const [searchTerm, setSearchTerm] = useState('');
@@ -50,6 +53,9 @@ export default function Products({ api = defaultProductsApi, materialsApi = defa
   // Recetas de materia prima: de un producto (por unidad) o de la torta personalizada
   const [recipeTarget, setRecipeTarget] = useState<Product | 'cake' | null>(null);
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
+
+  // Masa del inventario horneado que genera/consume cada producto
+  const [bakedLinkProduct, setBakedLinkProduct] = useState<Product | null>(null);
 
   const openRecipe = async (target: Product | 'cake') => {
     setRecipeTarget(target);
@@ -641,6 +647,15 @@ export default function Products({ api = defaultProductsApi, materialsApi = defa
           </Dialog>
         </div>
 
+        <BakedLinkDialog
+          product={bakedLinkProduct}
+          bakedApi={bakedApi}
+          onClose={() => setBakedLinkProduct(null)}
+          onSaved={(productId, bakedProductId) =>
+            setProducts(prev => prev.map(p => (p.id === productId ? { ...p, bakedProductId } : p)))
+          }
+        />
+
         {/* Receta de materia prima */}
         {recipeTarget === 'cake' ? (
           <RecipeDialog
@@ -855,6 +870,15 @@ export default function Products({ api = defaultProductsApi, materialsApi = defa
                               >
                                 <FlaskConical className="h-4 w-4" />
                               </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className={`h-8 w-8 ${product.bakedProductId ? 'text-primary' : ''}`}
+                                onClick={() => setBakedLinkProduct(product)}
+                                title="Masa horneada"
+                              >
+                                <Wheat className="h-4 w-4" />
+                              </Button>
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
@@ -950,6 +974,15 @@ export default function Products({ api = defaultProductsApi, materialsApi = defa
                                   title="Receta"
                                 >
                                   <FlaskConical className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className={`h-8 w-8 ${product.bakedProductId ? 'text-primary' : ''}`}
+                                  onClick={() => setBakedLinkProduct(product)}
+                                  title="Masa horneada"
+                                >
+                                  <Wheat className="h-4 w-4" />
                                 </Button>
                                 <Button 
                                   variant="ghost" 

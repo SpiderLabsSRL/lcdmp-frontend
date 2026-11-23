@@ -1,7 +1,7 @@
 import api from '@/api/api';
 import type { 
   RawMaterial, 
-  BakedProduct,
+  BakedItem,
   Category 
 } from '@/types';
 import { inventoryCategories } from '@/types/consts';
@@ -14,13 +14,6 @@ export interface IInventoryApi {
   deleteRawMaterial(id: string): Promise<void>;
   adjustRawMaterialStock(id: string, quantity: number): Promise<RawMaterial>;
   
-  getBakedProducts(filters?: BakedProductFilters): Promise<BakedProduct[]>;
-  getBakedProductById(id: string): Promise<BakedProduct>;
-  createBakedProduct(data: CreateBakedProductData): Promise<BakedProduct>;
-  updateBakedProduct(id: string, data: Partial<BakedProduct>): Promise<BakedProduct>;
-  deleteBakedProduct(id: string): Promise<void>;
-  adjustBakedProductStock(id: string, quantity: number): Promise<BakedProduct>;
-  
   getCategories(): Promise<Category[]>;
   
   getLowStockItems(): Promise<LowStockSummary>;
@@ -28,12 +21,6 @@ export interface IInventoryApi {
 
 export interface RawMaterialFilters {
   category?: string;
-  searchTerm?: string;
-  lowStockOnly?: boolean;
-}
-
-export interface BakedProductFilters {
-  type?: string;
   searchTerm?: string;
   lowStockOnly?: boolean;
 }
@@ -46,23 +33,14 @@ export interface CreateRawMaterialData {
   category: string;
 }
 
-export interface CreateBakedProductData {
-  name: string;
-  type: 'cake_base' | 'cupcake' | 'cookie' | 'bread' | 'pastry';
-  quantity: number;
-  minStock: number;
-  expiresAt?: Date;
-}
-
 export interface LowStockSummary {
   rawMaterials: RawMaterial[];
-  bakedProducts: BakedProduct[];
+  bakedProducts: BakedItem[];
   totalLowStock: number;
 }
 
 export class MockInventoryApi implements IInventoryApi {
   private rawMaterials: RawMaterial[] = [];
-  private bakedProducts: BakedProduct[] = [];
   private categories: Category[] = [];
 
   constructor() {
@@ -116,34 +94,6 @@ export class MockInventoryApi implements IInventoryApi {
         minStock: 3,
         category: 'flavoring',
         lastUpdated: new Date()
-      }
-    ];
-
-    // Datos de ejemplo para productos horneados
-    this.bakedProducts = [
-      {
-        id: '1',
-        name: 'Bizcocho de Vainilla',
-        type: 'cake_base',
-        quantity: 8,
-        minStock: 3,
-        createdAt: new Date()
-      },
-      {
-        id: '2',
-        name: 'Cupcakes de Chocolate',
-        type: 'cupcake',
-        quantity: 15,
-        minStock: 6,
-        createdAt: new Date()
-      },
-      {
-        id: '3',
-        name: 'Galletas de Mantequilla',
-        type: 'cookie',
-        quantity: 12,
-        minStock: 5,
-        createdAt: new Date()
       }
     ];
 
@@ -262,103 +212,6 @@ export class MockInventoryApi implements IInventoryApi {
   }
 
   // ============================================
-  // MÉTODOS PARA PRODUCTOS HORNEADOS
-  // ============================================
-
-  async getBakedProducts(filters?: BakedProductFilters): Promise<BakedProduct[]> {
-    await this.delay(300);
-    
-    let filtered = [...this.bakedProducts];
-    
-    if (filters) {
-      if (filters.type) {
-        filtered = filtered.filter(p => p.type === filters.type);
-      }
-      
-      if (filters.searchTerm) {
-        const term = filters.searchTerm.toLowerCase();
-        filtered = filtered.filter(p => 
-          p.name.toLowerCase().includes(term)
-        );
-      }
-      
-      if (filters.lowStockOnly) {
-        filtered = filtered.filter(p => p.quantity <= p.minStock);
-      }
-    }
-    
-    return filtered;
-  }
-
-  async getBakedProductById(id: string): Promise<BakedProduct> {
-    await this.delay(200);
-    
-    const product = this.bakedProducts.find(p => p.id === id);
-    if (!product) {
-      throw new Error('Producto horneado no encontrado');
-    }
-    
-    return product;
-  }
-
-  async createBakedProduct(data: CreateBakedProductData): Promise<BakedProduct> {
-    await this.delay(300);
-    
-    const newProduct: BakedProduct = {
-      id: String(Date.now()),
-      name: data.name,
-      type: data.type,
-      quantity: data.quantity || 0,
-      minStock: data.minStock || 0,
-      expiresAt: data.expiresAt,
-      createdAt: new Date()
-    };
-    
-    this.bakedProducts.push(newProduct);
-    console.log('Mock baked product created:', newProduct);
-    return newProduct;
-  }
-
-  async updateBakedProduct(id: string, data: Partial<BakedProduct>): Promise<BakedProduct> {
-    await this.delay(300);
-    
-    const index = this.bakedProducts.findIndex(p => p.id === id);
-    if (index === -1) {
-      throw new Error('Producto horneado no encontrado');
-    }
-    
-    this.bakedProducts[index] = {
-      ...this.bakedProducts[index],
-      ...data,
-      createdAt: this.bakedProducts[index].createdAt // Mantener fecha original
-    };
-    
-    console.log('Mock baked product updated:', this.bakedProducts[index]);
-    return this.bakedProducts[index];
-  }
-
-  async deleteBakedProduct(id: string): Promise<void> {
-    await this.delay(300);
-    
-    const index = this.bakedProducts.findIndex(p => p.id === id);
-    if (index === -1) {
-      throw new Error('Producto horneado no encontrado');
-    }
-    
-    this.bakedProducts.splice(index, 1);
-    console.log('Mock baked product deleted:', id);
-  }
-
-  async adjustBakedProductStock(id: string, quantity: number): Promise<BakedProduct> {
-    await this.delay(300);
-    
-    const product = await this.getBakedProductById(id);
-    const newQuantity = Math.max(0, product.quantity + quantity);
-    
-    return this.updateBakedProduct(id, { quantity: newQuantity });
-  }
-
-  // ============================================
   // MÉTODOS DE UTILIDAD
   // ============================================
 
@@ -371,12 +224,11 @@ export class MockInventoryApi implements IInventoryApi {
     await this.delay(300);
     
     const lowStockRaw = this.rawMaterials.filter(m => m.quantity <= m.minStock);
-    const lowStockBaked = this.bakedProducts.filter(p => p.quantity <= p.minStock);
-    
+
     return {
       rawMaterials: lowStockRaw,
-      bakedProducts: lowStockBaked,
-      totalLowStock: lowStockRaw.length + lowStockBaked.length
+      bakedProducts: [],
+      totalLowStock: lowStockRaw.length
     };
   }
 }
@@ -485,112 +337,6 @@ export class InventoryApi implements IInventoryApi {
   }
 
   // ============================================
-  // PRODUCTOS HORNEADOS
-  // ============================================
-
-  async getBakedProducts(filters?: BakedProductFilters): Promise<BakedProduct[]> {
-    try {
-      const params: any = {};
-      
-      if (filters) {
-        if (filters.type) {
-          params.type = filters.type;
-        }
-        if (filters.searchTerm) {
-          params.search = filters.searchTerm;
-        }
-        if (filters.lowStockOnly) {
-          params.lowStock = true;
-        }
-      }
-      
-      const response = await api.get('/inventory/baked-products', { params });
-      
-      if (!response.data.success) {
-        throw new Error(response.data.message || 'Error al obtener productos horneados');
-      }
-      
-      return response.data.data as BakedProduct[];
-    } catch (error: any) {
-      console.error('Error en getBakedProducts:', error);
-      throw new Error(error.response?.data?.message || error.message || 'Error de conexión');
-    }
-  }
-
-  async getBakedProductById(id: string): Promise<BakedProduct> {
-    try {
-      const response = await api.get(`/inventory/baked-products/${id}`);
-      
-      if (!response.data.success) {
-        throw new Error(response.data.message || 'Error al obtener producto horneado');
-      }
-      
-      return response.data.data as BakedProduct;
-    } catch (error: any) {
-      console.error('Error en getBakedProductById:', error);
-      throw new Error(error.response?.data?.message || error.message || 'Error de conexión');
-    }
-  }
-
-  async createBakedProduct(data: CreateBakedProductData): Promise<BakedProduct> {
-    try {
-      const response = await api.post('/inventory/baked-products', data);
-      
-      if (!response.data.success) {
-        throw new Error(response.data.message || 'Error al crear producto horneado');
-      }
-      
-      return response.data.data as BakedProduct;
-    } catch (error: any) {
-      console.error('Error en createBakedProduct:', error);
-      throw new Error(error.response?.data?.message || error.message || 'Error al crear producto horneado');
-    }
-  }
-
-  async updateBakedProduct(id: string, data: Partial<BakedProduct>): Promise<BakedProduct> {
-    try {
-      const response = await api.put(`/inventory/baked-products/${id}`, data);
-      
-      if (!response.data.success) {
-        throw new Error(response.data.message || 'Error al actualizar producto horneado');
-      }
-      
-      return response.data.data as BakedProduct;
-    } catch (error: any) {
-      console.error('Error en updateBakedProduct:', error);
-      throw new Error(error.response?.data?.message || error.message || 'Error al actualizar producto horneado');
-    }
-  }
-
-  async deleteBakedProduct(id: string): Promise<void> {
-    try {
-      const response = await api.delete(`/inventory/baked-products/${id}`);
-      
-      if (!response.data.success) {
-        throw new Error(response.data.message || 'Error al eliminar producto horneado');
-      }
-    } catch (error: any) {
-      console.error('Error en deleteBakedProduct:', error);
-      throw new Error(error.response?.data?.message || error.message || 'Error al eliminar producto horneado');
-    }
-  }
-
-  async adjustBakedProductStock(id: string, quantity: number): Promise<BakedProduct> {
-    try {
-      const response = await api.patch(`/inventory/baked-products/${id}/stock`, { quantity });
-      
-      if (!response.data.success) {
-        throw new Error(response.data.message || 'Error al ajustar stock');
-      }
-      
-      return response.data.data as BakedProduct;
-    } catch (error: any) {
-      console.error('Error en adjustBakedProductStock:', error);
-      throw new Error(error.response?.data?.message || error.message || 'Error al ajustar stock');
-    }
-  }
-
-  // ============================================
   // MÉTODOS DE UTILIDAD
   // ============================================
 
@@ -600,16 +346,14 @@ export class InventoryApi implements IInventoryApi {
 
   async getLowStockItems(): Promise<LowStockSummary> {
     try {
-      const [rawMaterials, bakedProducts] = await Promise.all([
-        this.getRawMaterials({ lowStockOnly: true }),
-        this.getBakedProducts({ lowStockOnly: true })
-      ]);
-      
-      return {
-        rawMaterials,
-        bakedProducts,
-        totalLowStock: rawMaterials.length + bakedProducts.length
-      };
+      // El backend agrupa en un solo llamado las materias primas y las masas con stock bajo
+      const response = await api.get('/inventory/low-stock');
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Error al obtener el stock bajo');
+      }
+
+      return response.data.data as LowStockSummary;
     } catch (error: any) {
       console.error('Error en getLowStockItems:', error);
       throw new Error(error.response?.data?.message || error.message || 'Error de conexión');

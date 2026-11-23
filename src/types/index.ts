@@ -80,19 +80,83 @@ export interface RawMaterial {
   lastUpdated: Date;
 }
 
-export interface BakedProduct {
+// Inventario de masas horneadas. Un ítem = tipo de masa + sabor + porciones (+ forma).
+export interface DoughType {
   id: string;
   name: string;
-  type: 'cake_base' | 'cupcake' | 'cookie' | 'bread' | 'pastry';
+  usesPortions: boolean;
+  usesShape: boolean;
+  // La masa de las tortas personalizadas (solo hay una)
+  isCake: boolean;
+  isActive: boolean;
+  // false: masa que no se distingue por sabor (pie...): sus ítems no llevan sabor
+  usesFlavor: boolean;
+  // Masa que se hornea en láminas / masas grandes y se corta en porciones (mil hojas, tres leches...)
+  isCuttable: boolean;
+  // Unidad entera de una masa que se corta ("lámina", "masa grande")
+  unitName: string | null;
+  // Porciones que suele rendir una pieza cortada (sugerencia al cortar)
+  defaultPortions: number | null;
+}
+
+export interface BakedItem {
+  id: string;
+  doughTypeId: string;
+  doughTypeName: string;
+  // Nombre legible: tipo · sabor · porciones · forma
+  name: string;
+  flavor: string;
+  // En un tipo que se corta, sin porciones = la unidad entera (lámina / masa grande)
+  portions: number | null;
+  shape: string | null;
   quantity: number;
   minStock: number;
-  expiresAt?: Date;
-  createdAt: Date;
+  createdAt: string;
+  isCuttable?: boolean;
+  unitName?: string | null;
+  defaultPortions?: number | null;
 }
+
+// Resultado de cortar unidades enteras en piezas
+export interface CutResult {
+  whole: BakedItem;
+  pieces: BakedItem;
+  // Unidades enteras que faltaban (el stock no baja de 0)
+  shortage: number;
+}
+
+export type WasteReason = 'expired' | 'burned' | 'accident' | 'other';
+
+export interface BakedMovement {
+  id: string;
+  bakedProductId: string;
+  itemName: string;
+  direction: 'in' | 'out';
+  quantity: number;
+  reason: 'batch' | 'order_baking' | 'order_assembly' | 'waste' | 'adjustment' | 'cut';
+  wasteReason: WasteReason | null;
+  // Unidades que faltaban en una salida (el stock no baja de 0)
+  shortage: number;
+  orderNumber: string | null;
+  notes: string | null;
+  createdAt: string;
+  createdByName: string | null;
+}
+
+// Masa que Hornos propone registrar al completar una línea de pedido
+export interface LineEntry {
+  label: string;
+  quantity: number;
+}
+
+// Resultado de avanzar una línea de etapa: el pedido y avisos (p.ej. faltaba masa en el inventario)
+export type StageResult = Order & { warnings?: string[] };
 
 // Product Types
 export interface Product {
   id: string;
+  // Masa del inventario horneado que genera su horneado y consume su armado
+  bakedProductId?: string | null;
   name: string;
   description: string;
   basePrice: number;

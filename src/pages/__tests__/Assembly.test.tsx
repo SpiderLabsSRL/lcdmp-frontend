@@ -13,6 +13,7 @@ vi.mock('sonner', () => ({
     success: vi.fn(),
     error: vi.fn(),
     info: vi.fn(),
+    warning: vi.fn(),
   },
 }));
 
@@ -289,6 +290,22 @@ describe('Assembly', () => {
 
     expect(screen.queryByText('Completar Armado')).not.toBeInTheDocument();
     expect(mockApi.completeItem).not.toHaveBeenCalled();
+  });
+
+  it('warns when the baked dough was missing from the inventory, but still completes', async () => {
+    const mockApi = buildMockApi({
+      getAssemblyOrders: vi.fn().mockResolvedValue([singleCakeOrder]),
+      completeItem: vi.fn().mockResolvedValue({ warnings: ['Faltaba masa en el inventario: Masa X (faltaron 1)'] }),
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<Assembly assemblyApi={mockApi} />);
+
+    await screen.findByText('#ORD-002');
+    await user.click(screen.getByRole('button', { name: /Completar/i }));
+    await user.click(await screen.findByRole('button', { name: /Enviar a Decoración/i }));
+
+    await waitFor(() => expect(toast.warning).toHaveBeenCalledWith('Faltaba masa en el inventario: Masa X (faltaron 1)'));
+    expect(toast.success).toHaveBeenCalledWith('Armado completado, enviado a decoración');
   });
 
   it('shows an error toast when completing the item fails', async () => {

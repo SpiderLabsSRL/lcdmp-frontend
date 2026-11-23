@@ -68,9 +68,11 @@ export default function Assembly({ assemblyApi = defaultAssemblyApi }: AssemblyP
     if (!selectedItem) return;
 
     try {
-      await assemblyApi.completeItem(selectedItem.order.id, selectedItem.itemType, selectedItem.itemId);
+      const result = await assemblyApi.completeItem(selectedItem.order.id, selectedItem.itemType, selectedItem.itemId);
       // El socket actualizará la lista automáticamente via order:item_stage_changed
       toast.success('Armado completado, enviado a decoración');
+      // Faltaba masa en el inventario horneado: el armado avanzó igual, pero se avisa
+      result?.warnings?.forEach(warning => toast.warning(warning));
       setIsCompleteDialogOpen(false);
       setSelectedItem(null);
     } catch (error) {

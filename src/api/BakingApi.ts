@@ -1,22 +1,20 @@
 import api from '@/api/api';
-import { mockOrders, mockBakedProducts } from '@/data/mockData';
+import { mockOrders } from '@/data/mockData';
 import { getWorkItemsAtStage } from '@/utils/workItems';
-import type { Order, OrderStatus, CustomCake, BakedProduct, WorkItemType } from '@/types';
+import type { Order, OrderStatus, CustomCake, WorkItemType } from '@/types';
 
 export interface IBakingApi {
   getBakingOrders(signal?: AbortSignal): Promise<Order[]>;
-  getBakedProductsStock(): Promise<BakedProduct[]>;
   updateOrderStatus(id: string, status: OrderStatus): Promise<Order>;
-  completeItem(orderId: string, itemType: WorkItemType, itemId: string): Promise<Order>;
+  // bakedQuantities: unidades de masa que el hornero confirmó (una por ítem que propone el backend)
+  completeItem(orderId: string, itemType: WorkItemType, itemId: string, bakedQuantities?: number[]): Promise<Order>;
 }
 
 export class MockBakingApi implements IBakingApi {
   private orders: Order[] = [];
-  private bakedProducts: BakedProduct[] = [];
 
   constructor() {
     this.orders = [...mockOrders];
-    this.bakedProducts = [...mockBakedProducts];
   }
 
   async getBakingOrders(signal?: AbortSignal): Promise<Order[]> {
@@ -33,11 +31,6 @@ export class MockBakingApi implements IBakingApi {
       });
   }
 
-  async getBakedProductsStock(): Promise<BakedProduct[]> {
-    await this.simulateNetworkDelay();
-    return this.bakedProducts.filter(p => p.type === 'cake_base');
-  }
-
   async updateOrderStatus(id: string, status: OrderStatus): Promise<Order> {
     await this.simulateNetworkDelay();
     
@@ -52,7 +45,7 @@ export class MockBakingApi implements IBakingApi {
     return this.orders[index];
   }
 
-  async completeItem(orderId: string, itemType: WorkItemType, itemId: string): Promise<Order> {
+  async completeItem(orderId: string, itemType: WorkItemType, itemId: string, bakedQuantities?: number[]): Promise<Order> {
     await this.simulateNetworkDelay();
 
     const index = this.orders.findIndex(o => o.id === orderId);
@@ -115,25 +108,6 @@ export class BakingApi implements IBakingApi {
     }
   }
 
-  async getBakedProductsStock(): Promise<BakedProduct[]> {
-    try {
-      const response = await api.get('/inventory/baked-products');
-      
-      if (!response.data.success) {
-        throw new Error(response.data.message || 'Error al obtener stock de productos horneados');
-      }
-      
-      return response.data.data.map((product: any) => ({
-        ...product,
-        expiresAt: product.expiresAt ? new Date(product.expiresAt) : undefined,
-        createdAt: new Date(product.createdAt)
-      }));
-    } catch (error: any) {
-      console.error('Error en getBakedProductsStock:', error);
-      throw new Error(error.response?.data?.message || error.message || 'Error de conexión');
-    }
-  }
-
   async updateOrderStatus(id: string, status: OrderStatus): Promise<Order> {
     try {
       const response = await api.patch(`/orders/${id}/status`, { status });
@@ -153,9 +127,9 @@ export class BakingApi implements IBakingApi {
     }
   }
 
-  async completeItem(orderId: string, itemType: WorkItemType, itemId: string): Promise<Order> {
+  async completeItem(orderId: string, itemType: WorkItemType, itemId: string, bakedQuantities?: number[]): Promise<Order> {
     try {
-      const response = await api.patch(`/orders/${orderId}/items/${itemType}/${itemId}/advance`, { toStage: 'assembling' });
+      const response = await api.patch(`/orders/${orderId}/items/${itemType}/${itemId}/advance`, { toStage: 'assembling', bakedQuantities });
 
       if (!response.data.success) {
         throw new Error(response.data.message || 'Error al actualizar la etapa');
