@@ -572,13 +572,22 @@ describe('Products - Productos tab', () => {
 });
 
 describe('Products - recetas de materia prima', () => {
+  const emptyStage = { source: 'materials', materials: [], doughs: [] };
   const materialsApi = {
-    getProductRecipe: vi.fn().mockResolvedValue({ baking: [], assembling: [], decorating: [] }),
+    getProductRecipe: vi.fn().mockResolvedValue({ baking: emptyStage, assembling: emptyStage, decorating: emptyStage }),
     saveProductRecipe: vi.fn().mockResolvedValue({}),
-    getCakeRecipe: vi.fn().mockResolvedValue({ baking: [], assembling: [] }),
+    getCakeRecipe: vi.fn().mockResolvedValue({ assembling: [] }),
     saveCakeRecipe: vi.fn().mockResolvedValue({}),
+    getDoughRecipes: vi.fn().mockResolvedValue([]),
+    saveDoughRecipe: vi.fn().mockResolvedValue([]),
   } as any;
   const inventoryApi = { getRawMaterials: vi.fn().mockResolvedValue([]) } as any;
+  const bakedApi = {
+    getItems: vi.fn().mockResolvedValue([]),
+    getDoughTypes: vi.fn().mockResolvedValue([
+      { id: 'dt-cake', name: 'Masa de torta', usesPortions: true, usesShape: true, usesFlavor: true, isCake: true, isActive: true, isCuttable: false, unitName: null, defaultPortions: null },
+    ]),
+  } as any;
 
   beforeEach(() => vi.clearAllMocks());
 
@@ -598,15 +607,34 @@ describe('Products - recetas de materia prima', () => {
     expect(screen.getByText('Decoración')).toBeInTheDocument();
   });
 
-  it('opens the cake recipe dialog with only baking and assembling', async () => {
+  it('opens the cake recipe dialog: dough recipes for baking, the cake recipe for assembling', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<Products api={buildMockApi()} materialsApi={materialsApi} inventoryApi={inventoryApi} />);
+    renderWithProviders(
+      <Products api={buildMockApi()} materialsApi={materialsApi} inventoryApi={inventoryApi} bakedApi={bakedApi} />
+    );
 
     await user.click(await screen.findByRole('button', { name: /Receta de tortas/ }));
 
-    expect(await screen.findByText('Receta de tortas personalizadas')).toBeInTheDocument();
+    expect(await screen.findByText('Horneado — recetas de masas')).toBeInTheDocument();
+    expect(screen.getByText('Masa de torta')).toBeInTheDocument();
+    expect(screen.getByText('Armado')).toBeInTheDocument();
+    expect(materialsApi.getDoughRecipes).toHaveBeenCalled();
     expect(materialsApi.getCakeRecipe).toHaveBeenCalled();
     expect(screen.queryByText('Decoración')).not.toBeInTheDocument();
+  });
+
+  it('opens the dough recipe of a cake flavor from the Sabores tab', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <Products api={buildMockApi()} materialsApi={materialsApi} inventoryApi={inventoryApi} bakedApi={bakedApi} />
+    );
+
+    await waitFor(() => expect(screen.getByText('Torta de chocolate')).toBeInTheDocument());
+    await user.click(screen.getByRole('tab', { name: 'Sabores' }));
+    await user.click(screen.getByRole('button', { name: 'Receta de la masa de Chocolate' }));
+
+    expect(await screen.findByText('Receta de masa - Chocolate')).toBeInTheDocument();
+    expect(materialsApi.getDoughRecipes).toHaveBeenCalled();
   });
 });
 
@@ -652,7 +680,8 @@ describe('Products - Sabores tab', () => {
     await user.click(screen.getByRole('tab', { name: 'Sabores' }));
 
     const flavorRow = screen.getByText('Chocolate').closest('div')!;
-    const editBtn = within(flavorRow).getAllByRole('button')[0];
+    // los botones de la fila son: receta de la masa, editar, eliminar
+    const editBtn = within(flavorRow).getAllByRole('button')[1];
     await user.click(editBtn);
 
     expect(screen.getByRole('heading', { name: 'Editar Sabor' })).toBeInTheDocument();
@@ -687,7 +716,7 @@ describe('Products - Sabores tab', () => {
     await user.click(screen.getByRole('tab', { name: 'Sabores' }));
 
     const flavorRow = screen.getByText('Chocolate').closest('div')!;
-    const deleteBtn = within(flavorRow).getAllByRole('button')[1];
+    const deleteBtn = within(flavorRow).getAllByRole('button')[2];
     await user.click(deleteBtn);
 
     expect(screen.getByRole('heading', { name: 'Eliminar sabor' })).toBeInTheDocument();

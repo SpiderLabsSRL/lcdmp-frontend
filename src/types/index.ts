@@ -155,8 +155,6 @@ export type StageResult = Order & { warnings?: string[] };
 // Product Types
 export interface Product {
   id: string;
-  // Masa del inventario horneado que genera su horneado y consume su armado
-  bakedProductId?: string | null;
   name: string;
   description: string;
   basePrice: number;

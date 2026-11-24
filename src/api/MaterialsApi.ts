@@ -9,7 +9,44 @@ export interface RecipeLine {
   quantity: number;
 }
 
+// Receta de tortas: solo armado (el horneado lo descuenta la receta de la masa)
 export type Recipe = Record<string, RecipeLine[]>;
+
+// Una etapa de un producto consume materia prima O masas horneadas, nunca las dos.
+export interface RecipeDoughLine {
+  bakedProductId: string;
+  name?: string;
+  quantity: number;
+}
+
+export interface StageRecipe {
+  source: 'materials' | 'doughs';
+  materials: RecipeLine[];
+  doughs: RecipeDoughLine[];
+}
+
+export type ProductRecipe = Record<string, StageRecipe>;
+
+// Receta de materia prima de una masa, para N porciones base. flavor null = receta del tipo de
+// masa; la receta de un sabor pisa esa base.
+export interface DoughRecipe {
+  id: string;
+  doughTypeId: string;
+  doughTypeName: string;
+  usesPortions: boolean;
+  usesFlavor: boolean;
+  isCake: boolean;
+  flavor: string | null;
+  basePortions: number | null;
+  materials: RecipeLine[];
+}
+
+export interface SaveDoughRecipeData {
+  doughTypeId: string;
+  flavor?: string | null;
+  basePortions?: number | null;
+  materials: { rawMaterialId: string; quantity: number }[];
+}
 
 export interface MaterialMovement {
   id: string;
@@ -36,10 +73,12 @@ export interface RegisterUsageData {
 }
 
 export interface IMaterialsApi {
-  getProductRecipe(productId: string): Promise<Recipe>;
-  saveProductRecipe(productId: string, recipe: Recipe): Promise<Recipe>;
+  getProductRecipe(productId: string): Promise<ProductRecipe>;
+  saveProductRecipe(productId: string, recipe: ProductRecipe): Promise<ProductRecipe>;
   getCakeRecipe(): Promise<Recipe>;
   saveCakeRecipe(recipe: Recipe): Promise<Recipe>;
+  getDoughRecipes(): Promise<DoughRecipe[]>;
+  saveDoughRecipe(data: SaveDoughRecipeData): Promise<DoughRecipe[]>;
   registerUsage(data: RegisterUsageData): Promise<void>;
   getMovements(filters?: { orderId?: string; rawMaterialId?: string; limit?: number }): Promise<MaterialMovement[]>;
 }
@@ -63,8 +102,19 @@ const toPayload = (recipe: Recipe): Recipe =>
     ])
   );
 
+// Por etapa se manda solo lo que esa etapa usa; name es de lectura.
+const toProductPayload = (recipe: ProductRecipe) =>
+  Object.fromEntries(
+    Object.entries(recipe).map(([stage, entry]) => [
+      stage,
+      entry.source === 'doughs'
+        ? { source: 'doughs', doughs: (entry.doughs || []).map(({ bakedProductId, quantity }) => ({ bakedProductId, quantity })) }
+        : { source: 'materials', materials: (entry.materials || []).map(({ rawMaterialId, quantity }) => ({ rawMaterialId, quantity })) },
+    ])
+  );
+
 export class MaterialsApi implements IMaterialsApi {
-  async getProductRecipe(productId: string): Promise<Recipe> {
+  async getProductRecipe(productId: string): Promise<ProductRecipe> {
     try {
       return unwrap(await api.get(`/materials/recipes/product/${productId}`), 'Error al obtener la receta');
     } catch (error: any) {
@@ -72,11 +122,31 @@ export class MaterialsApi implements IMaterialsApi {
     }
   }
 
-  async saveProductRecipe(productId: string, recipe: Recipe): Promise<Recipe> {
+  async saveProductRecipe(productId: string, recipe: ProductRecipe): Promise<ProductRecipe> {
     try {
-      return unwrap(await api.put(`/materials/recipes/product/${productId}`, toPayload(recipe)), 'Error al guardar la receta');
+      return unwrap(await api.put(`/materials/recipes/product/${productId}`, toProductPayload(recipe)), 'Error al guardar la receta');
     } catch (error: any) {
       return fail('saveProductRecipe', error);
+    }
+  }
+
+  async getDoughRecipes(): Promise<DoughRecipe[]> {
+    try {
+      return unwrap(await api.get('/materials/recipes/doughs'), 'Error al obtener las recetas de masas');
+    } catch (error: any) {
+      return fail('getDoughRecipes', error);
+    }
+  }
+
+  async saveDoughRecipe(data: SaveDoughRecipeData): Promise<DoughRecipe[]> {
+    try {
+      const payload = {
+        ...data,
+        materials: data.materials.map(({ rawMaterialId, quantity }) => ({ rawMaterialId, quantity })),
+      };
+      return unwrap(await api.put('/materials/recipes/dough', payload), 'Error al guardar la receta de la masa');
+    } catch (error: any) {
+      return fail('saveDoughRecipe', error);
     }
   }
 

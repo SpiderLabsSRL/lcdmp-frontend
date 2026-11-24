@@ -41,8 +41,6 @@ export interface IBakedApi {
 
   // Hornos: la masa que propone registrar al completar una línea de pedido
   getLineEntries(itemType: string, itemId: string): Promise<LineEntry[]>;
-  // Admin: masa que genera/consume un producto de catálogo (null = quitar el vínculo)
-  setProductLink(productId: string, link: BakedItemSpec | null): Promise<BakedItem | null>;
 }
 
 const fail = (error: any, fallback: string): never => {
@@ -111,10 +109,6 @@ export class BakedApi implements IBakedApi {
 
   getLineEntries(itemType: string, itemId: string) {
     return call<LineEntry[]>(api.get('/baked/line-entries', { params: { itemType, itemId } }), 'Error al obtener las masas de la línea');
-  }
-
-  setProductLink(productId: string, link: BakedItemSpec | null) {
-    return call<BakedItem | null>(api.put(`/baked/products/${productId}/link`, { link }), 'Error al vincular la masa del producto');
   }
 }
 

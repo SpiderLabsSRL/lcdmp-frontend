@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Loader2, Plus, X } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { NumberInput } from '@/components/ui/number-input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { RawMaterial } from '@/types';
-import type { Recipe } from '@/api/MaterialsApi';
+import { DoughLines, MaterialLines } from '@/components/Dialogs/RecipeLines';
+import type { BakedItem, RawMaterial } from '@/types';
+import type { ProductRecipe, StageRecipe } from '@/api/MaterialsApi';
 
 interface RecipeDialogProps {
   open: boolean;
@@ -15,16 +14,19 @@ interface RecipeDialogProps {
   description?: string;
   stages: { key: string; label: string }[];
   rawMaterials: RawMaterial[];
-  load: () => Promise<Recipe>;
-  save: (recipe: Recipe) => Promise<Recipe>;
+  doughs: BakedItem[];
+  load: () => Promise<ProductRecipe>;
+  save: (recipe: ProductRecipe) => Promise<ProductRecipe>;
 }
 
-type Draft = Record<string, { rawMaterialId: string; quantity: number }[]>;
+const emptyStage = (): StageRecipe => ({ source: 'materials', materials: [], doughs: [] });
 
-// Editor de receta por etapa: una lista de (materia prima, cantidad) por etapa.
-// Las cantidades están siempre en la unidad de la materia prima elegida.
-export default function RecipeDialog({ open, onOpenChange, title, description, stages, rawMaterials, load, save }: RecipeDialogProps) {
-  const [draft, setDraft] = useState<Draft>({});
+// Editor de la receta de un producto. Cada etapa usa materia prima O masas horneadas, nunca las
+// dos: así la lista no mezcla el inventario entero con el de masas.
+export default function RecipeDialog({
+  open, onOpenChange, title, description, stages, rawMaterials, doughs, load, save,
+}: RecipeDialogProps) {
+  const [draft, setDraft] = useState<ProductRecipe>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -35,15 +37,19 @@ export default function RecipeDialog({ open, onOpenChange, title, description, s
     load()
       .then((recipe) => {
         if (cancelled) return;
-        setDraft(Object.fromEntries(stages.map(({ key }) => [
-          key,
-          (recipe[key] || []).map(({ rawMaterialId, quantity }) => ({ rawMaterialId, quantity })),
-        ])));
+        setDraft(Object.fromEntries(stages.map(({ key }) => {
+          const entry = recipe[key];
+          return [key, {
+            source: entry?.source === 'doughs' ? 'doughs' : 'materials',
+            materials: (entry?.materials || []).map(({ rawMaterialId, quantity }) => ({ rawMaterialId, quantity })),
+            doughs: (entry?.doughs || []).map(({ bakedProductId, quantity }) => ({ bakedProductId, quantity })),
+          } as StageRecipe];
+        })));
       })
       .catch((error) => {
         console.error('Error loading recipe:', error);
         toast.error('Error al cargar la receta');
-        setDraft(Object.fromEntries(stages.map(({ key }) => [key, []])));
+        setDraft(Object.fromEntries(stages.map(({ key }) => [key, emptyStage()])));
       })
       .finally(() => !cancelled && setLoading(false));
     return () => { cancelled = true; };
@@ -51,17 +57,23 @@ export default function RecipeDialog({ open, onOpenChange, title, description, s
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const unitOf = (id: string) => rawMaterials.find(m => m.id === id)?.unit;
-
-  const updateLine = (stage: string, index: number, patch: Partial<Draft[string][number]>) =>
-    setDraft(d => ({ ...d, [stage]: d[stage].map((line, i) => (i === index ? { ...line, ...patch } : line)) }));
+  const patchStage = (stage: string, change: Partial<StageRecipe>) =>
+    setDraft(d => ({ ...d, [stage]: { ...(d[stage] || emptyStage()), ...change } }));
 
   const handleSave = async () => {
-    const lines = Object.values(draft).flat();
-    if (lines.some(l => !l.rawMaterialId || !(l.quantity > 0))) {
-      toast.error('Cada material necesita una materia prima y una cantidad mayor a 0');
-      return;
+    for (const { key, label } of stages) {
+      const entry = draft[key] || emptyStage();
+      if (entry.source === 'doughs') {
+        if (entry.doughs.some(l => !l.bakedProductId || !(l.quantity > 0))) {
+          toast.error(`${label}: cada masa necesita una masa elegida y una cantidad mayor a 0`);
+          return;
+        }
+      } else if (entry.materials.some(l => !l.rawMaterialId || !(l.quantity > 0))) {
+        toast.error(`${label}: cada material necesita una materia prima y una cantidad mayor a 0`);
+        return;
+      }
     }
+
     setSaving(true);
     try {
       await save(draft);
@@ -86,62 +98,53 @@ export default function RecipeDialog({ open, onOpenChange, title, description, s
           <p className="text-sm py-4 text-center">Cargando receta...</p>
         ) : (
           <div className="space-y-4">
-            {stages.map(({ key, label }) => (
-              <div key={key} className="border rounded-lg p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-sm">{label}</span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setDraft(d => ({ ...d, [key]: [...(d[key] || []), { rawMaterialId: '', quantity: 1 }] }))}
-                  >
-                    <Plus className="h-4 w-4 mr-1" /> Material
-                  </Button>
-                </div>
-
-                {(draft[key] || []).length === 0 && (
-                  <p className="text-xs text-muted-foreground">No consume materiales en esta etapa.</p>
-                )}
-
-                {(draft[key] || []).map((line, index) => (
-                  <div key={index} className="grid grid-cols-[1fr_110px_auto] gap-2 items-center">
-                    <Select value={line.rawMaterialId} onValueChange={(v) => updateLine(key, index, { rawMaterialId: v })}>
-                      <SelectTrigger className="text-sm">
-                        <SelectValue placeholder="Materia prima" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {rawMaterials.map(m => (
-                          <SelectItem key={m.id} value={m.id}>{m.name} ({m.unit})</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <div className="flex items-center gap-1">
-                      <NumberInput
-                        decimal
-                        min="0"
-                        step="any"
-                        value={line.quantity}
-                        onChange={(v) => updateLine(key, index, { quantity: v })}
-                        fallback={1}
-                        aria-label="Cantidad"
-                        className="text-sm"
-                      />
-                      <span className="text-xs text-muted-foreground w-8">{unitOf(line.rawMaterialId)}</span>
+            {stages.map(({ key, label }) => {
+              const entry = draft[key] || emptyStage();
+              return (
+                <div key={key} className="border rounded-lg p-3 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <span className="font-medium text-sm">{label}</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={entry.source === 'materials' ? 'default' : 'outline'}
+                        aria-pressed={entry.source === 'materials'}
+                        aria-label={`${label}: usar materia prima`}
+                        onClick={() => patchStage(key, { source: 'materials' })}
+                      >
+                        Materia prima
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={entry.source === 'doughs' ? 'default' : 'outline'}
+                        aria-pressed={entry.source === 'doughs'}
+                        aria-label={`${label}: usar masas horneadas`}
+                        onClick={() => patchStage(key, { source: 'doughs' })}
+                      >
+                        Masas horneadas
+                      </Button>
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive"
-                      onClick={() => setDraft(d => ({ ...d, [key]: d[key].filter((_, i) => i !== index) }))}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
                   </div>
-                ))}
-              </div>
-            ))}
+
+                  {entry.source === 'doughs' ? (
+                    <DoughLines
+                      lines={entry.doughs}
+                      doughs={doughs}
+                      onChange={lines => patchStage(key, { doughs: lines })}
+                    />
+                  ) : (
+                    <MaterialLines
+                      lines={entry.materials}
+                      rawMaterials={rawMaterials}
+                      onChange={lines => patchStage(key, { materials: lines })}
+                      emptyText="No consume materiales en esta etapa."
+                    />
+                  )}
+                </div>
+              );
+            })}
 
             <div className="flex flex-col sm:flex-row justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>

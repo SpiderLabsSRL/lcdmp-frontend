@@ -45,15 +45,12 @@ describe('BakedApi', () => {
     expect(mocked.post).toHaveBeenNthCalledWith(3, '/baked/items/i1/adjust', { delta: -2, notes: 'conteo' });
   });
 
-  it('asks the backend what a line of an order will move, and links products', async () => {
+  it('asks the backend what a line of an order will move', async () => {
     mocked.get.mockResolvedValue(ok([{ label: 'x', quantity: 2 }]));
-    mocked.put.mockResolvedValue(ok(null));
 
     expect(await bakedApi.getLineEntries('custom_cake', 'c1')).toEqual([{ label: 'x', quantity: 2 }]);
-    await bakedApi.setProductLink('p1', null);
 
     expect(mocked.get).toHaveBeenCalledWith('/baked/line-entries', { params: { itemType: 'custom_cake', itemId: 'c1' } });
-    expect(mocked.put).toHaveBeenCalledWith('/baked/products/p1/link', { link: null });
   });
 
   it('throws the backend message when success is false, and a connection error otherwise', async () => {
