@@ -1,6 +1,6 @@
 import api from '@/api/api';
 import { mockOrders } from '@/data/mockData';
-import { getWorkItemsAtStage } from '@/utils/workItems';
+import { getWorkItemsAtStage, STAGES_VISIBLE_AT } from '@/utils/workItems';
 import type { Order, OrderStatus, CustomCake, StageResult, WorkItemType } from '@/types';
 
 export interface IAssemblyApi {
@@ -20,7 +20,7 @@ export class MockAssemblyApi implements IAssemblyApi {
     await this.simulateNetworkDelay();
 
     return this.orders
-      .filter(o => getWorkItemsAtStage([o], 'assembling').length > 0)
+      .filter(o => getWorkItemsAtStage([o], STAGES_VISIBLE_AT.assembling).length > 0)
       .sort((a, b) => {
         const hoursA = this.getHoursUntilPickup(a.pickupDate);
         const hoursB = this.getHoursUntilPickup(b.pickupDate);
@@ -78,7 +78,7 @@ export class AssemblyApi implements IAssemblyApi {
   async getAssemblyOrders(signal?: AbortSignal): Promise<Order[]> {
     try {
       const params: any = {};
-      params.itemStage = 'assembling';
+      params.itemStage = STAGES_VISIBLE_AT.assembling.join(',');
 			params.limit = 50;
       
       const response = await api.get('/orders', { 

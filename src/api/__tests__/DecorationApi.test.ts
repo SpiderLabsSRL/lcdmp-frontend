@@ -31,7 +31,7 @@ describe('DecorationApi (real, axios-backed)', () => {
   });
 
   describe('getDecorationOrders', () => {
-    it('gets /orders filtered to itemStage=decorating with a limit and maps dates', async () => {
+    it('gets /orders filtered to its stage and the earlier ones, with a limit, and maps dates', async () => {
       const rawOrders = [
         { id: '1', pickupDate: '2026-03-05', createdAt: '2026-01-01T10:00:00.000Z' },
       ];
@@ -40,7 +40,7 @@ describe('DecorationApi (real, axios-backed)', () => {
       const result = await decorationApi.getDecorationOrders();
 
       expect(mockedApi.get).toHaveBeenCalledWith('/orders', {
-        params: { itemStage: 'decorating', limit: 50 },
+        params: { itemStage: 'pending,baking,assembling,decorating', limit: 50 },
         signal: undefined,
       });
       expect(result[0].pickupDate).toEqual(new Date(2026, 2, 5));
@@ -54,7 +54,7 @@ describe('DecorationApi (real, axios-backed)', () => {
       await decorationApi.getDecorationOrders(controller.signal);
 
       expect(mockedApi.get).toHaveBeenCalledWith('/orders', {
-        params: { itemStage: 'decorating', limit: 50 },
+        params: { itemStage: 'pending,baking,assembling,decorating', limit: 50 },
         signal: controller.signal,
       });
     });
@@ -136,10 +136,10 @@ describe('MockDecorationApi (in-memory)', () => {
     mockApi.setMockOrders(baseOrders);
   });
 
-  it('returns only orders with status decorating, sorted by nearest pickupDate first', async () => {
+  it('returns the orders of its stage and of the earlier ones, sorted by nearest pickupDate first', async () => {
     const orders = await mockApi.getDecorationOrders();
 
-    expect(orders.map(o => o.id)).toEqual(['2', '1']);
+    expect(orders.map(o => o.id)).toEqual(['3', '2', '1']);
   });
 
   it('completeItem returns the existing order without throwing', async () => {

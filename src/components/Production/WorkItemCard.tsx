@@ -3,9 +3,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MobileCard, useIsMobile } from '@/components/ui/responsive-table';
 import { Clock, CheckCircle } from 'lucide-react';
+import { statusConfig } from '@/types/consts';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import type { WorkItem } from '@/types';
+import type { ProductStatus, WorkItem } from '@/types';
 import { hoursUntilPickupDateTime, formatPickupDate } from '@/utils/DateUtils';
 
 interface WorkItemCardProps {
@@ -13,6 +14,9 @@ interface WorkItemCardProps {
   urgentHours: number;
   soonHours: number;
   completeLabel?: string;
+  // Etapa de la pantalla que muestra la tarjeta. Las líneas que todavía no
+  // llegaron a esta etapa se ven (para saber qué viene) pero no se completan.
+  activeStage?: ProductStatus;
   detail?: ReactNode;
   onComplete: (item: WorkItem) => void;
   onClick?: (item: WorkItem) => void;
@@ -28,11 +32,14 @@ const getUrgencyBadge = (hoursUntil: number, urgentHours: number, soonHours: num
 // producción (torta/producto/item de combo/extra). Cada pantalla de área
 // (Hornos/Armado/Decoración) le pasa su propio contenido de detalle vía
 // `detail`, sus umbrales de urgencia, y su acción de completar.
-export function WorkItemCard({ item, urgentHours, soonHours, completeLabel = 'Completar', detail, onComplete, onClick }: WorkItemCardProps) {
+export function WorkItemCard({ item, urgentHours, soonHours, completeLabel = 'Completar', activeStage, detail, onComplete, onClick }: WorkItemCardProps) {
   const isMobile = useIsMobile();
   const { order } = item;
   const hoursUntil = hoursUntilPickupDateTime(order);
   const urgency = getUrgencyBadge(hoursUntil, urgentHours, soonHours);
+  const stage = statusConfig[item.status];
+  const StageIcon = stage.icon;
+  const canComplete = !activeStage || item.status === activeStage;
 
   const handleComplete = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -50,7 +57,13 @@ export function WorkItemCard({ item, urgentHours, soonHours, completeLabel = 'Co
                 <span className="font-bold text-primary text-sm">#{order.orderNumber}</span>
                 <p className="text-sm mt-1">{order.customerName}</p>
               </div>
-              <Badge className={`${urgency.color} text-white text-xs`}>{urgency.label}</Badge>
+              <div className="flex flex-col items-end gap-1">
+                <Badge className={`${urgency.color} text-white text-xs`}>{urgency.label}</Badge>
+                <Badge variant="outline" className={`${stage.color} text-xs gap-1`}>
+                  <StageIcon className="h-3 w-3" />
+                  {stage.label}
+                </Badge>
+              </div>
             </div>
 
             <div className="text-sm bg-muted/50 p-2 rounded mt-2">
@@ -69,10 +82,12 @@ export function WorkItemCard({ item, urgentHours, soonHours, completeLabel = 'Co
                   {formatPickupDate(order.pickupDate)} {order.pickupTime}
                 </span>
               </div>
-              <Button size="sm" className="h-8 text-xs" onClick={handleComplete}>
-                {completeLabel}
-                <CheckCircle className="h-3 w-3 ml-1" />
-              </Button>
+              {canComplete && (
+                <Button size="sm" className="h-8 text-xs" onClick={handleComplete}>
+                  {completeLabel}
+                  <CheckCircle className="h-3 w-3 ml-1" />
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -91,6 +106,10 @@ export function WorkItemCard({ item, urgentHours, soonHours, completeLabel = 'Co
         <div className="flex items-center gap-2 mb-1 flex-wrap">
           <span className="font-medium">#{order.orderNumber}</span>
           <Badge className={urgency.color}>{urgency.label}</Badge>
+          <Badge variant="outline" className={`${stage.color} gap-1`}>
+            <StageIcon className="h-3 w-3" />
+            {stage.label}
+          </Badge>
         </div>
         <p className="text-sm">{order.customerName}</p>
         <div className="mt-2 space-y-1">
@@ -114,10 +133,12 @@ export function WorkItemCard({ item, urgentHours, soonHours, completeLabel = 'Co
         </p>
       </div>
 
-      <Button size="sm" onClick={handleComplete}>
-        <CheckCircle className="h-4 w-4 mr-2" />
-        {completeLabel}
-      </Button>
+      {canComplete && (
+        <Button size="sm" onClick={handleComplete}>
+          <CheckCircle className="h-4 w-4 mr-2" />
+          {completeLabel}
+        </Button>
+      )}
     </div>
   );
 }

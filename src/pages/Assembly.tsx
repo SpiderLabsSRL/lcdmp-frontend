@@ -8,7 +8,7 @@ import { differenceInHours } from 'date-fns';
 import { toast } from 'sonner';
 import { IAssemblyApi, defaultAssemblyApi } from '@/api/AssemblyApi';
 import { useOrdersSocket } from '@/hooks/useOrdersSocket';
-import { getWorkItemsAtStage } from '@/utils/workItems';
+import { getWorkItemsAtStage, STAGES_VISIBLE_AT } from '@/utils/workItems';
 import { WorkItemCard } from '@/components/Production/WorkItemCard';
 import { WorkItemDetailDialog, DesignPreview } from '@/components/Production/WorkItemDetailDialog';
 import type { Order, WorkItem } from '@/types';
@@ -26,11 +26,12 @@ export default function Assembly({ assemblyApi = defaultAssemblyApi }: AssemblyP
 
   // Socket en tiempo real — filtra pedidos con al menos una línea en 'assembling'
   const { orders, isConnected } = useOrdersSocket({
-    itemStageFilter: 'assembling',
+    itemStageFilter: STAGES_VISIBLE_AT.assembling,
     initialOrders,
   });
 
-  const assemblyItems = getWorkItemsAtStage(orders, 'assembling');
+  const visibleItems = getWorkItemsAtStage(orders, STAGES_VISIBLE_AT.assembling);
+  const assemblyItems = visibleItems.filter(item => item.status === 'assembling');
 
   const stats = {
     pendingItems: assemblyItems.length,
@@ -151,18 +152,19 @@ export default function Assembly({ assemblyApi = defaultAssemblyApi }: AssemblyP
           </CardHeader>
           {!isLoading ? (
             <CardContent className="px-4 pb-4 sm:px-6">
-              {assemblyItems.length === 0 ? (
+              {visibleItems.length === 0 ? (
                 <p className="text-center  py-8 text-sm">
                   No hay productos pendientes de armar
                 </p>
               ) : (
                 <div className="space-y-3 sm:space-y-4">
-                  {assemblyItems.map(item => (
+                  {visibleItems.map(item => (
                     <WorkItemCard
                       key={`${item.itemType}-${item.itemId}`}
                       item={item}
                       urgentHours={12}
                       soonHours={24}
+                      activeStage="assembling"
                       detail={renderDetail(item)}
                       onComplete={handleOpenCompleteDialog}
                       onClick={handleViewItem}

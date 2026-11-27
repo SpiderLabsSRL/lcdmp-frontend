@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getWorkItemsAtStage } from '../workItems';
+import { getWorkItemsAtStage, STAGES_VISIBLE_AT } from '../workItems';
 import type { Order, CustomCake, OrderItem, OrderCombo, ComboProduct } from '@/types';
 
 const makeCake = (overrides: Partial<CustomCake> = {}): CustomCake => ({
@@ -329,5 +329,32 @@ describe('getWorkItemsAtStage - mockups (maquetas)', () => {
   it('works for orders that came without the mockups field (older data)', () => {
     const order = { id: 'o1', customCakes: [], items: [] } as unknown as Order;
     expect(getWorkItemsAtStage([order], 'decorating')).toEqual([]);
+  });
+});
+
+describe('getWorkItemsAtStage - varias etapas a la vez', () => {
+  // Cada pantalla de área ve su etapa y las anteriores, para saber qué trabajo viene
+  const order = makeOrder({
+    items: [
+      makeItem({ id: 'i1', status: 'pending' }),
+      makeItem({ id: 'i2', status: 'baking' }),
+      makeItem({ id: 'i3', status: 'decorating' }),
+    ],
+  });
+
+  it('returns the lines of every requested stage', () => {
+    const result = getWorkItemsAtStage([order], STAGES_VISIBLE_AT.baking);
+
+    expect(result.map(i => i.status)).toEqual(['baking', 'pending']);
+  });
+
+  it('puts the lines of the own stage (the last one) first, so the actionable ones are on top', () => {
+    const result = getWorkItemsAtStage([order], STAGES_VISIBLE_AT.decorating);
+
+    expect(result.map(i => i.status)).toEqual(['decorating', 'baking', 'pending']);
+  });
+
+  it('leaves out the lines of later stages', () => {
+    expect(getWorkItemsAtStage([order], STAGES_VISIBLE_AT.baking).map(i => i.itemId)).not.toContain('i3');
   });
 });

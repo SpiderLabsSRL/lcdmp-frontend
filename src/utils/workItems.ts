@@ -87,8 +87,16 @@ export function getOrderWorkItems(order: Order): WorkItem[] {
   return items;
 }
 
-// Solo las líneas que están en la etapa pedida. Reutilizado por Hornos/Armado/Decoración
-// para renderizar una tarjeta por línea en vez de una tarjeta por pedido completo.
-export function getWorkItemsAtStage(orders: Order[], stage: ProductStatus): WorkItem[] {
-  return orders.flatMap(getOrderWorkItems).filter(item => item.status === stage);
+export const STAGES_VISIBLE_AT: Record<'baking' | 'assembling' | 'decorating', ProductStatus[]> = {
+  baking: ['pending', 'baking'],
+  assembling: ['pending', 'baking', 'assembling'],
+  decorating: ['pending', 'baking', 'assembling', 'decorating'],
+};
+
+export function getWorkItemsAtStage(orders: Order[], stage: ProductStatus | ProductStatus[]): WorkItem[] {
+  const stages = Array.isArray(stage) ? stage : [stage];
+  const items = orders.flatMap(getOrderWorkItems).filter(item => stages.includes(item.status));
+  return stages.length > 1
+    ? items.sort((a, b) => stages.indexOf(b.status) - stages.indexOf(a.status))
+    : items;
 }

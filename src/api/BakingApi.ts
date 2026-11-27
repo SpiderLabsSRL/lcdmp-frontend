@@ -1,6 +1,6 @@
 import api from '@/api/api';
 import { mockOrders } from '@/data/mockData';
-import { getWorkItemsAtStage } from '@/utils/workItems';
+import { getWorkItemsAtStage, STAGES_VISIBLE_AT } from '@/utils/workItems';
 import type { Order, OrderStatus, CustomCake, WorkItemType } from '@/types';
 
 export interface IBakingApi {
@@ -21,7 +21,7 @@ export class MockBakingApi implements IBakingApi {
     await this.simulateNetworkDelay();
 
     return this.orders
-      .filter(o => getWorkItemsAtStage([o], 'baking').length > 0)
+      .filter(o => getWorkItemsAtStage([o], STAGES_VISIBLE_AT.baking).length > 0)
       .sort((a, b) => {
         const hoursA = this.getHoursUntilPickup(a.pickupDate);
         const hoursB = this.getHoursUntilPickup(b.pickupDate);
@@ -75,7 +75,8 @@ export class BakingApi implements IBakingApi {
   async getBakingOrders(signal?: AbortSignal): Promise<Order[]> {
     try {
       const params: any = {};
-      params.itemStage = 'baking';
+      // Hornos también ve lo pendiente, para saber qué trabajo viene
+      params.itemStage = STAGES_VISIBLE_AT.baking.join(',');
 			params.limit = 50;
 
       const response = await api.get('/orders', {

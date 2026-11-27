@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { getWorkItemsAtStage, STAGES_VISIBLE_AT } from '@/utils/workItems';
 
 vi.mock('@/api/api', () => ({
   default: {
@@ -30,7 +31,7 @@ describe('BakingApi (real, axios-backed)', () => {
   });
 
   describe('getBakingOrders', () => {
-    it('gets /orders filtered to itemStage=baking with a limit and maps dates', async () => {
+    it('gets /orders filtered to its stage and the earlier ones, with a limit, and maps dates', async () => {
       const rawOrders = [
         { id: '1', pickupDate: '2026-03-05', createdAt: '2026-01-01T10:00:00.000Z' },
       ];
@@ -39,7 +40,7 @@ describe('BakingApi (real, axios-backed)', () => {
       const result = await bakingApi.getBakingOrders();
 
       expect(mockedApi.get).toHaveBeenCalledWith('/orders', {
-        params: { itemStage: 'baking', limit: 50 },
+        params: { itemStage: 'pending,baking', limit: 50 },
         signal: undefined,
       });
       expect(result[0].pickupDate).toEqual(new Date(2026, 2, 5));
@@ -53,7 +54,7 @@ describe('BakingApi (real, axios-backed)', () => {
       await bakingApi.getBakingOrders(controller.signal);
 
       expect(mockedApi.get).toHaveBeenCalledWith('/orders', {
-        params: { itemStage: 'baking', limit: 50 },
+        params: { itemStage: 'pending,baking', limit: 50 },
         signal: controller.signal,
       });
     });
@@ -138,18 +139,14 @@ describe('MockBakingApi (in-memory)', () => {
     mockApi = new MockBakingApi();
   });
 
-  it('returns only orders that have at least one item in the baking stage', async () => {
+  it('returns the orders with at least one line in its stage or in an earlier one', async () => {
     const orders = await mockApi.getBakingOrders();
 
     expect(orders.length).toBeGreaterThan(0);
-    expect(orders.every(o =>
-      o.customCakes.some(c => c.status === 'baking') ||
-      (o.items || []).some(i => i.status === 'baking') ||
-      (o.sweetTableCombos || []).some(combo => combo.products.some(p => p.status === 'baking')) ||
-      (o.sweetTableExtras || []).some(e => e.status === 'baking')
-    )).toBe(true);
+    // Hornos ve lo que se hornea y lo que viene (pendiente), nada más adelante
+    expect(orders.every(o => getWorkItemsAtStage([o], STAGES_VISIBLE_AT.baking).length > 0)).toBe(true);
     // Order '1' is the only mock order with a custom cake in the baking stage.
-    expect(orders.map(o => o.id)).toEqual(['1']);
+    expect(orders.map(o => o.id)).toContain('1');
   });
 
   it('updates the status of an existing order', async () => {

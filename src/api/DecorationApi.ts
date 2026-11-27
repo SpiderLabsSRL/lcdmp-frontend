@@ -1,6 +1,6 @@
 // src/api/DecorationApi.ts
 import api from '@/api/api';
-import { getWorkItemsAtStage } from '@/utils/workItems';
+import { getWorkItemsAtStage, STAGES_VISIBLE_AT } from '@/utils/workItems';
 import type { Order, WorkItemType } from '@/types';
 
 export interface IDecorationApi {
@@ -16,7 +16,7 @@ export class MockDecorationApi implements IDecorationApi {
     await new Promise(resolve => setTimeout(resolve, 300));
     
     // Filtrar órdenes que necesitan decoración
-    const decorationOrders = this.orders.filter(o => getWorkItemsAtStage([o], 'decorating').length > 0);
+    const decorationOrders = this.orders.filter(o => getWorkItemsAtStage([o], STAGES_VISIBLE_AT.decorating).length > 0);
     
     // Ordenar por urgencia (fecha de entrega más cercana)
     return decorationOrders.sort((a, b) => 
@@ -53,7 +53,8 @@ export class DecorationApi implements IDecorationApi {
   async getDecorationOrders(signal?: AbortSignal): Promise<Order[]> {
     try {
       const params: any = {};
-      params.itemStage = 'decorating';
+      // Decoración también ve las etapas anteriores, para saber qué viene
+      params.itemStage = STAGES_VISIBLE_AT.decorating.join(',');
 			params.limit = 50;
       
       const response = await api.get('/orders', { 

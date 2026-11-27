@@ -3,16 +3,15 @@ import { getSocket } from '@/lib/socket';
 import type { Order, ProductStatus } from '@/types';
 import { getLocalDateString, parseLocalDate } from '@/utils/DateUtils';
 
-const hasLineInStage = (order: Order, stage: ProductStatus): boolean => {
-  const cakes = order.customCakes || [];
-  const items = order.items || [];
-  const comboProducts = (order.sweetTableCombos || []).flatMap(c => c.products || []);
-  const extras = order.sweetTableExtras || [];
+const hasLineInStage = (order: Order, stage: ProductStatus | ProductStatus[]): boolean => {
+  const stages = Array.isArray(stage) ? stage : [stage];
+  const inStage = (line: { status?: ProductStatus }) => !!line.status && stages.includes(line.status);
   return (
-    cakes.some(c => c.status === stage) ||
-    items.some(i => i.status === stage) ||
-    comboProducts.some(p => p.status === stage) ||
-    extras.some(e => e.status === stage)
+    (order.customCakes || []).some(inStage) ||
+    (order.items || []).some(inStage) ||
+    (order.sweetTableCombos || []).flatMap(c => c.products || []).some(inStage) ||
+    (order.sweetTableExtras || []).some(inStage) ||
+    (order.mockups || []).some(inStage)
   );
 };
 
@@ -32,7 +31,7 @@ interface UseOrdersSocketOptions {
    * el status (derivado) del pedido completo. Mutuamente excluyente con
    * statusFilter.
    */
-  itemStageFilter?: ProductStatus;
+  itemStageFilter?: ProductStatus | ProductStatus[];
 
   /**
    * Tipo de pedido a excluir siempre, sin importar el filtro anterior — usado
@@ -144,7 +143,7 @@ export const useOrdersSocket = ({
     if (excludeStatusesRef.current?.includes(order.status)) {
       return false;
     }
-    if (itemStageFilterRef.current) {
+    if (itemStageFilterRef.current?.length) {
       return hasLineInStage(order, itemStageFilterRef.current);
     }
     return matchesFilter(order.status);

@@ -12,7 +12,7 @@ import { IBakedApi, defaultBakedApi } from '@/api/BakedApi';
 import { BakedBatchDialog } from '@/components/Inventory/BakedBatchDialog';
 import { CutDialog } from '@/components/Inventory/BakedItemDialogs';
 import { useOrdersSocket } from '@/hooks/useOrdersSocket';
-import { getWorkItemsAtStage } from '@/utils/workItems';
+import { getWorkItemsAtStage, STAGES_VISIBLE_AT } from '@/utils/workItems';
 import { WorkItemCard } from '@/components/Production/WorkItemCard';
 import { WorkItemDetailDialog, DesignPreview } from '@/components/Production/WorkItemDetailDialog';
 import { Badge } from '@/components/ui/badge';
@@ -39,11 +39,12 @@ export default function Baking({ bakingApi = defaultBakingApi, bakedApi = defaul
 
   // Socket en tiempo real — filtra pedidos con al menos una línea en 'baking'
   const { orders, isConnected } = useOrdersSocket({
-    itemStageFilter: 'baking',
+    itemStageFilter: STAGES_VISIBLE_AT.baking,
     initialOrders,
   });
 
-  const bakingItems = getWorkItemsAtStage(orders, 'baking');
+  const visibleItems = getWorkItemsAtStage(orders, STAGES_VISIBLE_AT.baking);
+  const bakingItems = visibleItems.filter(item => item.status === 'baking');
 
   const stats = {
     pendingItems: bakingItems.length,
@@ -260,18 +261,19 @@ export default function Baking({ bakingApi = defaultBakingApi, bakedApi = defaul
           </CardHeader>
           {!isLoading ? (
             <CardContent className="px-4 pb-4 sm:px-6">
-              {bakingItems.length === 0 ? (
+              {visibleItems.length === 0 ? (
                 <p className="text-center  py-8 text-sm">
                   No hay productos pendientes de hornear
                 </p>
               ) : (
                 <div className="space-y-3 sm:space-y-4">
-                  {bakingItems.map(item => (
+                  {visibleItems.map(item => (
                     <WorkItemCard
                       key={`${item.itemType}-${item.itemId}`}
                       item={item}
                       urgentHours={12}
                       soonHours={24}
+                      activeStage="baking"
                       detail={renderDetail(item)}
                       onComplete={handleOpenCompleteDialog}
                       onClick={handleViewItem}

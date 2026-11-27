@@ -10,7 +10,7 @@ import { differenceInHours } from 'date-fns';
 import { toast } from 'sonner';
 import { IDecorationApi, defaultDecorationApi } from '@/api/DecorationApi';
 import { useOrdersSocket } from '@/hooks/useOrdersSocket';
-import { getWorkItemsAtStage } from '@/utils/workItems';
+import { getWorkItemsAtStage, STAGES_VISIBLE_AT } from '@/utils/workItems';
 import { WorkItemCard } from '@/components/Production/WorkItemCard';
 import { WorkItemDetailDialog, DesignPreview } from '@/components/Production/WorkItemDetailDialog';
 import type { Order, WorkItem } from '@/types';
@@ -29,11 +29,12 @@ export default function Decoration({ decorationApi = defaultDecorationApi }: Dec
 
   // Socket en tiempo real — filtra pedidos con al menos una línea en 'decorating'
   const { orders, isConnected } = useOrdersSocket({
-    itemStageFilter: 'decorating',
+    itemStageFilter: STAGES_VISIBLE_AT.decorating,
     initialOrders,
   });
 
-  const decorationItems = getWorkItemsAtStage(orders, 'decorating');
+  const visibleItems = getWorkItemsAtStage(orders, STAGES_VISIBLE_AT.decorating);
+  const decorationItems = visibleItems.filter(item => item.status === 'decorating');
 
   useEffect(() => {
     loadDecorationOrders();
@@ -143,18 +144,19 @@ export default function Decoration({ decorationApi = defaultDecorationApi }: Dec
           </CardHeader>
           {!isLoading ? (
             <CardContent className="px-4 pb-4 sm:px-6">
-              {decorationItems.length === 0 ? (
+              {visibleItems.length === 0 ? (
                 <p className="text-center  py-8 text-sm">
                   No hay productos pendientes de decorar
                 </p>
               ) : (
                 <div className="space-y-3 sm:space-y-4">
-                  {decorationItems.map(item => (
+                  {visibleItems.map(item => (
                     <WorkItemCard
                       key={`${item.itemType}-${item.itemId}`}
                       item={item}
                       urgentHours={6}
                       soonHours={12}
+                      activeStage="decorating"
                       detail={renderDetail(item)}
                       onComplete={handleCompleteItem}
                       onClick={handleViewItem}

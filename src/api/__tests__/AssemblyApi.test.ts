@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { getWorkItemsAtStage, STAGES_VISIBLE_AT } from '@/utils/workItems';
 
 vi.mock('@/api/api', () => ({
   default: {
@@ -30,7 +31,7 @@ describe('AssemblyApi (real, axios-backed)', () => {
   });
 
   describe('getAssemblyOrders', () => {
-    it('gets /orders filtered to itemStage=assembling with a limit and maps dates', async () => {
+    it('gets /orders filtered to its stage and the earlier ones, with a limit, and maps dates', async () => {
       const rawOrders = [
         { id: '1', pickupDate: '2026-03-05', createdAt: '2026-01-01T10:00:00.000Z' },
       ];
@@ -39,7 +40,7 @@ describe('AssemblyApi (real, axios-backed)', () => {
       const result = await assemblyApi.getAssemblyOrders();
 
       expect(mockedApi.get).toHaveBeenCalledWith('/orders', {
-        params: { itemStage: 'assembling', limit: 50 },
+        params: { itemStage: 'pending,baking,assembling', limit: 50 },
         signal: undefined,
       });
       expect(result[0].pickupDate).toEqual(new Date(2026, 2, 5));
@@ -53,7 +54,7 @@ describe('AssemblyApi (real, axios-backed)', () => {
       await assemblyApi.getAssemblyOrders(controller.signal);
 
       expect(mockedApi.get).toHaveBeenCalledWith('/orders', {
-        params: { itemStage: 'assembling', limit: 50 },
+        params: { itemStage: 'pending,baking,assembling', limit: 50 },
         signal: controller.signal,
       });
     });
@@ -129,12 +130,14 @@ describe('MockAssemblyApi (in-memory)', () => {
     mockApi = new MockAssemblyApi();
   });
 
-  it('returns only orders that have at least one item in the assembling stage', async () => {
+  it('returns the orders with at least one line in its stage or in an earlier one', async () => {
     const orders = await mockApi.getAssemblyOrders();
 
     expect(orders.length).toBeGreaterThan(0);
+    // Armado ve también lo pendiente y lo que se está horneando
+    expect(orders.every(o => getWorkItemsAtStage([o], STAGES_VISIBLE_AT.assembling).length > 0)).toBe(true);
     // Order '4' is the only mock order with a custom cake in the assembling stage.
-    expect(orders.map(o => o.id)).toEqual(['4']);
+    expect(orders.map(o => o.id)).toContain('4');
   });
 
   it('updates the status of an existing order', async () => {

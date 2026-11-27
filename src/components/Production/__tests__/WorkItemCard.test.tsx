@@ -181,6 +181,44 @@ describe('WorkItemCard', () => {
       expect(screen.getByRole('button', { name: /completar/i })).toBeInTheDocument();
     });
 
+    it('shows the stage each line is in', () => {
+      render(
+        <WorkItemCard item={makeItem({ status: 'pending' })} urgentHours={2} soonHours={24} onComplete={vi.fn()} />
+      );
+
+      expect(screen.getByText('Pendiente')).toBeInTheDocument();
+    });
+
+    it('does not offer to complete a line that has not reached this screen stage yet', () => {
+      render(
+        <WorkItemCard
+          item={makeItem({ status: 'pending' })}
+          urgentHours={2}
+          soonHours={24}
+          activeStage="baking"
+          onComplete={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText('Pendiente')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /completar/i })).not.toBeInTheDocument();
+    });
+
+    it('offers to complete a line that is in this screen stage', () => {
+      render(
+        <WorkItemCard
+          item={makeItem({ status: 'baking' })}
+          urgentHours={2}
+          soonHours={24}
+          activeStage="baking"
+          onComplete={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText('Horneando')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /completar/i })).toBeInTheDocument();
+    });
+
     it('uses the custom completeLabel text when provided', () => {
       const item = makeItem();
       render(
